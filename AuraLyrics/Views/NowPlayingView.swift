@@ -382,7 +382,7 @@ struct NowPlayingView: View {
                         }
                     }
                     .padding(.top, 16)
-                    .padding(.bottom, 96) // 預留底部空間，避免被懸浮底欄遮蔽
+                    .padding(.bottom, 24)
                 }
             }
             // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續）
