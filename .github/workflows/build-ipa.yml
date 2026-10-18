@@ -10,9 +10,11 @@ on:
 jobs:
   build:
     runs-on: macos-15
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode Version
         run: sudo xcode-select -s /Applications/Xcode_16.0.app
@@ -55,7 +57,7 @@ jobs:
           cd ..
 
       - name: Upload IPAs as Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: AuraLyrics-IPAs
           path: ipa_output/*.ipa
