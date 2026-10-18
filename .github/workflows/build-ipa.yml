@@ -37,28 +37,18 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Package IPAs (Full & LiveContainer)
+      - name: Package Unified IPA
         run: |
           mkdir -p ipa_output
-
-          # 1. 打包完整版（含動態島 Widget Extension + PiP 懸浮窗，適合直接側載或 TrollStore）
-          mkdir -p package_full/Payload
-          cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package_full/Payload/
-          cd package_full
-          zip -r ../ipa_output/AuraLyrics-Full.ipa Payload
+          mkdir -p package/Payload
+          cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package/Payload/
+          cd package
+          zip -r ../ipa_output/AuraLyrics.ipa Payload
           cd ..
 
-          # 2. 打包 LiveContainer 專用單體版（移除 PlugIns 目錄，免消耗額外 App ID，極度純淨相容）
-          mkdir -p package_lc/Payload
-          cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package_lc/Payload/
-          rm -rf package_lc/Payload/AuraLyrics.app/PlugIns
-          cd package_lc
-          zip -r ../ipa_output/AuraLyrics-LiveContainer.ipa Payload
-          cd ..
-
-      - name: Upload IPAs as Artifacts
+      - name: Upload IPA as Artifact
         uses: actions/upload-artifact@v5
         with:
-          name: AuraLyrics-IPAs
-          path: ipa_output/*.ipa
+          name: AuraLyrics-IPA
+          path: ipa_output/AuraLyrics.ipa
           retention-days: 14
