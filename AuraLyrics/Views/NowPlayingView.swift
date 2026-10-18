@@ -2,7 +2,7 @@ import SwiftUI
 import MediaPlayer
 import UIKit
 
-/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + 頂部置中 Liquid Glass 雙鍵靈動膠囊）
+/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + 右上角精準置中 Liquid Glass 雙鍵靈動膠囊）
 struct NowPlayingView: View {
     @ObservedObject var monitor = AppleMusicMonitor.shared
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
@@ -31,9 +31,9 @@ struct NowPlayingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                // 頂部中央：置中 Liquid Glass 雙鍵控制膠囊 (PiP 懸浮窗 + 更多操作選單)
-                ToolbarItem(placement: .principal) {
-                    centeredActionCapsule
+                // 右上角：雙鍵精準置中 Liquid Glass 膠囊 (PiP 懸浮窗 + 更多操作選單)
+                ToolbarItem(placement: .topBarTrailing) {
+                    topTrailingActionCapsule
                 }
             }
             .sheet(isPresented: $showSearchSheet) {
@@ -91,35 +91,38 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 頂部置中 Liquid Glass 雙鍵控制膠囊 (PiP 懸浮窗 + 更多操作選單)
-    private var centeredActionCapsule: some View {
+    // MARK: - 右上角雙鍵精準置中 Liquid Glass 膠囊 (PiP 懸浮窗 + 更多操作選單)
+    private var topTrailingActionCapsule: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
+        let buttonSize: CGFloat = 34
+        let capsuleHeight: CGFloat = 42
 
-        return HStack(spacing: 8) {
-            // 左側：畫中畫 (PiP) 小圓按鈕
+        return HStack(spacing: 6) {
+            // 左側：畫中畫 (PiP) 小圓按鈕（幾何中心對齊）
             Button {
                 pipEngine.togglePiP()
             } label: {
                 ZStack {
                     Circle()
                         .fill(isPiPOn ? Color.pink : Color.white.opacity(0.12))
-                        .frame(width: 38, height: 38)
+                        .frame(width: buttonSize, height: buttonSize)
                         .overlay(
                             Circle()
-                                .strokeBorder(Color.white.opacity(isPiPOn ? 0.35 : 0.16), lineWidth: 0.8)
+                                .strokeBorder(Color.white.opacity(isPiPOn ? 0.35 : 0.16), lineWidth: 0.75)
                         )
 
                     Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                 }
+                .frame(width: buttonSize, height: buttonSize)
                 .contentShape(Circle())
             }
-            .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
+            .buttonStyle(.plain)
             .sensoryFeedback(.impact(weight: .medium), trigger: isPiPOn)
             .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
 
-            // 右側：更多操作選單小圓按鈕
+            // 右側：更多操作選單小圓按鈕（幾何中心對齊）
             Menu {
                 // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
                 Button {
@@ -165,23 +168,24 @@ struct NowPlayingView: View {
                 ZStack {
                     Circle()
                         .fill(Color.white.opacity(0.12))
-                        .frame(width: 38, height: 38)
+                        .frame(width: buttonSize, height: buttonSize)
                         .overlay(
                             Circle()
-                                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
+                                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.75)
                         )
 
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
                 }
+                .frame(width: buttonSize, height: buttonSize)
                 .contentShape(Circle())
             }
-            .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
+            .buttonStyle(.plain)
             .accessibilityLabel("更多歌詞操作選項")
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 4)
+        .frame(height: capsuleHeight)
         .background {
             if reduceTransparency {
                 Capsule(style: .continuous)
@@ -215,7 +219,7 @@ struct NowPlayingView: View {
                 }
             }
         }
-        .shadow(color: .black.opacity(0.20), radius: 10, x: 0, y: 4)
+        .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
     }
 
     // MARK: - 沉浸式氛圍背景 (Ambient Backdrop)
