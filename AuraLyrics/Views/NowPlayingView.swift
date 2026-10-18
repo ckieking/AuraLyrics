@@ -174,14 +174,15 @@ struct NowPlayingView: View {
     private var engineActionButtons: some View {
         HStack(spacing: 8) {
             // PiP 畫中畫按鈕
+            let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
             Button {
                 pipEngine.togglePiP()
             } label: {
-                Image(systemName: pipEngine.isPiPActive ? "pip.exit" : "pip.enter")
+                Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
                     .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(pipEngine.isPiPActive ? .white : .primary)
+                    .foregroundColor(isPiPOn ? .white : .primary)
                     .frame(width: 40, height: 40)
-                    .background(pipEngine.isPiPActive ? Color.accentColor : Color(.tertiarySystemFill))
+                    .background(isPiPOn ? Color.accentColor : Color(.tertiarySystemFill))
                     .clipShape(Circle())
             }
 

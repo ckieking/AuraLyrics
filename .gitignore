@@ -13,3 +13,6 @@ xcuserdata/
 ipa_output/
 *.ipa
 Payload/
+
+# Agent & Local tools
+.agents/

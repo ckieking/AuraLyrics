@@ -8,7 +8,7 @@
 
 1. **雙引擎顯示架構 (Dual-Engine Display Architecture)**
    - **原生動態島與即時動態 (`ActivityKit` + `WidgetKit`)**：在直接側載安裝時，提供 iPhone 動態島（Dynamic Island 緊湊/展開）、鎖定畫面與 StandBy 待機模式毫秒級同步歌詞。
-   - **PiP 畫中畫懸浮歌詞膠囊 (`AVPictureInPictureController` + `AVSampleBufferDisplayLayer`)**：完全在主程式執行檔內渲染，不依賴獨立 App Extension。在 **LiveContainer** 環境中自動啟用，跨 App、主畫面懸浮顯示，隨手掌握歌詞。
+   - **PiP 畫中畫懸浮歌詞膠囊 (`AVPictureInPictureController` + 原生 View)**：完全在主程式執行檔內渲染，不依賴獨立 App Extension，無影片控制條且不黑屏。在 **LiveContainer** 與側載環境中均可無縫運作，跨 App、主畫面懸浮顯示，隨手掌握歌詞。
 2. **Apple Human Interface Guidelines (HIG) 原生設計標準**
    - 雙層材質紀律（功能導覽層 Liquid Glass 與邊緣捲動模糊；內容層採用原生動態語義色彩）。
    - SF Pro 動態字級 (`Dynamic Type`)、高對比度文字與 WCAG AA 無障礙標準支援。
