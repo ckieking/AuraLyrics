@@ -98,24 +98,17 @@ public struct AuraLyricsLiveActivityWidget: Widget {
     }
 }
 
-// 緊湊 Trailing 視圖（適配橫向受限寬度）
+// 緊湊 Trailing 視圖
 struct CompactTrailingView: View {
-    @Environment(\.isDynamicIslandLimitedInWidth) var isLimited
     let currentLine: String
 
     var body: some View {
-        if isLimited {
-            Image(systemName: "waveform")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundColor(.white)
-                .padding(.trailing, 4)
-        } else {
-            Text(currentLine)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundColor(.white)
-                .lineLimit(1)
-                .padding(.trailing, 4)
-        }
+        Text(currentLine)
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .foregroundColor(.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.trailing, 4)
     }
 }
 
