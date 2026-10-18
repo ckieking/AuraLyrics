@@ -2,7 +2,7 @@ import SwiftUI
 import MediaPlayer
 import UIKit
 
-/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + 右上角精準置中 Liquid Glass 雙鍵靈動膠囊）
+/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + 右上角獨立放大 Liquid Glass 雙圓鈕）
 struct NowPlayingView: View {
     @ObservedObject var monitor = AppleMusicMonitor.shared
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
@@ -31,9 +31,12 @@ struct NowPlayingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                // 右上角：雙鍵精準置中 Liquid Glass 膠囊 (PiP 懸浮窗 + 更多操作選單)
+                // 右上角：兩顆獨立放大的 Liquid Glass 圓形按鈕（按鈕即為最底層，無外層膠囊底襯）
                 ToolbarItem(placement: .topBarTrailing) {
-                    topTrailingActionCapsule
+                    HStack(spacing: 10) {
+                        pipIndependentButton
+                        moreMenuIndependentButton
+                    }
                 }
             }
             .sheet(isPresented: $showSearchSheet) {
@@ -91,135 +94,85 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 右上角雙鍵精準置中 Liquid Glass 膠囊 (PiP 懸浮窗 + 更多操作選單)
-    private var topTrailingActionCapsule: some View {
+    // MARK: - 右上角獨立小圓按鈕：畫中畫 (PiP 懸浮窗，直徑 40pt，按鈕即為最底層)
+    private var pipIndependentButton: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
-        let buttonSize: CGFloat = 34
-        let capsuleHeight: CGFloat = 42
+        let buttonDiameter: CGFloat = 40
 
-        return HStack(spacing: 6) {
-            // 左側：畫中畫 (PiP) 小圓按鈕（幾何中心對齊）
+        return Button {
+            pipEngine.togglePiP()
+        } label: {
+            ZStack {
+                Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(isPiPOn ? .white : .primary)
+            }
+            .frame(width: buttonDiameter, height: buttonDiameter)
+            .liquidGlassCircle(isActive: isPiPOn, activeTint: .pink)
+            .contentShape(Circle())
+        }
+        .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
+        .sensoryFeedback(.impact(weight: .medium), trigger: isPiPOn)
+        .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
+    }
+
+    // MARK: - 右上角獨立小圓按鈕：更多操作選單 (直徑 40pt，按鈕即為最底層)
+    private var moreMenuIndependentButton: some View {
+        let buttonDiameter: CGFloat = 40
+
+        return Menu {
+            // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
             Button {
-                pipEngine.togglePiP()
+                showTranslation.toggle()
             } label: {
-                ZStack {
-                    Circle()
-                        .fill(isPiPOn ? Color.pink : Color.white.opacity(0.12))
-                        .frame(width: buttonSize, height: buttonSize)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(Color.white.opacity(isPiPOn ? 0.35 : 0.16), lineWidth: 0.75)
-                        )
-
-                    Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
+                if showTranslation {
+                    Label("雙語歌詞", systemImage: "checkmark")
+                } else {
+                    Text("雙語歌詞")
                 }
-                .frame(width: buttonSize, height: buttonSize)
-                .contentShape(Circle())
             }
-            .buttonStyle(.plain)
-            .sensoryFeedback(.impact(weight: .medium), trigger: isPiPOn)
-            .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
 
-            // 右側：更多操作選單小圓按鈕（幾何中心對齊）
-            Menu {
-                // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
+            // 動態島開關（在非 LiveContainer 環境下提供）
+            if !envDetector.isLiveContainer {
                 Button {
-                    showTranslation.toggle()
-                } label: {
-                    if showTranslation {
-                        Label("雙語歌詞", systemImage: "checkmark")
+                    if liveActivityEngine.isActivityActive {
+                        liveActivityEngine.endActivity()
                     } else {
-                        Text("雙語歌詞")
+                        liveActivityEngine.startActivity(track: monitor.currentTrack)
                     }
-                }
-
-                // 動態島開關（在非 LiveContainer 環境下提供）
-                if !envDetector.isLiveContainer {
-                    Button {
-                        if liveActivityEngine.isActivityActive {
-                            liveActivityEngine.endActivity()
-                        } else {
-                            liveActivityEngine.startActivity(track: monitor.currentTrack)
-                        }
-                    } label: {
-                        Label(
-                            liveActivityEngine.isActivityActive ? "結束動態島同步" : "啟動動態島同步",
-                            systemImage: liveActivityEngine.isActivityActive ? "waveform.badge.minus" : "waveform.badge.plus"
-                        )
-                    }
-                }
-
-                Divider()
-
-                Button {
-                    showSearchSheet = true
                 } label: {
-                    Label("線上搜尋歌詞", systemImage: "magnifyingglass")
-                }
-
-                Button {
-                    showFileImporter = true
-                } label: {
-                    Label("匯入本地 .lrc", systemImage: "square.and.arrow.down")
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .fill(Color.white.opacity(0.12))
-                        .frame(width: buttonSize, height: buttonSize)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.75)
-                        )
-
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .frame(width: buttonSize, height: buttonSize)
-                .contentShape(Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("更多歌詞操作選項")
-        }
-        .padding(.horizontal, 4)
-        .frame(height: capsuleHeight)
-        .background {
-            if reduceTransparency {
-                Capsule(style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.75)
+                    Label(
+                        liveActivityEngine.isActivityActive ? "結束動態島同步" : "啟動動態島同步",
+                        systemImage: liveActivityEngine.isActivityActive ? "waveform.badge.minus" : "waveform.badge.plus"
                     )
-            } else {
-                ZStack {
-                    Capsule(style: .continuous)
-                        .fill(.ultraThinMaterial)
-
-                    Capsule(style: .continuous)
-                        .fill(Color.black.opacity(0.35))
-
-                    Capsule(style: .continuous)
-                        .strokeBorder(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.30),
-                                    Color.white.opacity(0.08),
-                                    Color.white.opacity(0.02),
-                                    Color.white.opacity(0.16)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 0.8
-                        )
                 }
             }
+
+            Divider()
+
+            Button {
+                showSearchSheet = true
+            } label: {
+                Label("線上搜尋歌詞", systemImage: "magnifyingglass")
+            }
+
+            Button {
+                showFileImporter = true
+            } label: {
+                Label("匯入本地 .lrc", systemImage: "square.and.arrow.down")
+            }
+        } label: {
+            ZStack {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primary)
+            }
+            .frame(width: buttonDiameter, height: buttonDiameter)
+            .liquidGlassCircle(isActive: false)
+            .contentShape(Circle())
         }
-        .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
+        .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
+        .accessibilityLabel("更多歌詞操作選項")
     }
 
     // MARK: - 沉浸式氛圍背景 (Ambient Backdrop)
