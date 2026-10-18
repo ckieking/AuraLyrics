@@ -201,42 +201,48 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
 // MARK: - AVPictureInPictureControllerDelegate
 extension PiPLyricsEngine: AVPictureInPictureControllerDelegate {
-    public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        isPiPActive = true
+    nonisolated public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor in
+            self.isPiPActive = true
+        }
     }
 
-    public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
-        isPiPActive = false
+    nonisolated public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor in
+            self.isPiPActive = false
+        }
     }
 
-    public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
-        isPiPActive = false
-        print("[PiPLyricsEngine] 啟動失敗: \(error.localizedDescription)")
+    nonisolated public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        Task { @MainActor in
+            self.isPiPActive = false
+            print("[PiPLyricsEngine] 啟動失敗: \(error.localizedDescription)")
+        }
     }
 }
 
 // MARK: - AVPictureInPictureSampleBufferPlaybackDelegate
 extension PiPLyricsEngine: AVPictureInPictureSampleBufferPlaybackDelegate {
-    public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
+    nonisolated public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {
         // 使用者點擊 PiP 暫停/播放時同調
     }
 
-    public func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
-        let duration = AppleMusicMonitor.shared.currentTrack.duration
-        let current = AppleMusicMonitor.shared.currentPlaybackTimeSec
+    nonisolated public func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
+        let duration = MainActor.assumeIsolated { AppleMusicMonitor.shared.currentTrack.duration }
+        let current = MainActor.assumeIsolated { AppleMusicMonitor.shared.currentPlaybackTimeSec }
         return CMTimeRange(
             start: CMTime(seconds: current, preferredTimescale: 600),
             duration: CMTime(seconds: max(duration, 1), preferredTimescale: 600)
         )
     }
 
-    public func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
-        return !AppleMusicMonitor.shared.isPlaying
+    nonisolated public func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
+        return MainActor.assumeIsolated { !AppleMusicMonitor.shared.isPlaying }
     }
 
-    public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) {}
+    nonisolated public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) {}
 
-    public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, skipByInterval skipInterval: CMTime, completion: @escaping () -> Void) {
+    nonisolated public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, skipByInterval skipInterval: CMTime, completion: @escaping () -> Void) {
         completion()
     }
 }

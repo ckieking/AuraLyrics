@@ -10,7 +10,7 @@ public final class AppleMusicMonitor: ObservableObject {
 
     @Published public private(set) var currentTrack: TrackInfo = .placeholder
     @Published public private(set) var currentLyrics: SyncedLyrics = .empty
-    @Published public private(set) var currentLineIndex: Int? = nil
+    @Published public var currentLineIndex: Int? = nil
     @Published public private(set) var isPlaying: Bool = false
     @Published public private(set) var playbackProgress: Double = 0.0
     @Published public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
