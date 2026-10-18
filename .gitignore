@@ -1,0 +1,15 @@
+# Xcode & Swift
+.DS_Store
+*/.DS_Store
+build/
+DerivedData/
+*.xcuserstate
+project.xcworkspace/
+*.xcuserdata/
+xcuserdata/
+*.xcarchive
+
+# Output IPAs
+ipa_output/
+*.ipa
+Payload/
