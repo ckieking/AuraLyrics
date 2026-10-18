@@ -2,7 +2,7 @@ import SwiftUI
 import MediaPlayer
 import UIKit
 
-/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + Liquid Glass 懸浮曲目島與智能跟隨）
+/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + Liquid Glass 頂部控件與智能跟隨）
 struct NowPlayingView: View {
     @ObservedObject var monitor = AppleMusicMonitor.shared
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
@@ -28,13 +28,31 @@ struct NowPlayingView: View {
                 // MARK: - 內容中層：可滾動穿透之歌詞清單
                 lyricsScrollView
             }
-            .navigationTitle("正在播放")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
+                // 左上角：單層 Liquid Glass 長條膠囊 LiveContainer 環境標籤
                 ToolbarItem(placement: .topBarLeading) {
                     environmentBadge
                 }
+
+                // 中央：當前曲目名稱與歌手
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text(monitor.currentTrack.title.isEmpty ? "正在播放" : monitor.currentTrack.title)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundColor(.primary)
+                            .lineLimit(1)
+                        if !monitor.currentTrack.artist.isEmpty {
+                            Text(monitor.currentTrack.artist)
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+
+                // 右上角：獨立 Liquid Glass 小圓按鈕（PiP 懸浮窗與更多操作選單）
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 10) {
                         // 需求 2：獨立右上角懸浮窗小圓按鈕 (Liquid Glass Circle)
@@ -44,13 +62,6 @@ struct NowPlayingView: View {
                         moreMenuCircularButton
                     }
                 }
-            }
-            // MARK: - 功能浮動層：頂部 Liquid Glass 懸浮曲目島
-            .safeAreaInset(edge: .top) {
-                compactTrackHeader
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-                    .padding(.bottom, 6)
             }
             .sheet(isPresented: $showSearchSheet) {
                 LyricsSearchSheet(currentTrack: monitor.currentTrack) { selectedLyrics in
@@ -107,7 +118,7 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 右上角獨立小圓按鈕 (PiP 懸浮窗)
+    // MARK: - 右上角獨立小圓按鈕 (PiP 懸浮窗，Liquid Glass Circle)
     private var pipCircularButton: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
         return Button {
@@ -127,7 +138,7 @@ struct NowPlayingView: View {
         .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
     }
 
-    // MARK: - 右上角更多操作選單小圓按鈕
+    // MARK: - 右上角更多操作選單小圓按鈕 (Liquid Glass Circle)
     private var moreMenuCircularButton: some View {
         Menu {
             // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
@@ -215,68 +226,6 @@ struct NowPlayingView: View {
             Color(.systemBackground)
                 .ignoresSafeArea()
         }
-    }
-
-    // MARK: - 頂部 Liquid Glass 懸浮曲目島 (Floating Track Capsule)
-    private var compactTrackHeader: some View {
-        HStack(spacing: 12) {
-            // 封面圖示
-            if let artworkData = monitor.currentTrack.artworkData,
-               let uiImage = UIImage(data: artworkData) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: 44, height: 44)
-                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
-                    .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .fill(Color(.tertiarySystemFill))
-                        .frame(width: 44, height: 44)
-                    Image(systemName: "music.note")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundColor(.pink)
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(monitor.currentTrack.title.isEmpty ? "未在播放音樂" : monitor.currentTrack.title)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
-
-                Text(monitor.currentTrack.artist.isEmpty ? "開啟 Apple Music 播放歌曲" : monitor.currentTrack.artist)
-                    .font(.system(.caption, design: .rounded))
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-
-            // 來源標籤
-            HStack(spacing: 4) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.pink)
-                if !monitor.currentLyrics.source.isEmpty && monitor.currentLyrics.source != "None" {
-                    Text(monitor.currentLyrics.source)
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("AuraLyrics")
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(.secondary)
-                }
-            }
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(Color.primary.opacity(0.06))
-            .clipShape(Capsule())
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .liquidGlassCard(cornerRadius: 18)
     }
 
     // MARK: - 中央滾動歌詞清單 (Scroll-Through Lyrics with Apple Music Smart Follow)
@@ -420,20 +369,49 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 環境標籤
+    // MARK: - 左上角環境標籤（確保只有單一層 Liquid Glass 長條膠囊包裹）
     private var environmentBadge: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Circle()
                 .fill(envDetector.isLiveContainer ? Color.orange : Color.green)
                 .frame(width: 7, height: 7)
                 .accessibilityHidden(true)
             Text(envDetector.isLiveContainer ? "LiveContainer" : "獨立側載")
-                .font(.system(.caption, design: .rounded).weight(.medium))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundColor(.secondary)
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .liquidGlassCapsule()
+        .padding(.horizontal, 11)
+        .padding(.vertical, 6)
+        .background {
+            if reduceTransparency {
+                Capsule(style: .continuous)
+                    .fill(Color(.secondarySystemBackground))
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.75)
+                    )
+            } else {
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.35),
+                                        Color.white.opacity(0.08),
+                                        Color.white.opacity(0.02),
+                                        Color.white.opacity(0.16)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                ),
+                                lineWidth: 0.8
+                            )
+                    )
+            }
+        }
+        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(envDetector.isLiveContainer ? "運行於 LiveContainer 容器環境" : "運行於原生獨立側載環境")
     }
