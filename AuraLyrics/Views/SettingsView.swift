@@ -7,6 +7,7 @@ struct SettingsView: View {
     @ObservedObject var pipEngine = PiPLyricsEngine.shared
     @ObservedObject var keepAlive = BackgroundKeepAliveManager.shared
     @ObservedObject var pipVM = PiPLyricsViewModel.shared
+    @ObservedObject var musicMonitor = AppleMusicMonitor.shared
 
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
@@ -52,6 +53,68 @@ struct SettingsView: View {
                     Text("畫中畫 (PiP) 懸浮視窗")
                 } footer: {
                     Text("切換至主畫面或其他 App 時，將自動顯示微縮懸浮動態島歌詞視窗；可隨時拖曳與縮放。")
+                }
+
+                // MARK: - 歌詞同步時間微調（全域共用）
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("目前全域延遲微調")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(String(format: "%+.1f 秒", Double(musicMonitor.globalOffsetMs) / 1000.0))
+                                .font(.system(.subheadline, design: .monospaced).weight(.bold))
+                                .foregroundColor(musicMonitor.globalOffsetMs == 0 ? .secondary : .pink)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color(.tertiarySystemFill))
+                                .clipShape(Capsule())
+                        }
+
+                        HStack(spacing: 10) {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                musicMonitor.adjustGlobalOffset(byMs: -500)
+                            } label: {
+                                Text("-0.5s")
+                                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 38)
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("所有歌曲歌詞延後 0.5 秒")
+
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                musicMonitor.resetGlobalOffset()
+                            } label: {
+                                Text("重設歸零")
+                                    .font(.system(.subheadline, design: .rounded).weight(.medium))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 38)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.secondary)
+                            .accessibilityLabel("重設全域歌詞延遲為零秒")
+
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                musicMonitor.adjustGlobalOffset(byMs: 500)
+                            } label: {
+                                Text("+0.5s")
+                                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 38)
+                            }
+                            .buttonStyle(.bordered)
+                            .accessibilityLabel("所有歌曲歌詞提前 0.5 秒")
+                        }
+                    }
+                    .padding(.vertical, 4)
+                } header: {
+                    Text("歌詞同步時間微調（全域共用）")
+                } footer: {
+                    Text("所有歌曲共用此微調時間，正值代表歌詞提前唱出、負值代表延後；無須為每首歌分別微調。")
                 }
 
                 // MARK: - 系統與環境診斷（圖示形狀 + 狀態文字 + 色彩，符合無障礙規範）
