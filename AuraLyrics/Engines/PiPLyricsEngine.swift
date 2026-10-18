@@ -14,42 +14,46 @@ public final class PiPLyricsViewModel: ObservableObject {
     @Published public var theme: PiPVisualTheme = .dynamicIsland
 }
 
-// MARK: - PiP 懸浮歌詞原生畫面（Apple HIG 深色膠囊設計，非影片格式）
+// MARK: - PiP 懸浮歌詞原生畫面（Apple HIG 極致深黑動態島膠囊設計）
 public struct PiPLyricsView: View {
-    @ObservedObject var vm = PiPLyricsViewModel.shared
+    @ObservedObject var vm: PiPLyricsViewModel
+
+    public init(viewModel: PiPLyricsViewModel = .shared) {
+        self.vm = viewModel
+    }
 
     public var body: some View {
         ZStack {
-            // 背景底層：深黑高對比圓角膠囊 (呼應動態島)
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
+            // 背景底層：深黑高對比圓角膠囊 (呼應動態島同心幾何)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.black)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
                 )
 
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 // 頂部進度條
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule()
-                            .fill(Color.white.opacity(0.18))
-                            .frame(height: 3)
+                            .fill(Color.white.opacity(0.15))
+                            .frame(height: 2.5)
                         Capsule()
                             .fill(Color.pink)
-                            .frame(width: geo.size.width * max(0.02, min(vm.progress, 1.0)), height: 3)
+                            .frame(width: geo.size.width * max(0.02, min(vm.progress, 1.0)), height: 2.5)
                     }
                 }
-                .frame(height: 3)
+                .frame(height: 2.5)
                 .padding(.horizontal, 14)
                 .padding(.top, 8)
 
                 Spacer(minLength: 0)
 
                 // 主歌詞行 (高對比加粗)
-                HStack(spacing: 8) {
+                HStack(spacing: 7) {
                     Image(systemName: "music.note")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.pink)
 
                     Text(vm.primaryLine)
@@ -62,11 +66,11 @@ public struct PiPLyricsView: View {
                 .padding(.horizontal, 14)
 
                 // 次要行（雙語翻譯或下一句預覽）
-                if let secondary = vm.secondaryLine, !secondary.isEmpty && vm.theme != .minimalLine {
+                if let secondary = vm.secondaryLine, !secondary.isEmpty {
                     HStack {
                         Text(secondary)
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(Color.white.opacity(0.75))
+                            .foregroundColor(Color.white.opacity(0.72))
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                         Spacer()

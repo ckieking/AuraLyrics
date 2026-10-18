@@ -24,7 +24,7 @@ struct MainTabView: View {
             TabView(selection: $selectedTab) {
                 NowPlayingView()
                     .tabItem {
-                        Label("正在播放", systemImage: "music.note.tv")
+                        Label("正在播放", systemImage: "play.circle.fill")
                     }
                     .tag(0)
 
@@ -36,10 +36,11 @@ struct MainTabView: View {
 
                 SettingsView()
                     .tabItem {
-                        Label("設定", systemImage: "gearshape")
+                        Label("設定", systemImage: "gearshape.fill")
                     }
                     .tag(2)
             }
+            .tint(.pink)
         }
     }
 }
