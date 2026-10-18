@@ -2,7 +2,7 @@ import SwiftUI
 import MediaPlayer
 import UIKit
 
-/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + Liquid Glass 頂部控件與智能跟隨）
+/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + 頂部置中 Liquid Glass 雙鍵靈動膠囊）
 struct NowPlayingView: View {
     @ObservedObject var monitor = AppleMusicMonitor.shared
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
@@ -31,36 +31,9 @@ struct NowPlayingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                // 左上角：單層 Liquid Glass 長條膠囊 LiveContainer 環境標籤
-                ToolbarItem(placement: .topBarLeading) {
-                    environmentBadge
-                }
-
-                // 中央：當前曲目名稱與歌手
+                // 頂部中央：置中 Liquid Glass 雙鍵控制膠囊 (PiP 懸浮窗 + 更多操作選單)
                 ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        Text(monitor.currentTrack.title.isEmpty ? "正在播放" : monitor.currentTrack.title)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundColor(.primary)
-                            .lineLimit(1)
-                        if !monitor.currentTrack.artist.isEmpty {
-                            Text(monitor.currentTrack.artist)
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-
-                // 右上角：獨立 Liquid Glass 小圓按鈕（PiP 懸浮窗與更多操作選單）
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 10) {
-                        // 需求 2：獨立右上角懸浮窗小圓按鈕 (Liquid Glass Circle)
-                        pipCircularButton
-
-                        // 更多功能選單小圓按鈕 (Liquid Glass Circle)
-                        moreMenuCircularButton
-                    }
+                    centeredActionCapsule
                 }
             }
             .sheet(isPresented: $showSearchSheet) {
@@ -118,81 +91,131 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 右上角獨立小圓按鈕 (PiP 懸浮窗，Liquid Glass Circle)
-    private var pipCircularButton: some View {
+    // MARK: - 頂部置中 Liquid Glass 雙鍵控制膠囊 (PiP 懸浮窗 + 更多操作選單)
+    private var centeredActionCapsule: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
-        return Button {
-            pipEngine.togglePiP()
-        } label: {
-            ZStack {
-                Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(isPiPOn ? .white : .primary)
-            }
-            .frame(width: 38, height: 38)
-            .liquidGlassCircle(isActive: isPiPOn, activeTint: .pink)
-            .contentShape(Circle())
-        }
-        .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
-        .sensoryFeedback(.impact(weight: .medium), trigger: isPiPOn)
-        .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
-    }
 
-    // MARK: - 右上角更多操作選單小圓按鈕 (Liquid Glass Circle)
-    private var moreMenuCircularButton: some View {
-        Menu {
-            // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
+        return HStack(spacing: 8) {
+            // 左側：畫中畫 (PiP) 小圓按鈕
             Button {
-                showTranslation.toggle()
+                pipEngine.togglePiP()
             } label: {
-                if showTranslation {
-                    Label("雙語歌詞", systemImage: "checkmark")
-                } else {
-                    Text("雙語歌詞")
-                }
-            }
+                ZStack {
+                    Circle()
+                        .fill(isPiPOn ? Color.pink : Color.white.opacity(0.12))
+                        .frame(width: 38, height: 38)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.white.opacity(isPiPOn ? 0.35 : 0.16), lineWidth: 0.8)
+                        )
 
-            // 動態島開關（在非 LiveContainer 環境下提供）
-            if !envDetector.isLiveContainer {
+                    Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .contentShape(Circle())
+            }
+            .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
+            .sensoryFeedback(.impact(weight: .medium), trigger: isPiPOn)
+            .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
+
+            // 右側：更多操作選單小圓按鈕
+            Menu {
+                // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
                 Button {
-                    if liveActivityEngine.isActivityActive {
-                        liveActivityEngine.endActivity()
-                    } else {
-                        liveActivityEngine.startActivity(track: monitor.currentTrack)
-                    }
+                    showTranslation.toggle()
                 } label: {
-                    Label(
-                        liveActivityEngine.isActivityActive ? "結束動態島同步" : "啟動動態島同步",
-                        systemImage: liveActivityEngine.isActivityActive ? "waveform.badge.minus" : "waveform.badge.plus"
+                    if showTranslation {
+                        Label("雙語歌詞", systemImage: "checkmark")
+                    } else {
+                        Text("雙語歌詞")
+                    }
+                }
+
+                // 動態島開關（在非 LiveContainer 環境下提供）
+                if !envDetector.isLiveContainer {
+                    Button {
+                        if liveActivityEngine.isActivityActive {
+                            liveActivityEngine.endActivity()
+                        } else {
+                            liveActivityEngine.startActivity(track: monitor.currentTrack)
+                        }
+                    } label: {
+                        Label(
+                            liveActivityEngine.isActivityActive ? "結束動態島同步" : "啟動動態島同步",
+                            systemImage: liveActivityEngine.isActivityActive ? "waveform.badge.minus" : "waveform.badge.plus"
+                        )
+                    }
+                }
+
+                Divider()
+
+                Button {
+                    showSearchSheet = true
+                } label: {
+                    Label("線上搜尋歌詞", systemImage: "magnifyingglass")
+                }
+
+                Button {
+                    showFileImporter = true
+                } label: {
+                    Label("匯入本地 .lrc", systemImage: "square.and.arrow.down")
+                }
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.12))
+                        .frame(width: 38, height: 38)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
+                        )
+
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                }
+                .contentShape(Circle())
+            }
+            .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
+            .accessibilityLabel("更多歌詞操作選項")
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background {
+            if reduceTransparency {
+                Capsule(style: .continuous)
+                    .fill(Color(.secondarySystemBackground))
+                    .overlay(
+                        Capsule(style: .continuous)
+                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.75)
                     )
+            } else {
+                ZStack {
+                    Capsule(style: .continuous)
+                        .fill(.ultraThinMaterial)
+
+                    Capsule(style: .continuous)
+                        .fill(Color.black.opacity(0.35))
+
+                    Capsule(style: .continuous)
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.30),
+                                    Color.white.opacity(0.08),
+                                    Color.white.opacity(0.02),
+                                    Color.white.opacity(0.16)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 0.8
+                        )
                 }
             }
-
-            Divider()
-
-            Button {
-                showSearchSheet = true
-            } label: {
-                Label("線上搜尋歌詞", systemImage: "magnifyingglass")
-            }
-
-            Button {
-                showFileImporter = true
-            } label: {
-                Label("匯入本地 .lrc", systemImage: "square.and.arrow.down")
-            }
-        } label: {
-            ZStack {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.primary)
-            }
-            .frame(width: 38, height: 38)
-            .liquidGlassCircle(isActive: false)
-            .contentShape(Circle())
         }
-        .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
-        .accessibilityLabel("更多歌詞操作選項")
+        .shadow(color: .black.opacity(0.20), radius: 10, x: 0, y: 4)
     }
 
     // MARK: - 沉浸式氛圍背景 (Ambient Backdrop)
@@ -367,52 +390,5 @@ struct NowPlayingView: View {
                 proxy.scrollTo("LyricsTopAnchor", anchor: .top)
             }
         }
-    }
-
-    // MARK: - 左上角環境標籤（確保只有單一層 Liquid Glass 長條膠囊包裹）
-    private var environmentBadge: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(envDetector.isLiveContainer ? Color.orange : Color.green)
-                .frame(width: 7, height: 7)
-                .accessibilityHidden(true)
-            Text(envDetector.isLiveContainer ? "LiveContainer" : "獨立側載")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundColor(.secondary)
-        }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 6)
-        .background {
-            if reduceTransparency {
-                Capsule(style: .continuous)
-                    .fill(Color(.secondarySystemBackground))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.75)
-                    )
-            } else {
-                Capsule(style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.35),
-                                        Color.white.opacity(0.08),
-                                        Color.white.opacity(0.02),
-                                        Color.white.opacity(0.16)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.8
-                            )
-                    )
-            }
-        }
-        .shadow(color: .black.opacity(0.08), radius: 6, x: 0, y: 3)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(envDetector.isLiveContainer ? "運行於 LiveContainer 容器環境" : "運行於原生獨立側載環境")
     }
 }
