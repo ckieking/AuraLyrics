@@ -101,7 +101,7 @@ struct SettingsView: View {
                     HStack {
                         Text("版本")
                         Spacer()
-                        Text("0.1.0 (Build 1)")
+                        Text(appVersionString)
                             .foregroundColor(.secondary)
                     }
                     HStack {
@@ -130,5 +130,12 @@ struct SettingsView: View {
                 Text("此操作將刪除本機儲存的所有歌詞 JSON 快取，後續播放時將重新從網路抓取。")
             }
         }
+    }
+
+    /// 動態讀取 App 系統版本與內部建置號
+    private var appVersionString: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (Build \(build))"
     }
 }
