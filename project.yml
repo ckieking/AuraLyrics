@@ -3,7 +3,6 @@ options:
   bundleIdPrefix: com.auralyrics
   deploymentTarget:
     iOS: "16.2"
-  xcodeVersion: "16.0"
 
 settings:
   SWIFT_VERSION: "5.9"
