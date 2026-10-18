@@ -1,14 +1,5 @@
 import SwiftUI
 
-/// UIViewRepresentable 將 PiPLyricsEngine 的 sourceView 嵌入 View 樹狀結構中，確保系統允許啟動畫中畫
-struct PiPSourceViewRepresentable: UIViewRepresentable {
-    func makeUIView(context: Context) -> UIView {
-        return PiPLyricsEngine.shared.sourceView
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {}
-}
-
 /// 主導覽分頁列舉
 enum MainTab: Int, CaseIterable, Identifiable {
     case nowPlaying = 0
@@ -34,16 +25,19 @@ enum MainTab: Int, CaseIterable, Identifiable {
     }
 }
 
-/// 主導覽分頁視圖（Apple Liquid Glass 懸浮動態膠囊底欄）
+/// UIViewRepresentable 將 PiPLyricsEngine 的 sourceView 嵌入 View 樹狀結構中，確保系統允許啟動畫中畫
+struct PiPSourceViewRepresentable: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        return PiPLyricsEngine.shared.sourceView
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
+}
+
+/// 主導覽分頁視圖（iOS 27 原生 Apple Liquid Glass 懸浮動態膠囊底欄）
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .nowPlaying
     @Namespace private var tabNamespace
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    init() {
-        // 隱藏系統預設的傳統貼底 UITabBar，改由懸浮 Liquid Glass 底欄呈現
-        UITabBar.appearance().isHidden = true
-    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -74,6 +68,7 @@ struct MainTabView: View {
                 .padding(.bottom, 16)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .sensoryFeedback(.selection, trigger: selectedTab)
     }
 
     // MARK: - Apple Liquid Glass 懸浮膠囊底欄
@@ -83,7 +78,6 @@ struct MainTabView: View {
                 let isSelected = (selectedTab == tab)
 
                 Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
                         selectedTab = tab
                     }
@@ -92,6 +86,7 @@ struct MainTabView: View {
                         Image(systemName: tab.iconName)
                             .font(.system(size: 16, weight: isSelected ? .bold : .medium))
                             .foregroundColor(isSelected ? .pink : .secondary)
+                            .symbolEffect(.bounce, value: isSelected)
 
                         Text(tab.title)
                             .font(.system(size: 13, weight: isSelected ? .bold : .medium, design: .rounded))
@@ -107,47 +102,18 @@ struct MainTabView: View {
                                 .matchedGeometryEffect(id: "ActiveTabGlass", in: tabNamespace)
                                 .overlay(
                                     Capsule(style: .continuous)
-                                        .strokeBorder(Color.pink.opacity(0.25), lineWidth: 0.8)
+                                        .strokeBorder(Color.pink.opacity(0.28), lineWidth: 0.85)
                                 )
                         }
                     }
                     .contentShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.95))
                 .accessibilityLabel("\(tab.title)分頁\(isSelected ? "，目前選取" : "")")
             }
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 5)
-        .background {
-            if reduceTransparency {
-                Capsule(style: .continuous)
-                    .fill(Color(.systemBackground))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.8)
-                    )
-            } else {
-                Capsule(style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.40),
-                                        Color.white.opacity(0.10),
-                                        Color.white.opacity(0.04),
-                                        Color.white.opacity(0.16)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 0.8
-                            )
-                    )
-            }
-        }
-        .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 8)
+        .liquidGlassCapsule()
     }
 }

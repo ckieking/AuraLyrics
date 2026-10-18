@@ -2,7 +2,7 @@ import SwiftUI
 import MediaPlayer
 import UIKit
 
-/// Apple Music 正在播放與即時歌詞同步畫面（HIG 沉浸流光舞台 + Liquid Glass 頂部資訊條與智能跟隨）
+/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + Liquid Glass 懸浮曲目島與智能跟隨）
 struct NowPlayingView: View {
     @ObservedObject var monitor = AppleMusicMonitor.shared
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
@@ -22,7 +22,7 @@ struct NowPlayingView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // MARK: - 內容底層：沉浸式專輯光暈背景 (Ambient Backdrop)
+                // MARK: - 內容底層：沉浸式動態專輯流光背景 (Ambient Backdrop)
                 ambientBackdrop
 
                 // MARK: - 內容中層：可滾動穿透之歌詞清單
@@ -30,24 +30,27 @@ struct NowPlayingView: View {
             }
             .navigationTitle("正在播放")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     environmentBadge
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
-                        // 需求 2：獨立右上角懸浮窗小圓按鈕
+                    HStack(spacing: 10) {
+                        // 需求 2：獨立右上角懸浮窗小圓按鈕 (Liquid Glass Circle)
                         pipCircularButton
 
-                        // 更多功能選單小圓按鈕
+                        // 更多功能選單小圓按鈕 (Liquid Glass Circle)
                         moreMenuCircularButton
                     }
                 }
             }
-            // MARK: - 功能浮動層：頂部曲目資訊條
+            // MARK: - 功能浮動層：頂部 Liquid Glass 懸浮曲目島
             .safeAreaInset(edge: .top) {
                 compactTrackHeader
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 6)
             }
             .sheet(isPresented: $showSearchSheet) {
                 LyricsSearchSheet(currentTrack: monitor.currentTrack) { selectedLyrics in
@@ -74,7 +77,7 @@ struct NowPlayingView: View {
                     }
                 }
             }
-            .onChange(of: monitor.currentLineIndex) { newIndex in
+            .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 guard let index = newIndex, monitor.currentLyrics.lines.indices.contains(index) else { return }
                 let current = monitor.currentLyrics.lines[index]
 
@@ -108,25 +111,19 @@ struct NowPlayingView: View {
     private var pipCircularButton: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
         return Button {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             pipEngine.togglePiP()
         } label: {
             ZStack {
-                Circle()
-                    .fill(isPiPOn ? Color.pink : Color(.tertiarySystemFill))
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8)
-                    )
-
                 Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(isPiPOn ? .white : .primary)
             }
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
+            .frame(width: 38, height: 38)
+            .liquidGlassCircle(isActive: isPiPOn, activeTint: .pink)
+            .contentShape(Circle())
         }
+        .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
+        .sensoryFeedback(.impact(weight: .medium), trigger: isPiPOn)
         .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
     }
 
@@ -135,7 +132,6 @@ struct NowPlayingView: View {
         Menu {
             // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
             Button {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 showTranslation.toggle()
             } label: {
                 if showTranslation {
@@ -148,7 +144,6 @@ struct NowPlayingView: View {
             // 動態島開關（在非 LiveContainer 環境下提供）
             if !envDetector.isLiveContainer {
                 Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     if liveActivityEngine.isActivityActive {
                         liveActivityEngine.endActivity()
                     } else {
@@ -177,21 +172,15 @@ struct NowPlayingView: View {
             }
         } label: {
             ZStack {
-                Circle()
-                    .fill(Color(.tertiarySystemFill))
-                    .frame(width: 36, height: 36)
-                    .overlay(
-                        Circle()
-                            .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.8)
-                    )
-
                 Image(systemName: "ellipsis")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(.primary)
             }
-            .frame(minWidth: 44, minHeight: 44)
-            .contentShape(Rectangle())
+            .frame(width: 38, height: 38)
+            .liquidGlassCircle(isActive: false)
+            .contentShape(Circle())
         }
+        .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
         .accessibilityLabel("更多歌詞操作選項")
     }
 
@@ -207,13 +196,13 @@ struct NowPlayingView: View {
                     .scaledToFill()
                     .frame(width: geo.size.width, height: geo.size.height)
                     .clipped()
-                    .blur(radius: 50)
+                    .blur(radius: 54)
                     .overlay(
                         LinearGradient(
                             colors: [
-                                Color(.systemBackground).opacity(0.85),
-                                Color(.systemBackground).opacity(0.70),
-                                Color(.systemBackground).opacity(0.92)
+                                Color(.systemBackground).opacity(0.82),
+                                Color(.systemBackground).opacity(0.68),
+                                Color(.systemBackground).opacity(0.94)
                             ],
                             startPoint: .top,
                             endPoint: .bottom
@@ -228,7 +217,7 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 頂部精簡浮動曲目卡 (Compact Track Header)
+    // MARK: - 頂部 Liquid Glass 懸浮曲目島 (Floating Track Capsule)
     private var compactTrackHeader: some View {
         HStack(spacing: 12) {
             // 封面圖示
@@ -237,28 +226,28 @@ struct NowPlayingView: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
-                    .frame(width: 46, height: 46)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
                     .shadow(color: .black.opacity(0.18), radius: 5, x: 0, y: 2)
             } else {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
                         .fill(Color(.tertiarySystemFill))
-                        .frame(width: 46, height: 46)
+                        .frame(width: 44, height: 44)
                     Image(systemName: "music.note")
-                        .font(.system(size: 20, weight: .semibold))
+                        .font(.system(size: 19, weight: .semibold))
                         .foregroundColor(.pink)
                 }
             }
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(monitor.currentTrack.title)
-                    .font(.system(.headline, design: .rounded))
+                Text(monitor.currentTrack.title.isEmpty ? "未在播放音樂" : monitor.currentTrack.title)
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
 
-                Text(monitor.currentTrack.artist)
-                    .font(.system(.subheadline, design: .rounded))
+                Text(monitor.currentTrack.artist.isEmpty ? "開啟 Apple Music 播放歌曲" : monitor.currentTrack.artist)
+                    .font(.system(.caption, design: .rounded))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
@@ -280,20 +269,14 @@ struct NowPlayingView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(Color(.tertiarySystemFill))
+            .padding(.horizontal, 9)
+            .padding(.vertical, 5)
+            .background(Color.primary.opacity(0.06))
             .clipShape(Capsule())
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .background(.ultraThinMaterial)
-        .overlay(
-            Rectangle()
-                .fill(Color.white.opacity(0.12))
-                .frame(height: 0.5),
-            alignment: .bottom
-        )
+        .liquidGlassCard(cornerRadius: 18)
     }
 
     // MARK: - 中央滾動歌詞清單 (Scroll-Through Lyrics with Apple Music Smart Follow)
@@ -366,6 +349,7 @@ struct NowPlayingView: View {
                                         .font(.system(isCurrent ? .title2 : .title3, design: .rounded))
                                         .fontWeight(isCurrent ? .bold : .medium)
                                         .foregroundColor(isCurrent ? .primary : .secondary)
+                                        .shadow(color: isCurrent ? Color.pink.opacity(0.32) : Color.clear, radius: 8, x: 0, y: 0)
                                         .multilineTextAlignment(.leading)
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
@@ -380,13 +364,12 @@ struct NowPlayingView: View {
                             .id(index)
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                // 點擊手動對齊時間軸並給予輕微觸覺回饋，同時置中畫面恢復跟隨
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 monitor.currentLineIndex = index
                                 withAnimation(.easeInOut(duration: 0.35)) {
                                     proxy.scrollTo(index, anchor: .center)
                                 }
                             }
+                            .sensoryFeedback(.impact(weight: .light), trigger: monitor.currentLineIndex)
                             .onAppear {
                                 visibleLineIndices.insert(index)
                             }
@@ -403,7 +386,7 @@ struct NowPlayingView: View {
                 }
             }
             // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續）
-            .onChange(of: monitor.currentLineIndex) { newIndex in
+            .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 guard let index = newIndex else { return }
                 let isVisible = visibleLineIndices.contains(index)
                 if isVisible {
@@ -417,10 +400,10 @@ struct NowPlayingView: View {
                 }
             }
             // 需求 6：每首歌播完切換下一首時顯示新歌詞並同時滾動回最上方（無視歌詞是否在畫面內外）
-            .onChange(of: monitor.currentTrack.title) { _ in
+            .onChange(of: monitor.currentTrack.title) { _, _ in
                 scrollToTop(proxy: proxy)
             }
-            .onChange(of: monitor.currentLyrics.id) { _ in
+            .onChange(of: monitor.currentLyrics.id) { _, _ in
                 scrollToTop(proxy: proxy)
             }
         }
@@ -448,6 +431,9 @@ struct NowPlayingView: View {
                 .font(.system(.caption, design: .rounded).weight(.medium))
                 .foregroundColor(.secondary)
         }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .liquidGlassCapsule()
         .accessibilityElement(children: .combine)
         .accessibilityLabel(envDetector.isLiveContainer ? "運行於 LiveContainer 容器環境" : "運行於原生獨立側載環境")
     }
