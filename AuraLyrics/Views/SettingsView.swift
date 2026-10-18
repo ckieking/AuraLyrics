@@ -46,7 +46,21 @@ struct SettingsView: View {
                 }
 
                 // MARK: - 懸浮歌詞外觀偏好
-                Section(header: Text("畫中畫 (PiP) 懸浮視窗樣式")) {
+                Section(
+                    header: Text("畫中畫 (PiP) 懸浮視窗樣式"),
+                    footer: Text("啟用後，退至背景或切換 App 時會自動跳出懸浮視窗；預設為關閉。")
+                ) {
+                    Toggle("啟用懸浮歌詞 (退至背景自動顯示)", isOn: Binding(
+                        get: { pipEngine.isPiPEnabled },
+                        set: { enable in
+                            if enable {
+                                pipEngine.startPiP()
+                            } else {
+                                pipEngine.stopPiP()
+                            }
+                        }
+                    ))
+
                     Picker("視覺主題風格", selection: $storedPiPTheme) {
                         ForEach(PiPVisualTheme.allCases) { theme in
                             Text(theme.localizedTitle).tag(theme.rawValue)
@@ -87,7 +101,7 @@ struct SettingsView: View {
                     HStack {
                         Text("版本")
                         Spacer()
-                        Text("1.0.0 (Build 1)")
+                        Text("0.1.0 (Build 1)")
                             .foregroundColor(.secondary)
                     }
                     HStack {

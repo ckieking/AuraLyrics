@@ -90,6 +90,15 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
     @Published public private(set) var isPiPActive: Bool = false
     @Published public private(set) var isPiPPossible: Bool = false
+    /// 懸浮窗功能開關（預設為關閉，關閉時退到後台絕不自動跳出懸浮窗）
+    @Published public var isPiPEnabled: Bool = false {
+        didSet {
+            pipController?.canStartPictureInPictureAutomaticallyFromInline = isPiPEnabled
+            if !isPiPEnabled && isPiPActive {
+                pipController?.stopPictureInPicture()
+            }
+        }
+    }
     @Published public var currentTheme: PiPVisualTheme = .dynamicIsland {
         didSet {
             PiPLyricsViewModel.shared.theme = currentTheme
@@ -148,7 +157,8 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
         let controller = AVPictureInPictureController(contentSource: contentSource)
         controller.delegate = self
-        controller.canStartPictureInPictureAutomaticallyFromInline = true
+        // 預設為關閉：在使用者未主動開啟前，退到後台絕不自動彈出懸浮窗
+        controller.canStartPictureInPictureAutomaticallyFromInline = false
 
         self.pipController = controller
         self.isPiPPossible = true
@@ -157,22 +167,29 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
     // MARK: - 開啟 / 關閉 PiP
     public func togglePiP() {
         guard let controller = pipController else { return }
-        if controller.isPictureInPictureActive {
-            controller.stopPictureInPicture()
+        if controller.isPictureInPictureActive || isPiPEnabled {
+            stopPiP()
         } else {
-            syncCurrentLyricsToViewModel()
-            controller.startPictureInPicture()
+            startPiP()
         }
     }
 
     public func startPiP() {
-        guard let controller = pipController, !controller.isPictureInPictureActive else { return }
+        guard let controller = pipController else { return }
+        isPiPEnabled = true
+        controller.canStartPictureInPictureAutomaticallyFromInline = true
         syncCurrentLyricsToViewModel()
-        controller.startPictureInPicture()
+        if !controller.isPictureInPictureActive {
+            controller.startPictureInPicture()
+        }
     }
 
     public func stopPiP() {
-        pipController?.stopPictureInPicture()
+        isPiPEnabled = false
+        pipController?.canStartPictureInPictureAutomaticallyFromInline = false
+        if pipController?.isPictureInPictureActive == true {
+            pipController?.stopPictureInPicture()
+        }
     }
 
     // MARK: - 更新歌詞狀態至 ViewModel
@@ -212,6 +229,8 @@ extension PiPLyricsEngine: AVPictureInPictureControllerDelegate {
     nonisolated public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         Task { @MainActor in
             self.isPiPActive = false
+            self.isPiPEnabled = false
+            pictureInPictureController.canStartPictureInPictureAutomaticallyFromInline = false
         }
     }
 
