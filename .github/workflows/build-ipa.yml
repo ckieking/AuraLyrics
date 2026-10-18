@@ -47,6 +47,26 @@ jobs:
           echo "Packaging AuraLyrics version: ${VERSION} (Build ${BUILD})"
           mkdir -p package/Payload
           cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package/Payload/
+
+          # 雙重防護：使用 PlistBuddy 確保打包檔案內的 Info.plist 版本與 Build 號精準一致
+          MAIN_PLIST="package/Payload/AuraLyrics.app/Info.plist"
+          if [ -f "$MAIN_PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$MAIN_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${VERSION}" "$MAIN_PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" "$MAIN_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD}" "$MAIN_PLIST"
+          fi
+
+          WIDGET_PLIST="package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
+          if [ -f "$WIDGET_PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$WIDGET_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${VERSION}" "$WIDGET_PLIST"
+            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" "$WIDGET_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD}" "$WIDGET_PLIST"
+          fi
+
+          echo "=== [驗證] Payload/AuraLyrics.app/Info.plist 版本資訊 ==="
+          echo -n "CFBundleShortVersionString: "
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MAIN_PLIST"
+          echo -n "CFBundleVersion: "
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$MAIN_PLIST"
+
           cd package
           zip -r "../ipa_output/AuraLyrics-${VERSION}.ipa" Payload
           cd ..
