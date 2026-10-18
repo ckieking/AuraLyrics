@@ -74,9 +74,7 @@ struct LibraryView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                    .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+                    .liquidGlassCapsule()
                     .padding(.bottom, 20)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }

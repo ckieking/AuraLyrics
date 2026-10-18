@@ -99,7 +99,6 @@ public struct AuraLyricsLiveActivityWidget: Widget {
 }
 
 // 緊湊 Trailing 視圖 (依據 Apple HIG 支援 isDynamicIslandLimitedInWidth 橫向窄寬度適配)
-@available(iOS 27.0, *)
 struct CompactTrailingView: View {
     @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
     let currentLine: String
