@@ -98,21 +98,30 @@ public struct AuraLyricsLiveActivityWidget: Widget {
     }
 }
 
-// 緊湊 Trailing 視圖
+// 緊湊 Trailing 視圖 (依據 live-activities.md 支援 isDynamicIslandLimitedInWidth 橫向窄寬度適配)
 struct CompactTrailingView: View {
+    @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
     let currentLine: String
 
     var body: some View {
-        Text(currentLine)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundColor(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.trailing, 4)
+        if isLimitedInWidth {
+            // 橫向或有限寬度：收斂為 28pt 內精巧波形圖示，防止文字被硬性截斷
+            Image(systemName: "waveform")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.pink)
+                .padding(.trailing, 4)
+        } else {
+            Text(currentLine)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.trailing, 4)
+        }
     }
 }
 
-// 鎖定畫面歌詞視圖
+// 鎖定畫面歌詞視圖 (嚴格遵守 HIG 14pt 標準邊距與同心幾何)
 struct LockScreenLyricsView: View {
     let context: ActivityViewContext<LyricsActivityAttributes>
 
@@ -121,17 +130,17 @@ struct LockScreenLyricsView: View {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "music.note")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundColor(.pink)
                     Text("\(context.state.trackTitle) · \(context.state.artistName)")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(.white.opacity(0.85))
                         .lineLimit(1)
                 }
                 Spacer()
                 Text("AuraLyrics")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundColor(.white.opacity(0.45))
             }
 
             Text(context.state.currentLine)
@@ -143,7 +152,7 @@ struct LockScreenLyricsView: View {
             if let secondary = context.state.secondaryLine, !secondary.isEmpty {
                 Text(secondary)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.75))
+                    .foregroundColor(.pink.opacity(0.9))
                     .lineLimit(1)
             }
         }

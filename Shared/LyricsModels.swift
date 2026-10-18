@@ -54,7 +54,8 @@ public struct LyricLine: Identifiable, Codable, Equatable, Sendable {
 }
 
 /// 完整同步歌詞集合與相關元資料
-public struct SyncedLyrics: Codable, Equatable, Sendable {
+public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
+    public var id: String { "\(trackTitle)-\(artistName)-\(source)" }
     public var trackTitle: String
     public var artistName: String
     public var lines: [LyricLine]
