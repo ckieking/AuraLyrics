@@ -98,17 +98,27 @@ public struct AuraLyricsLiveActivityWidget: Widget {
     }
 }
 
-// 緊湊 Trailing 視圖 (具備 minimumScaleFactor 防止窄寬度文字溢出)
+// 緊湊 Trailing 視圖 (依據 Apple HIG 支援 isDynamicIslandLimitedInWidth 橫向窄寬度適配)
+@available(iOS 27.0, *)
 struct CompactTrailingView: View {
+    @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
     let currentLine: String
 
     var body: some View {
-        Text(currentLine)
-            .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundColor(.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .padding(.trailing, 4)
+        if isLimitedInWidth {
+            // 橫向或有限寬度：收斂為 28pt 內精巧波形圖示，防止文字被硬性截斷
+            Image(systemName: "waveform")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(.pink)
+                .padding(.trailing, 4)
+        } else {
+            Text(currentLine)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.trailing, 4)
+        }
     }
 }
 
