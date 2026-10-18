@@ -40,15 +40,17 @@ jobs:
       - name: Package Unified IPA
         run: |
           mkdir -p ipa_output
+          VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" AuraLyrics/Info.plist)
+          echo "Packaging AuraLyrics version: ${VERSION}"
           mkdir -p package/Payload
           cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package/Payload/
           cd package
-          zip -r ../ipa_output/AuraLyrics.ipa Payload
+          zip -r "../ipa_output/AuraLyrics-${VERSION}.ipa" Payload
           cd ..
 
       - name: Upload IPA as Artifact
         uses: actions/upload-artifact@v5
         with:
           name: AuraLyrics-IPA
-          path: ipa_output/AuraLyrics.ipa
+          path: ipa_output/*.ipa
           retention-days: 14

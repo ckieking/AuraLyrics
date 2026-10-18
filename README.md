@@ -24,14 +24,14 @@
 
 ## 📱 環境相容與智慧檢測矩陣
 
-AuraLyrics 內建智慧環境檢測器（`RuntimeEnvironmentDetector`），全面統一發布單一安裝套件 **`AuraLyrics.ipa`**，在 App 啟動時動態判斷沙盒限制狀態，自動適配最佳顯示引擎：
+AuraLyrics 內建智慧環境檢測器（`RuntimeEnvironmentDetector`），全面統一發布單一安裝套件 **`AuraLyrics-<版本號>.ipa`**（例如 `AuraLyrics-0.1.0.ipa`），在 App 啟動時動態判斷沙盒限制狀態，自動適配最佳顯示引擎：
 
 | 環境 / 安裝方式 | 動態島 / 鎖定畫面 (`ActivityKit`) | 畫中畫懸浮歌詞 (`PiP`) | 智慧環境判定 | 推薦安裝包 |
 | :--- | :---: | :---: | :---: | :--- |
-| **LiveContainer** | ❌ (Guest App 無法載入 Extension) | ✅ **原生支援** (自動推薦 PiP) | 自動判定為容器環境，安全關閉 Extension 依賴 | `AuraLyrics.ipa` |
-| **SideStore / AltStore** | ✅ 支援 (需簽名 Extension Target) | ✅ 支援 | 判定為獨立側載，解鎖雙引擎並行 | `AuraLyrics.ipa` |
-| **TrollStore** | ✅ **完全支援** | ✅ **完全支援** | 完整權限運作，雙引擎極致效能 | `AuraLyrics.ipa` |
-| **免付費個人 Apple ID 側載** | ⚠️ (視簽名工具配置而定) | ✅ 支援 | 完美運作 PiP 與背景保活 | `AuraLyrics.ipa` |
+| **LiveContainer** | ❌ (Guest App 無法載入 Extension) | ✅ **原生支援** (自動推薦 PiP) | 自動判定為容器環境，安全關閉 Extension 依賴 | `AuraLyrics-0.1.0.ipa` |
+| **SideStore / AltStore** | ✅ 支援 (需簽名 Extension Target) | ✅ 支援 | 判定為獨立側載，解鎖雙引擎並行 | `AuraLyrics-0.1.0.ipa` |
+| **TrollStore** | ✅ **完全支援** | ✅ **完全支援** | 完整權限運作，雙引擎極致效能 | `AuraLyrics-0.1.0.ipa` |
+| **免付費個人 Apple ID 側載** | ⚠️ (視簽名工具配置而定) | ✅ 支援 | 完美運作 PiP 與背景保活 | `AuraLyrics-0.1.0.ipa` |
 
 ---
 
@@ -52,7 +52,7 @@ AuraLyrics 內建智慧環境檢測器（`RuntimeEnvironmentDetector`），全�
 2. 進入 GitHub 儲存庫的 **Actions** 分頁。
 3. 工作流 `Build AuraLyrics IPA` 會自動在 `macos-15` runner 上編譯。
 4. 建置完成後，於 Run 的 **Artifacts** 區下載 `AuraLyrics-IPA.zip`，解壓縮即可取得統一安裝套件：
-   - `AuraLyrics.ipa`：包含完整動態島 Extension + PiP 懸浮窗，全環境智慧自適應。
+   - `AuraLyrics-0.1.0.ipa`：包含完整動態島 Extension + PiP 懸浮窗，全環境智慧自適應。
 
 ### 方式 B：在 macOS 本機使用 Xcode 編譯
 
@@ -73,14 +73,14 @@ open AuraLyrics.xcodeproj
 ## 🚀 安裝與使用指南
 
 ### 在 LiveContainer 中使用
-1. 下載 `AuraLyrics.ipa`。
+1. 下載並解壓縮取得 `AuraLyrics-0.1.0.ipa`。
 2. 在 iPhone 上開啟 **LiveContainer**，點擊右上角 `+` 號直接匯入該 IPA。
 3. 進入 LiveContainer 設定，確保開啟「Fix Background Audio」或允許音訊背景執行。
 4. 點擊圖示啟動 AuraLyrics，App 會自動透過 `RuntimeEnvironmentDetector` 辨識為 LiveContainer 環境。
 5. 在 Apple Music 開始播放音樂，回到 AuraLyrics 點擊右上角 **畫中畫圖示 (PiP)**（或在設定中開啟「啟用懸浮歌詞」），滑動返回桌面即可懸浮顯示！
 
 ### 直接側載（SideStore / AltStore / TrollStore / Feather）
-1. 使用側載工具安裝 `AuraLyrics.ipa`。
+1. 使用側載工具安裝 `AuraLyrics-0.1.0.ipa`。
 2. 啟動 App 並同意「媒體與 Apple Music」讀取權限。
 3. 播放音樂時，可享受頂部 **動態島** 實時滾動歌詞或 **PiP 懸浮窗**。
 
