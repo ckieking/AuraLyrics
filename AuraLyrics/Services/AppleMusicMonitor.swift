@@ -16,13 +16,8 @@ public final class AppleMusicMonitor: ObservableObject {
     @Published public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
     @Published public private(set) var isLoadingLyrics: Bool = false
 
-    // 模擬播放模式（便於無音樂播放時即時測試 PiP 與動態島）
-    @Published public var isSimulationMode: Bool = false
-
     private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
     private var timer: Timer?
-    private var simulationTimer: Timer?
-    private var cancellables = Set<AnyCancellable>()
 
     private init() {
         setupNotifications()
@@ -73,8 +68,6 @@ public final class AppleMusicMonitor: ObservableObject {
 
     // MARK: - 曲目變更處理
     private func handleTrackChanged() {
-        guard !isSimulationMode else { return }
-
         guard let nowPlaying = musicPlayer.nowPlayingItem else {
             currentTrack = .placeholder
             currentLyrics = .empty
@@ -118,14 +111,11 @@ public final class AppleMusicMonitor: ObservableObject {
     }
 
     private func handlePlaybackStateChanged() {
-        guard !isSimulationMode else { return }
         isPlaying = (musicPlayer.playbackState == .playing)
     }
 
     // MARK: - 時間軸定時器循環
     private func tick() {
-        guard !isSimulationMode else { return }
-
         let playTime = musicPlayer.currentPlaybackTime
         currentPlaybackTimeSec = playTime
 
@@ -160,44 +150,5 @@ public final class AppleMusicMonitor: ObservableObject {
         currentLyrics = lyrics
         let timeMs = Int(currentPlaybackTimeSec * 1000)
         currentLineIndex = currentLyrics.currentLineIndex(at: timeMs)
-    }
-
-    // MARK: - 模擬預覽模式（用於測試與示範）
-    public func startSimulation(sampleLyrics: SyncedLyrics) {
-        isSimulationMode = true
-        currentTrack = TrackInfo(
-            title: sampleLyrics.trackTitle.isEmpty ? "夜曲" : sampleLyrics.trackTitle,
-            artist: sampleLyrics.artistName.isEmpty ? "周杰倫" : sampleLyrics.artistName,
-            album: "十一月的蕭邦",
-            duration: 226
-        )
-        currentLyrics = sampleLyrics
-        isPlaying = true
-        currentPlaybackTimeSec = 0
-
-        simulationTimer?.invalidate()
-        simulationTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self = self, self.isSimulationMode else { return }
-                self.currentPlaybackTimeSec += 0.2
-                if self.currentPlaybackTimeSec > 226 {
-                    self.currentPlaybackTimeSec = 0
-                }
-                self.playbackProgress = self.currentPlaybackTimeSec / 226.0
-                let timeMs = Int(self.currentPlaybackTimeSec * 1000)
-                let newIndex = self.currentLyrics.currentLineIndex(at: timeMs)
-                if newIndex != self.currentLineIndex {
-                    self.currentLineIndex = newIndex
-                }
-            }
-        }
-    }
-
-    public func stopSimulation() {
-        simulationTimer?.invalidate()
-        simulationTimer = nil
-        isSimulationMode = false
-        handleTrackChanged()
-        handlePlaybackStateChanged()
     }
 }
