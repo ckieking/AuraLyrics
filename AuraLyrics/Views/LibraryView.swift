@@ -148,7 +148,7 @@ struct LibraryView: View {
                                             .cornerRadius(4)
                                     }
 
-                                    Text("\(lyrics.lines.count) 行 · 偏移 \(lyrics.offsetMs)ms")
+                                    Text("\(lyrics.lines.count) 行歌詞")
                                         .font(.caption2)
                                         .foregroundColor(.secondary.opacity(0.8))
                                 }
@@ -331,8 +331,6 @@ private struct LyricsPreviewSheet: View {
                             Label(lyrics.source, systemImage: "server.rack")
                             Text("·")
                             Text("\(lyrics.lines.count) 行歌詞")
-                            Text("·")
-                            Text("偏移 \(lyrics.offsetMs)ms")
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)

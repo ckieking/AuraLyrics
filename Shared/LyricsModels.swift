@@ -86,10 +86,10 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         source: "None"
     )
 
-    /// 根據當前播放時間（毫秒），取得當前正在唱的歌詞行索引
-    public func currentLineIndex(at currentPlaybackTimeMs: Int) -> Int? {
+    /// 根據當前播放時間（毫秒）與全域微調偏移量，取得當前正在唱的歌詞行索引
+    public func currentLineIndex(at currentPlaybackTimeMs: Int, globalOffsetMs: Int = 0) -> Int? {
         guard !lines.isEmpty else { return nil }
-        let adjustedTime = currentPlaybackTimeMs + offsetMs
+        let adjustedTime = currentPlaybackTimeMs + globalOffsetMs
 
         // 若尚未到達第一句歌詞時間
         if adjustedTime < lines[0].timeMs {

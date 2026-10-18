@@ -16,10 +16,18 @@ public final class AppleMusicMonitor: ObservableObject {
     @Published public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
     @Published public private(set) var isLoadingLyrics: Bool = false
 
+    /// 全域歌詞同步時間微調偏移量（毫秒，每首歌共用）
+    @Published public var globalOffsetMs: Int {
+        didSet {
+            UserDefaults.standard.set(globalOffsetMs, forKey: "globalLyricsOffsetMs")
+        }
+    }
+
     private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
     private var timer: Timer?
 
     private init() {
+        self.globalOffsetMs = UserDefaults.standard.integer(forKey: "globalLyricsOffsetMs")
         setupNotifications()
     }
 
@@ -97,6 +105,8 @@ public final class AppleMusicMonitor: ObservableObject {
         )
 
         currentTrack = newTrack
+        currentLineIndex = nil
+        playbackProgress = 0.0
 
         // 載入歌詞
         Task {
@@ -116,6 +126,16 @@ public final class AppleMusicMonitor: ObservableObject {
 
     // MARK: - 時間軸定時器循環
     private func tick() {
+        // 即時檢查當前播放曲目是否已換歌（增強換歌偵測）
+        if let nowPlaying = musicPlayer.nowPlayingItem {
+            let title = nowPlaying.title ?? ""
+            let artist = nowPlaying.artist ?? ""
+            if !title.isEmpty && (title != currentTrack.title || artist != currentTrack.artist) {
+                handleTrackChanged()
+                return
+            }
+        }
+
         let playTime = musicPlayer.currentPlaybackTime
         currentPlaybackTimeSec = playTime
 
@@ -124,31 +144,30 @@ public final class AppleMusicMonitor: ObservableObject {
         }
 
         let timeMs = Int(playTime * 1000)
-        let newIndex = currentLyrics.currentLineIndex(at: timeMs)
+        let newIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
 
         if newIndex != currentLineIndex {
             currentLineIndex = newIndex
         }
     }
 
-    // MARK: - 調整時間軸微調偏移量
-    public func adjustOffset(byMs: Int) {
-        let newOffset = currentLyrics.offsetMs + byMs
-        currentLyrics = LyricsProviderService.shared.updateOffset(
-            title: currentTrack.title,
-            artist: currentTrack.artist,
-            newOffsetMs: newOffset,
-            currentLyrics: currentLyrics
-        )
-        // 立即重新計算索引
+    // MARK: - 調整全域共用之時間軸微調偏移量
+    public func adjustGlobalOffset(byMs: Int) {
+        globalOffsetMs += byMs
         let timeMs = Int(currentPlaybackTimeSec * 1000)
-        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs)
+        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
+    }
+
+    public func resetGlobalOffset() {
+        globalOffsetMs = 0
+        let timeMs = Int(currentPlaybackTimeSec * 1000)
+        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
     }
 
     // MARK: - 手動套用自訂歌詞
     public func applyCustomLyrics(_ lyrics: SyncedLyrics) {
         currentLyrics = lyrics
         let timeMs = Int(currentPlaybackTimeSec * 1000)
-        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs)
+        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
     }
 }
