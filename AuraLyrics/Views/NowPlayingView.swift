@@ -54,22 +54,6 @@ struct NowPlayingView: View {
                         } label: {
                             Label("匯入本地 .lrc", systemImage: "square.and.arrow.down")
                         }
-
-                        Divider()
-
-                        if monitor.isSimulationMode {
-                            Button(role: .destructive) {
-                                monitor.stopSimulation()
-                            } label: {
-                                Label("結束模擬播放", systemImage: "stop.circle")
-                            }
-                        } else {
-                            Button {
-                                monitor.startSimulation(sampleLyrics: SampleLyricsData.sample)
-                            } label: {
-                                Label("啟動模擬示範播放", systemImage: "play.circle")
-                            }
-                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                             .font(.system(size: 17))
@@ -343,23 +327,4 @@ struct NowPlayingView: View {
                 .foregroundColor(.secondary)
         }
     }
-}
-
-// MARK: - 內建模擬示範歌詞資料
-public struct SampleLyricsData {
-    public static let sample = SyncedLyrics(
-        trackTitle: "夜曲 (示範曲目)",
-        artistName: "周杰倫",
-        lines: [
-            LyricLine(timeMs: 0, text: "一群嗜血的螞蟻 被腐肉所吸引", translation: "A swarm of bloodthirsty ants attracted by decaying flesh"),
-            LyricLine(timeMs: 4000, text: "我面無表情 看孤獨的風景", translation: "Expressionless, I gaze upon the lonely scenery"),
-            LyricLine(timeMs: 8000, text: "失去你 愛恨開始分明", translation: "Losing you, love and hate begin to become distinct"),
-            LyricLine(timeMs: 12000, text: "失去你 還有什麼事好關心", translation: "Without you, what else is worth caring about"),
-            LyricLine(timeMs: 16000, text: "為你彈奏蕭邦的夜曲 紀念我死去的愛情", translation: "Playing Chopin's nocturne for you, memorializing my departed love"),
-            LyricLine(timeMs: 22000, text: "而我為你隱姓埋名 在月光下彈琴", translation: "And I conceal my name for you, playing the piano under the moonlight"),
-            LyricLine(timeMs: 28000, text: "心碎的聲音 如此動聽", translation: "The sound of heartbreak is so pleasing to the ear")
-        ],
-        offsetMs: 0,
-        source: "Demo"
-    )
 }

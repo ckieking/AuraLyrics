@@ -55,8 +55,8 @@ struct LibraryView: View {
                             }
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                // 點選可直接啟動模擬預覽
-                                AppleMusicMonitor.shared.startSimulation(sampleLyrics: lyrics)
+                                // 點選可將歌詞手動套用至當前歌曲
+                                AppleMusicMonitor.shared.applyCustomLyrics(lyrics)
                             }
                             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                 Button(role: .destructive) {
