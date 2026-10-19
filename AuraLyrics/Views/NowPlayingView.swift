@@ -313,6 +313,26 @@ struct NowPlayingView: View {
                             .accessibilityLabel(line.text + (line.translation.map { "，翻譯：\($0)" } ?? ""))
                             .accessibilityHint(isCurrent ? "目前唱到的歌詞" : "點擊跳轉至此句")
                         }
+
+                        // MARK: - Apple Music 原生風格：參與人員與創作名單 (Credits, e.g. Written by ...)
+                        if !monitor.currentLyrics.credits.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("參與人員")
+                                    .font(.system(size: 15, weight: .semibold, design: .default))
+                                    .foregroundColor(Color.white.opacity(0.65))
+                                    .padding(.bottom, 2)
+
+                                ForEach(Array(monitor.currentLyrics.credits.enumerated()), id: \.offset) { _, credit in
+                                    Text(credit)
+                                        .font(.system(size: 13, weight: .regular, design: .default))
+                                        .foregroundColor(Color.white.opacity(0.42))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 36)
+                            .padding(.bottom, 48)
+                        }
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 24)

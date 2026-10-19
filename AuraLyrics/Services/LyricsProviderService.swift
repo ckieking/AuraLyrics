@@ -61,13 +61,14 @@ public final class LyricsProviderService: ObservableObject {
     // MARK: - 匯入外部 .lrc 檔案
     public func importLocalLRCFile(url: URL, title: String, artist: String) -> SyncedLyrics? {
         guard let content = try? String(contentsOf: url, encoding: .utf8) else { return nil }
-        let lines = LRCParser.shared.parse(lrcContent: content)
+        let (lines, credits) = LRCParser.shared.parseWithCredits(lrcContent: content)
         guard !lines.isEmpty else { return nil }
 
         let synced = SyncedLyrics(
             trackTitle: title,
             artistName: artist,
             lines: lines,
+            credits: credits,
             offsetMs: 0,
             source: "Local"
         )
@@ -173,12 +174,13 @@ public final class LyricsProviderService: ObservableObject {
 
             let decoded = try JSONDecoder().decode(LRCLIBResponse.self, from: data)
             if let synced = decoded.syncedLyrics, !synced.isEmpty {
-                let lines = LRCParser.shared.parse(lrcContent: synced)
+                let (lines, credits) = LRCParser.shared.parseWithCredits(lrcContent: synced)
                 if !lines.isEmpty {
                     return SyncedLyrics(
                         trackTitle: title,
                         artistName: artist,
                         lines: lines,
+                        credits: credits,
                         offsetMs: 0,
                         source: "LRCLIB"
                     )
@@ -276,16 +278,23 @@ public final class LyricsProviderService: ObservableObject {
                 return nil
             }
 
-            var finalLines = origLines
+            // 分離製作名單 (Credits) 與滾動歌詞，杜絕作者資訊搶佔時間軸
+            let (cleanLines, credits) = LRCParser.shared.extractCredits(from: origLines)
+            guard !cleanLines.isEmpty else {
+                return nil
+            }
+
+            var finalLines = cleanLines
             if let rawTrans = lyricDecoded.tlyric?.lyric, !rawTrans.isEmpty {
                 let transLines = LRCParser.shared.parse(lrcContent: rawTrans)
-                finalLines = LRCParser.shared.mergeTranslations(original: origLines, translation: transLines)
+                finalLines = LRCParser.shared.mergeTranslations(original: cleanLines, translation: transLines)
             }
 
             return SyncedLyrics(
                 trackTitle: title,
                 artistName: artist,
                 lines: finalLines,
+                credits: credits,
                 offsetMs: 0,
                 source: "NetEase"
             )
