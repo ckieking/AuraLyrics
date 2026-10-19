@@ -11,6 +11,7 @@ struct SettingsView: View {
 
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
+    @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
 
     var body: some View {
         NavigationStack {
@@ -53,6 +54,15 @@ struct SettingsView: View {
                     Text("畫中畫 (PiP) 懸浮視窗")
                 } footer: {
                     Text("切換至主畫面或其他 App 時，將自動顯示微縮懸浮動態島歌詞視窗；可隨時拖曳與縮放。")
+                }
+
+                // MARK: - 歌詞視覺效果
+                Section {
+                    Toggle("未播放歌詞景深模糊", isOn: $enableLyricDefocusBlur)
+                } header: {
+                    Text("歌詞視覺效果")
+                } footer: {
+                    Text("開啟後未播放的歌詞將呈現 Apple Music 原生景深模糊質感（單層級失焦），聚焦當前播放行；關閉可完全消除模糊運算以達到極致省電。")
                 }
 
                 // MARK: - 歌詞同步時間微調（全域共用）

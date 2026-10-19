@@ -16,6 +16,7 @@ struct NowPlayingView: View {
     @State private var showSearchSheet = false
     @State private var showFileImporter = false
     @AppStorage("showBilingualLyrics") private var showTranslation = true
+    @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
 
     /// 零重繪之可視行索引追蹤器（參考型別，不觸發全視圖 body 刷新）
     @State private var tracker = ViewportTracker()
@@ -426,46 +427,26 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 計算主歌詞行的階梯式景深模糊半徑
+    /// 計算主歌詞行的單層級景深模糊半徑（非焦點行統一 2.0pt，換行時僅 2 行切換狀態，極致省電流暢）
     private func blurRadius(for index: Int) -> CGFloat {
-        guard !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
+        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
             return 0.0
         }
         guard let current = monitor.currentLineIndex else {
             return 0.0
         }
-        let dist = abs(index - current)
-        switch dist {
-        case 0:
-            return 0.0
-        case 1:
-            return 1.2
-        case 2:
-            return 2.0
-        default:
-            return 2.8
-        }
+        return (index == current) ? 0.0 : 2.0
     }
 
-    /// 計算翻譯文字的階梯式景深模糊半徑
+    /// 計算翻譯文字的單層級景深模糊半徑
     private func translationBlurRadius(for index: Int) -> CGFloat {
-        guard !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
+        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
             return 0.0
         }
         guard let current = monitor.currentLineIndex else {
             return 0.0
         }
-        let dist = abs(index - current)
-        switch dist {
-        case 0:
-            return 0.0
-        case 1:
-            return 0.8
-        case 2:
-            return 1.3
-        default:
-            return 1.8
-        }
+        return (index == current) ? 0.0 : 1.2
     }
 
     /// 檢查焦點行是否在目前畫面可視範圍內（僅在結果翻轉時更新 @State）
