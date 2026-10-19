@@ -250,36 +250,7 @@ private struct CharacterPieceView: View {
                     x: 0,
                     y: 0
                 )
-                .opacity(charProgress > 0 ? 1.0 : 0.0)
-                .mask {
-                    if charProgress >= 1.0 {
-                        Color.white
-                    } else if charProgress <= 0.0 {
-                        Color.clear
-                    } else {
-                        GeometryReader { geo in
-                            let width = geo.size.width
-                            let currentX = width * charProgress
-                            let feather: CGFloat = 4
-
-                            HStack(spacing: 0) {
-                                Rectangle()
-                                    .fill(Color.white)
-                                    .frame(width: max(0, currentX - feather / 2))
-
-                                LinearGradient(
-                                    colors: [Color.white, Color.clear],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                                .frame(width: feather)
-
-                                Spacer(minLength: 0)
-                            }
-                            .frame(width: width, alignment: .leading)
-                        }
-                    }
-                }
+                .opacity(min(1.0, max(0.0, charProgress)))
         }
         .offset(y: liftY)
     }
