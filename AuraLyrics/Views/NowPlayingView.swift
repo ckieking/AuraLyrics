@@ -37,6 +37,7 @@ struct NowPlayingView: View {
                         pipIndependentButton
                         moreMenuIndependentButton
                     }
+                    .padding(.trailing, 20)
                 }
             }
             .sheet(isPresented: $showSearchSheet) {
