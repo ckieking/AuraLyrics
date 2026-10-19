@@ -52,15 +52,14 @@ public struct AppleMusicKaraokeText: View {
                         blurRadius: blurRadius
                     )
                 } else {
-                    let lineChars = buildLineChars(from: validSyllables)
-                    let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
+                    let grouped = buildSyllableCharGroups(from: validSyllables)
+                    let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: grouped.allChars)
 
                     SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
-                        ForEach(validSyllables) { syl in
-                            let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
+                        ForEach(grouped.syllableGroups) { group in
                             SyllablePieceView(
-                                syllable: syl,
-                                chars: charsInSyllable,
+                                syllable: group.syllable,
+                                chars: group.chars,
                                 continuousFocus: continuousFocus,
                                 currentPlayMs: currentPlaybackTimeMs
                             )
@@ -71,31 +70,41 @@ public struct AppleMusicKaraokeText: View {
         }
     }
 
-    // MARK: - 構建整行字元時間軸映射
-    private func buildLineChars(from syllables: [LyricSyllable]) -> [LineCharInfo] {
-        var result: [LineCharInfo] = []
+    // MARK: - 單次走訪構建整行字元時間軸與音節分組映射 (O(N) 取代 O(S*C) 重複 filter)
+    private func buildSyllableCharGroups(from syllables: [LyricSyllable]) -> (allChars: [LineCharInfo], syllableGroups: [SyllableCharGroup]) {
+        var allChars: [LineCharInfo] = []
+        var groups: [SyllableCharGroup] = []
+        groups.reserveCapacity(syllables.count)
         var globalIdx = 0
 
         for syl in syllables {
-            let chars = Array(syl.text)
-            guard !chars.isEmpty else { continue }
-            let count = chars.count
+            let rawChars = Array(syl.text)
+            guard !rawChars.isEmpty else {
+                groups.append(SyllableCharGroup(syllable: syl, chars: []))
+                continue
+            }
+            let count = rawChars.count
             let duration = max(10, syl.durationMs)
             let step = max(5, duration / count)
+            var sylChars: [LineCharInfo] = []
+            sylChars.reserveCapacity(count)
 
-            for (i, char) in chars.enumerated() {
+            for (i, char) in rawChars.enumerated() {
                 let charStart = syl.timeMs + i * step
-                result.append(LineCharInfo(
+                let info = LineCharInfo(
                     id: globalIdx,
                     text: String(char),
                     syllableId: syl.id,
                     startMs: charStart,
                     durationMs: step
-                ))
+                )
+                sylChars.append(info)
+                allChars.append(info)
                 globalIdx += 1
             }
+            groups.append(SyllableCharGroup(syllable: syl, chars: sylChars))
         }
-        return result
+        return (allChars, groups)
     }
 
     // MARK: - 計算全行 100% 連續平滑的能量焦點 (Continuous Focus Tracker)
@@ -137,7 +146,7 @@ public struct AppleMusicKaraokeText: View {
     }
 }
 
-// MARK: - 全行字元時空模型
+// MARK: - 全行字元時空模型與音節預分組
 private struct LineCharInfo: Identifiable {
     let id: Int // 全域字元索引 0, 1, 2...
     let text: String
@@ -145,6 +154,12 @@ private struct LineCharInfo: Identifiable {
     let startMs: Int
     let durationMs: Int
     var endMs: Int { startMs + max(5, durationMs) }
+}
+
+private struct SyllableCharGroup: Identifiable {
+    let syllable: LyricSyllable
+    let chars: [LineCharInfo]
+    var id: UUID { syllable.id }
 }
 
 // MARK: - 單音節渲染區塊 (鎖定佈局尺寸 + 逐字元掃描動態)
@@ -291,12 +306,10 @@ public struct SyllableFlowLayout: Layout {
         self.verticalSpacing = verticalSpacing
     }
 
-    /// 根據可用寬度，計算最優的行劃分（每行所包含的子視圖索引）
-    private func computeLineBreaks(subviews: Subviews, maxWidth: CGFloat) -> [[Int]] {
-        guard !subviews.isEmpty else { return [] }
-
-        let count = subviews.count
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+    /// 根據已量測的子視圖尺寸與可用寬度，計算最優的行劃分（避免重複呼叫 sizeThatFits）
+    private func computeLineBreaks(sizes: [CGSize], maxWidth: CGFloat) -> [[Int]] {
+        let count = sizes.count
+        guard count > 0 else { return [] }
 
         // 1. 檢查整句是否能在 1 行內完全放下
         var line1Width: CGFloat = 0
@@ -362,11 +375,12 @@ public struct SyllableFlowLayout: Layout {
     }
 
     public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard !subviews.isEmpty else { return .zero }
         let maxWidth = proposal.width ?? .infinity
-        let lineIndices = computeLineBreaks(subviews: subviews, maxWidth: maxWidth)
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let lineIndices = computeLineBreaks(sizes: sizes, maxWidth: maxWidth)
         guard !lineIndices.isEmpty else { return .zero }
 
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
         var totalHeight: CGFloat = 0
         var maxLineWidth: CGFloat = 0
 
@@ -385,18 +399,19 @@ public struct SyllableFlowLayout: Layout {
     }
 
     public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard !subviews.isEmpty else { return }
         let maxWidth = bounds.width
-        let lineIndices = computeLineBreaks(subviews: subviews, maxWidth: maxWidth)
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let lineIndices = computeLineBreaks(sizes: sizes, maxWidth: maxWidth)
         guard !lineIndices.isEmpty else { return }
 
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
         var currentY = bounds.minY
 
-        for (lineIdx, indices) in lineIndices.enumerated() {
+        for (_, indices) in lineIndices.enumerated() {
             var currentX = bounds.minX
             var lineHeight: CGFloat = 0
 
-            for (idxInLine, i) in indices.enumerated() {
+            for (_, i) in indices.enumerated() {
                 let size = sizes[i]
                 subviews[i].place(
                     at: CGPoint(x: currentX, y: currentY),
@@ -419,7 +434,7 @@ private struct InactiveSyllableLyricView: View, Equatable {
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.text == rhs.text &&
-        lhs.syllables.count == rhs.syllables.count &&
+        lhs.syllables == rhs.syllables &&
         lhs.blurRadius == rhs.blurRadius
     }
 

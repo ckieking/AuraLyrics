@@ -3,6 +3,7 @@ import ActivityKit
 import Combine
 
 /// 運行環境診斷與判定器
+@MainActor
 public final class RuntimeEnvironmentDetector: ObservableObject {
     public static let shared = RuntimeEnvironmentDetector()
 

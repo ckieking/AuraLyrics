@@ -5,13 +5,35 @@ import Combine
 /// 背景保活管理員
 /// 透過在記憶體中生成極小體積的無聲 PCM 音訊，配合 `.playback` 與 `.mixWithOthers`，
 /// 確保 App 在背景或鎖定畫面時持續運作，絕不中斷或干擾 Apple Music 音樂播放。
+@MainActor
 public final class BackgroundKeepAliveManager: ObservableObject {
     public static let shared = BackgroundKeepAliveManager()
 
     @Published public private(set) var isRunning: Bool = false
     private var audioPlayer: AVAudioPlayer?
 
-    private init() {}
+    private init() {
+        setupInterruptionObserver()
+    }
+
+    private func setupInterruptionObserver() {
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isRunning else { return }
+                if let typeValue = typeValue,
+                   let type = AVAudioSession.InterruptionType(rawValue: typeValue),
+                   type == .ended {
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                    self.audioPlayer?.play()
+                }
+            }
+        }
+    }
 
     public func startKeepAlive() {
         guard !isRunning else { return }

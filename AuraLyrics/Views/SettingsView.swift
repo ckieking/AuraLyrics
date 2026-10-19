@@ -299,12 +299,11 @@ struct SettingsView: View {
 
     private func clearAllCache() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        for item in LyricsProviderService.shared.listAllCachedLyrics() {
-            LyricsProviderService.shared.deleteCachedLyrics(title: item.trackTitle, artist: item.artistName)
-        }
+        LyricsProviderService.shared.clearAllCache()
         cacheClearedToast = true
         Task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
+            guard !Task.isCancelled else { return }
             cacheClearedToast = false
         }
     }

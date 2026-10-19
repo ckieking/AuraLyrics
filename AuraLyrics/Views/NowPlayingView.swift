@@ -75,32 +75,8 @@ struct NowPlayingView: View {
                     }
                 }
             }
-            .onChange(of: monitor.currentLineIndex) { _, newIndex in
-                guard let index = newIndex, monitor.currentLyrics.lines.indices.contains(index) else { return }
-                let current = monitor.currentLyrics.lines[index]
-
-                var secondaryText: String? = nil
-                if showTranslation, let trans = current.translation, !trans.isEmpty {
-                    secondaryText = trans
-                } else if index + 1 < monitor.currentLyrics.lines.count {
-                    secondaryText = monitor.currentLyrics.lines[index + 1].text
-                }
-
-                // 推送至 PiP 懸浮視窗引擎（懸浮窗內僅顯示原文歌詞）
-                pipEngine.updateLyrics(
-                    line: current.text,
-                    secondaryLine: nil,
-                    progress: monitor.playbackProgress
-                )
-
-                // 推送至即時動態引擎
-                liveActivityEngine.updateLyrics(
-                    line: current.text,
-                    secondaryLine: secondaryText,
-                    track: monitor.currentTrack,
-                    isPlaying: monitor.isPlaying,
-                    progress: monitor.playbackProgress
-                )
+            .onChange(of: showTranslation) { _, _ in
+                monitor.syncExternalEngines()
             }
         }
     }
@@ -311,16 +287,16 @@ struct NowPlayingView: View {
                             .id(index)
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 scrollIdleTask?.cancel()
                                 scrollIdleTask = nil
                                 isUserScrolling = false
-                                monitor.currentLineIndex = index
+                                monitor.seek(toMs: line.timeMs)
                                 isCurrentLineInViewport = true
                                 withAnimation(.easeInOut(duration: 0.35)) {
                                     proxy.scrollTo(index, anchor: .center)
                                 }
                             }
-                            .sensoryFeedback(.impact(weight: .light), trigger: monitor.currentLineIndex)
                             .onAppear {
                                 tracker.visibleIndices.insert(index)
                                 checkCurrentLineVisibility()
@@ -371,6 +347,7 @@ struct NowPlayingView: View {
                     scrollIdleTask?.cancel()
                     scrollIdleTask = Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        guard !Task.isCancelled else { return }
                         withAnimation(.easeInOut(duration: 0.35)) {
                             isUserScrolling = false
                         }
@@ -404,8 +381,13 @@ struct NowPlayingView: View {
                 updateCachedArtwork()
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 120_000_000)
+                    guard !Task.isCancelled else { return }
                     forceScrollToCurrentLine(proxy: proxy, animated: false)
                 }
+            }
+            .onDisappear {
+                scrollIdleTask?.cancel()
+                scrollIdleTask = nil
             }
             .onChange(of: monitor.currentTrack.artworkData) { _, _ in
                 updateCachedArtwork()
@@ -414,14 +396,9 @@ struct NowPlayingView: View {
                 if newPhase == .active {
                     Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 120_000_000)
+                        guard !Task.isCancelled else { return }
                         forceScrollToCurrentLine(proxy: proxy, animated: true)
                     }
-                }
-            }
-            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 150_000_000)
-                    forceScrollToCurrentLine(proxy: proxy, animated: true)
                 }
             }
         }

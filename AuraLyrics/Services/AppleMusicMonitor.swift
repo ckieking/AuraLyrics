@@ -130,6 +130,7 @@ public final class AppleMusicMonitor: ObservableObject {
             lastPersistentID = 0
             lastPlaybackStoreID = ""
             lastPlaybackTimeSec = 0
+            syncExternalEngines()
             return
         }
 
@@ -174,6 +175,7 @@ public final class AppleMusicMonitor: ObservableObject {
         anchorPlaybackTimeSec = playTime
         anchorMediaTime = CACurrentMediaTime()
         lastPlaybackTimeSec = playTime
+        syncExternalEngines()
 
         // 取消先前可能未完成的非同步歌詞請求，避免競態覆蓋
         lyricsFetchTask?.cancel()
@@ -184,12 +186,10 @@ public final class AppleMusicMonitor: ObservableObject {
             guard !Task.isCancelled else { return }
             if let fetched = fetched {
                 self.currentLyrics = fetched
-                let currentMs = self.interpolatedPlaybackTimeMs()
-                self.currentLineIndex = fetched.currentLineIndex(at: currentMs, globalOffsetMs: self.globalOffsetMs)
             } else {
                 self.currentLyrics = SyncedLyrics.empty
-                self.currentLineIndex = nil
             }
+            self.refreshCurrentLineIndex(forceSync: true)
             self.isLoadingLyrics = false
         }
     }
@@ -202,6 +202,7 @@ public final class AppleMusicMonitor: ObservableObject {
             currentPlaybackTimeSec = playTime
             anchorPlaybackTimeSec = playTime
             anchorMediaTime = CACurrentMediaTime()
+            syncExternalEngines()
         }
     }
 
@@ -243,10 +244,12 @@ public final class AppleMusicMonitor: ObservableObject {
 
         // 2. 即時同步播放狀態（主動偵測，不完全依賴可能延遲的跨行程通知）
         let actualIsPlaying = (musicPlayer.playbackState == .playing)
+        var didPlayStateChange = false
         if isPlaying != actualIsPlaying {
             isPlaying = actualIsPlaying
             anchorPlaybackTimeSec = playTime
             anchorMediaTime = now
+            didPlayStateChange = true
         }
 
         // 3. 高精度時鐘平滑推進與智慧防抖校準
@@ -281,44 +284,110 @@ public final class AppleMusicMonitor: ObservableObject {
 
         if currentTrack.duration > 0 {
             playbackProgress = min(max(currentPlaybackTimeSec / currentTrack.duration, 0.0), 1.0)
-            if PiPLyricsEngine.shared.isPiPActive {
+            if abs(PiPLyricsViewModel.shared.progress - playbackProgress) > 0.002 {
                 PiPLyricsViewModel.shared.progress = playbackProgress
             }
         }
 
-        // 核心修復：行索引比對必須採用高精度插值播放時間，絕不可使用可能因 IPC 卡在 0.0 的原始 playTime
+        refreshCurrentLineIndex(forceSync: didPlayStateChange)
+    }
+
+    /// 統一依據高精度插值時鐘重新計算當前歌詞行索引，並同步推播至 PiP 與動態島引擎
+    private func refreshCurrentLineIndex(forceSync: Bool = false) {
+        // interpolatedPlaybackTimeMs() 已內含 globalOffsetMs，此處傳入 globalOffsetMs: 0 避免重複累加
         let accurateTimeMs = interpolatedPlaybackTimeMs()
         let newIndex = currentLyrics.currentLineIndex(at: accurateTimeMs, globalOffsetMs: 0)
 
         if newIndex != currentLineIndex {
             currentLineIndex = newIndex
+            syncExternalEngines()
+        } else if forceSync {
+            syncExternalEngines()
         }
     }
 
-    /// 取得高精度插值播放時間（毫秒，結合平滑防抖時鐘與微秒級幀間差）
+    /// 主動同步當前歌詞或曲目狀態至 PiP 懸浮窗與 Live Activity 動態島（背景與各分頁下皆保持同步）
+    public func syncExternalEngines() {
+        let showTranslation = UserDefaults.standard.object(forKey: "showBilingualLyrics") as? Bool ?? true
+
+        if let index = currentLineIndex, currentLyrics.lines.indices.contains(index) {
+            let current = currentLyrics.lines[index]
+            var secondaryText: String? = nil
+            if showTranslation, let trans = current.translation, !trans.isEmpty {
+                secondaryText = trans
+            } else if index + 1 < currentLyrics.lines.count {
+                secondaryText = currentLyrics.lines[index + 1].text
+            }
+
+            PiPLyricsEngine.shared.updateLyrics(
+                line: current.text,
+                secondaryLine: nil,
+                progress: playbackProgress
+            )
+            LiveActivityLyricsEngine.shared.updateLyrics(
+                line: current.text,
+                secondaryLine: secondaryText,
+                track: currentTrack,
+                isPlaying: isPlaying,
+                progress: playbackProgress
+            )
+        } else {
+            let introPrimary = (currentTrack.title == TrackInfo.placeholder.title)
+                ? "AuraLyrics 靈動歌詞"
+                : "♪ \(currentTrack.title)"
+            let introSecondary = currentTrack.artist.isEmpty ? nil : currentTrack.artist
+
+            PiPLyricsEngine.shared.updateLyrics(
+                line: introPrimary,
+                secondaryLine: nil,
+                progress: playbackProgress
+            )
+            LiveActivityLyricsEngine.shared.updateLyrics(
+                line: introPrimary,
+                secondaryLine: introSecondary,
+                track: currentTrack,
+                isPlaying: isPlaying,
+                progress: playbackProgress
+            )
+        }
+    }
+
+    /// 取得高精度插值播放時間（毫秒，結合平滑防抖時鐘與微秒級幀間差，已包含 globalOffsetMs）
     public func interpolatedPlaybackTimeMs() -> Int {
         let elapsed = isPlaying ? max(0, CACurrentMediaTime() - anchorMediaTime) : 0
         let timeSec = anchorPlaybackTimeSec + elapsed
         return Int(timeSec * 1000) + globalOffsetMs
     }
 
+    // MARK: - 點擊歌詞行跳轉播放進度
+    public func seek(toMs targetLineTimeMs: Int) {
+        let rawMs = targetLineTimeMs - globalOffsetMs - currentLyrics.offsetMs
+        let targetSec = max(0.0, Double(rawMs) / 1000.0)
+        musicPlayer.currentPlaybackTime = targetSec
+        currentPlaybackTimeSec = targetSec
+        anchorPlaybackTimeSec = targetSec
+        anchorMediaTime = CACurrentMediaTime()
+        lastPlaybackTimeSec = targetSec
+        if currentTrack.duration > 0 {
+            playbackProgress = min(max(targetSec / currentTrack.duration, 0.0), 1.0)
+        }
+        refreshCurrentLineIndex(forceSync: true)
+    }
+
     // MARK: - 調整全域共用之時間軸微調偏移量
     public func adjustGlobalOffset(byMs: Int) {
         globalOffsetMs += byMs
-        let timeMs = Int(currentPlaybackTimeSec * 1000)
-        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
+        refreshCurrentLineIndex(forceSync: true)
     }
 
     public func resetGlobalOffset() {
         globalOffsetMs = 0
-        let timeMs = Int(currentPlaybackTimeSec * 1000)
-        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
+        refreshCurrentLineIndex(forceSync: true)
     }
 
     // MARK: - 手動套用自訂歌詞
     public func applyCustomLyrics(_ lyrics: SyncedLyrics) {
         currentLyrics = lyrics
-        let timeMs = Int(currentPlaybackTimeSec * 1000)
-        currentLineIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
+        refreshCurrentLineIndex(forceSync: true)
     }
 }

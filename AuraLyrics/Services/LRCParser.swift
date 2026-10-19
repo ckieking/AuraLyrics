@@ -1,29 +1,48 @@
 import Foundation
 
 /// LRC 歌詞解析與雙語合併引擎（支援標準 LRC 與 Enhanced LRC 逐字時間軸）
-public final class LRCParser {
+public final class LRCParser: Sendable {
     public static let shared = LRCParser()
+
+    // MARK: - 預編譯正則表達式快取（避免每次解析與每行重複編譯）
+    private static let lrcLineRegex = try? NSRegularExpression(pattern: "\\[(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?\\]", options: [])
+    private static let offsetTagRegex = try? NSRegularExpression(pattern: "^\\[offset:\\s*([+-]?\\d+)\\s*\\]$", options: [.caseInsensitive])
+    private static let enhancedSyllableRegex = try? NSRegularExpression(pattern: "<(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?>([^<]*)", options: [])
+    private static let yrcKrcLineRegex = try? NSRegularExpression(pattern: #"^\[(\d+),(\d+)\]"#, options: [])
+    private static let yrcSyllableRegex = try? NSRegularExpression(pattern: #"\((\d+),(\d+),(\d+)\)([^\(\[]*)"#, options: [])
+    private static let krcSyllableRegex = try? NSRegularExpression(pattern: #"[<\(](\d+),(\d+)[>\)]([^<\[\(\)]*)"#, options: [])
 
     private init() {}
 
-    /// 解析 LRC 字串為時間排序的 LyricLine 陣列（支援逐字音節解析）
+    /// 解析 LRC 字串為時間排序的 LyricLine 陣列（支援逐字音節解析與 [offset:] 標籤）
     public func parse(lrcContent: String) -> [LyricLine] {
         var lines: [LyricLine] = []
         let rawLines = lrcContent.components(separatedBy: .newlines)
+        guard let regex = Self.lrcLineRegex else { return [] }
 
-        // 正則表示式匹配 [01:23.45] 或 [01:23.456]
-        let regex = try? NSRegularExpression(pattern: "\\[(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?\\]", options: [])
+        var fileOffsetMs = 0
 
         for line in rawLines {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { continue }
 
-            // 略過純元資料標籤（如 [ti:Song], [ar:Artist], [offset:0]）
+            // 解析標準 LRC [offset:+/-ms] 標籤
+            if trimmed.lowercased().hasPrefix("[offset:"),
+               let offsetRegex = Self.offsetTagRegex,
+               let match = offsetRegex.firstMatch(in: trimmed, options: [], range: NSRange(location: 0, length: trimmed.utf16.count)),
+               match.numberOfRanges >= 2 {
+                let nsTrimmed = trimmed as NSString
+                if let val = Int(nsTrimmed.substring(with: match.range(at: 1))) {
+                    fileOffsetMs = val
+                }
+                continue
+            }
+
+            // 略過純元資料標籤（如 [ti:Song], [ar:Artist]）
             if trimmed.hasPrefix("[ti:") || trimmed.hasPrefix("[ar:") || trimmed.hasPrefix("[al:") || trimmed.hasPrefix("[by:") {
                 continue
             }
 
-            guard let regex = regex else { continue }
             let matches = regex.matches(in: trimmed, options: [], range: NSRange(location: 0, length: trimmed.utf16.count))
             guard !matches.isEmpty else { continue }
 
@@ -34,7 +53,15 @@ public final class LRCParser {
             let rawLyricText = nsString.substring(from: textStartIndex).trimmingCharacters(in: .whitespaces)
 
             // 解析是否含有 Enhanced 逐字音節標籤
-            let (cleanText, syllables) = parseEnhancedSyllables(from: rawLyricText)
+            let (cleanText, rawSyllables) = parseEnhancedSyllables(from: rawLyricText)
+            let adjustedSyllables = rawSyllables?.map { syl in
+                LyricSyllable(
+                    id: syl.id,
+                    text: syl.text,
+                    timeMs: max(0, syl.timeMs - fileOffsetMs),
+                    durationMs: syl.durationMs
+                )
+            }
 
             // 支援一對多時間標籤（如 [00:10.00][01:20.00] 相同歌詞）
             for match in matches {
@@ -55,12 +82,12 @@ public final class LRCParser {
 
                 let minutes = Int(minString) ?? 0
                 let seconds = Int(secString) ?? 0
-                let totalMs = (minutes * 60 + seconds) * 1000 + msValue
+                let totalMs = max(0, (minutes * 60 + seconds) * 1000 + msValue - fileOffsetMs)
 
                 lines.append(LyricLine(
                     timeMs: totalMs,
                     text: cleanText,
-                    syllables: syllables
+                    syllables: adjustedSyllables
                 ))
             }
         }
@@ -71,12 +98,8 @@ public final class LRCParser {
 
     /// 解析單行文字中是否夾帶 Enhanced LRC 音節標籤（如 <00:12.34>字<00:12.80>詞）
     private func parseEnhancedSyllables(from text: String) -> (cleanText: String, syllables: [LyricSyllable]?) {
-        guard text.contains("<") && text.contains(">") else {
-            return (text, nil)
-        }
-
-        let syllablePattern = "<(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?>([^<]*)"
-        guard let regex = try? NSRegularExpression(pattern: syllablePattern, options: []) else {
+        guard text.contains("<") && text.contains(">"),
+              let regex = Self.enhancedSyllableRegex else {
             return (text, nil)
         }
 
@@ -123,18 +146,44 @@ public final class LRCParser {
         return (clean.isEmpty ? text : clean, syllables.isEmpty ? nil : syllables)
     }
 
-    /// 將原文歌詞與翻譯歌詞依時間戳比對合併
+    /// 將原文歌詞與翻譯歌詞依時間戳比對合併（使用二分搜尋達到 O(N log M) 效能）
     public func mergeTranslations(original: [LyricLine], translation: [LyricLine], thresholdMs: Int = 800) -> [LyricLine] {
         guard !translation.isEmpty else { return original }
 
+        let sortedTrans = translation.sorted { $0.timeMs < $1.timeMs }
         var result: [LyricLine] = []
+        result.reserveCapacity(original.count)
 
         for orig in original {
-            // 在容許時間差內尋找最接近的翻譯行
-            let closestTrans = translation.min(by: { abs($0.timeMs - orig.timeMs) < abs($1.timeMs - orig.timeMs) })
-            var translatedText: String? = nil
+            // 二分搜尋尋找最接近 orig.timeMs 的翻譯行
+            var low = 0
+            var high = sortedTrans.count - 1
+            while low <= high {
+                let mid = (low + high) / 2
+                if sortedTrans[mid].timeMs < orig.timeMs {
+                    low = mid + 1
+                } else {
+                    high = mid - 1
+                }
+            }
 
-            if let closest = closestTrans, abs(closest.timeMs - orig.timeMs) <= thresholdMs {
+            var bestCandidate: LyricLine? = nil
+            if low < sortedTrans.count {
+                bestCandidate = sortedTrans[low]
+            }
+            if high >= 0 {
+                let prevCandidate = sortedTrans[high]
+                if let currentBest = bestCandidate {
+                    if abs(prevCandidate.timeMs - orig.timeMs) <= abs(currentBest.timeMs - orig.timeMs) {
+                        bestCandidate = prevCandidate
+                    }
+                } else {
+                    bestCandidate = prevCandidate
+                }
+            }
+
+            var translatedText: String? = nil
+            if let closest = bestCandidate, abs(closest.timeMs - orig.timeMs) <= thresholdMs {
                 let trimmed = closest.text.trimmingCharacters(in: .whitespaces)
                 if !trimmed.isEmpty {
                     translatedText = trimmed
@@ -159,10 +208,8 @@ public final class LRCParser {
         var lines: [LyricLine] = []
         let rawLines = yrcContent.components(separatedBy: .newlines)
 
-        // 匹配行首 [lineStartMs,lineDurationMs]
-        let lineRegex = try? NSRegularExpression(pattern: #"^\[(\d+),(\d+)\]"#, options: [])
-        // 匹配音節 (wordStartMs,wordDurationMs,0)文字
-        let sylRegex = try? NSRegularExpression(pattern: #"\((\d+),(\d+),(\d+)\)([^\(\[]*)"#, options: [])
+        let lineRegex = Self.yrcKrcLineRegex
+        let sylRegex = Self.yrcSyllableRegex
 
         for rawLine in rawLines {
             let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
@@ -241,8 +288,8 @@ public final class LRCParser {
         var lines: [LyricLine] = []
         let rawLines = krcContent.components(separatedBy: .newlines)
 
-        let lineRegex = try? NSRegularExpression(pattern: #"^\[(\d+),(\d+)\]"#, options: [])
-        let sylRegex = try? NSRegularExpression(pattern: #"[<\(](\d+),(\d+)[>\)]([^<\[\(\)]*)"#, options: [])
+        let lineRegex = Self.yrcKrcLineRegex
+        let sylRegex = Self.krcSyllableRegex
 
         for rawLine in rawLines {
             let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
