@@ -42,22 +42,22 @@ public struct PiPLyricsView: View {
                         .strokeBorder(strokeColor, lineWidth: 0.8)
                 )
 
-            VStack(alignment: .leading, spacing: 4) {
-                // 上方大字：播放中當前歌詞
+            VStack(alignment: .leading, spacing: 3) {
+                // 上方大字：播放中當前歌詞（固定字級不縮放、不省略，過長時自然換行至下一行）
                 Text(vm.primaryLine)
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundColor(primaryTextColor)
-                    .lineLimit(vm.secondaryLine == nil || vm.secondaryLine?.isEmpty == true ? 2 : 1)
-                    .minimumScaleFactor(0.75)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 下方小字：下一句歌詞（淺灰）
+                // 下方小字：下一句歌詞（淺灰，被上方折行大字自然往下推，不縮放）
                 if let nextLine = vm.secondaryLine, !nextLine.isEmpty {
                     Text(nextLine)
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
                         .foregroundColor(secondaryTextColor)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
