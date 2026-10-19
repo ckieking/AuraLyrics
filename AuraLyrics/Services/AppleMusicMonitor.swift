@@ -182,8 +182,11 @@ public final class AppleMusicMonitor: ObservableObject {
             guard !Task.isCancelled else { return }
             if let fetched = fetched {
                 self.currentLyrics = fetched
+                let currentMs = self.interpolatedPlaybackTimeMs()
+                self.currentLineIndex = fetched.currentLineIndex(at: currentMs, globalOffsetMs: self.globalOffsetMs)
             } else {
                 self.currentLyrics = SyncedLyrics.empty
+                self.currentLineIndex = nil
             }
             self.isLoadingLyrics = false
         }
@@ -242,8 +245,8 @@ public final class AppleMusicMonitor: ObservableObject {
         let predictedTime = anchorPlaybackTimeSec + (isPlaying ? max(0, now - anchorMediaTime) : 0)
         let drift = abs(playTime - predictedTime)
 
-        // 若誤差超過 120ms（發生拖曳跳轉或暫停），立即重設基準錨點；否則維持平滑推進
-        if drift >= 0.12 || anchorMediaTime == 0 || !isPlaying {
+        // 若誤差超過 600ms（發生手動拖曳跳轉或暫停），立即重設基準錨點；否則維持平滑推進
+        if drift >= 0.60 || anchorMediaTime == 0 || !isPlaying {
             anchorPlaybackTimeSec = playTime
             anchorMediaTime = now
         }
