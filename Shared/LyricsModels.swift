@@ -83,6 +83,8 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
     public var trackTitle: String
     public var artistName: String
     public var lines: [LyricLine]
+    /// 參與人員與創作團隊名單（如 Written by ..., Produced by ...）
+    public var credits: [String]
     /// 時間軸微調偏移量（毫秒，正值代表歌詞提前、負值代表延後）
     public var offsetMs: Int
     /// 來源標記（如 "LRCLIB" 或 "NetEase" 或 "Local"）
@@ -92,20 +94,47 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         trackTitle: String,
         artistName: String,
         lines: [LyricLine],
+        credits: [String] = [],
         offsetMs: Int = 0,
         source: String = "Unknown"
     ) {
         self.trackTitle = trackTitle
         self.artistName = artistName
         self.lines = lines
+        self.credits = credits
         self.offsetMs = offsetMs
         self.source = source
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case trackTitle, artistName, lines, credits, offsetMs, source
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.trackTitle = try container.decode(String.self, forKey: .trackTitle)
+        self.artistName = try container.decode(String.self, forKey: .artistName)
+        self.lines = try container.decode([LyricLine].self, forKey: .lines)
+        self.credits = try container.decodeIfPresent([String].self, forKey: .credits) ?? []
+        self.offsetMs = try container.decode(Int.self, forKey: .offsetMs)
+        self.source = try container.decode(String.self, forKey: .source)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(trackTitle, forKey: .trackTitle)
+        try container.encode(artistName, forKey: .artistName)
+        try container.encode(lines, forKey: .lines)
+        try container.encode(credits, forKey: .credits)
+        try container.encode(offsetMs, forKey: .offsetMs)
+        try container.encode(source, forKey: .source)
     }
 
     public static let empty = SyncedLyrics(
         trackTitle: "",
         artistName: "",
         lines: [],
+        credits: [],
         offsetMs: 0,
         source: "None"
     )

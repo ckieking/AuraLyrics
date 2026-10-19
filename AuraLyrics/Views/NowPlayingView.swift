@@ -313,15 +313,35 @@ struct NowPlayingView: View {
                             .accessibilityLabel(line.text + (line.translation.map { "，翻譯：\($0)" } ?? ""))
                             .accessibilityHint(isCurrent ? "目前唱到的歌詞" : "點擊跳轉至此句")
                         }
+
+                        // MARK: - Apple Music 原生風格：參與人員與創作名單 (Credits, e.g. Written by ...)
+                        if !monitor.currentLyrics.credits.isEmpty {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("參與人員")
+                                    .font(.system(size: 15, weight: .semibold, design: .default))
+                                    .foregroundColor(Color.white.opacity(0.65))
+                                    .padding(.bottom, 2)
+
+                                ForEach(Array(monitor.currentLyrics.credits.enumerated()), id: \.offset) { _, credit in
+                                    Text(credit)
+                                        .font(.system(size: 13, weight: .regular, design: .default))
+                                        .foregroundColor(Color.white.opacity(0.42))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 36)
+                            .padding(.bottom, 48)
+                        }
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 24)
                 }
             }
-            // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續）
+            // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 guard let index = newIndex else { return }
-                let isVisible = visibleLineIndices.contains(index)
+                let isVisible = visibleLineIndices.contains(index) || index <= 1
                 if isVisible {
                     if reduceMotion {
                         proxy.scrollTo(index, anchor: .center)
@@ -333,7 +353,7 @@ struct NowPlayingView: View {
                 }
             }
             // 需求 6：每首歌播完切換下一首時顯示新歌詞並同時滾動回最上方（無視歌詞是否在畫面內外）
-            .onChange(of: monitor.currentTrack.title) { _, _ in
+            .onChange(of: monitor.currentTrack) { _, _ in
                 scrollToTop(proxy: proxy)
             }
             .onChange(of: monitor.currentLyrics.id) { _, _ in
