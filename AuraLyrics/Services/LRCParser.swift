@@ -160,9 +160,9 @@ public final class LRCParser {
         let rawLines = yrcContent.components(separatedBy: .newlines)
 
         // 匹配行首 [lineStartMs,lineDurationMs]
-        let lineRegex = try? NSRegularExpression(pattern: "^\\[(\\d+),(\\d+)\\]", options: [])
+        let lineRegex = try? NSRegularExpression(pattern: #"^\[(\d+),(\d+)\]"#, options: [])
         // 匹配音節 (wordStartMs,wordDurationMs,0)文字
-        let sylRegex = try? NSRegularExpression(pattern: "\\((\\d+),(\\d+),(\\d+)\\)([^\(\\[]*)", options: [])
+        let sylRegex = try? NSRegularExpression(pattern: #"\((\d+),(\d+),(\d+)\)([^\(\[]*)"#, options: [])
 
         for rawLine in rawLines {
             let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
@@ -241,8 +241,8 @@ public final class LRCParser {
         var lines: [LyricLine] = []
         let rawLines = krcContent.components(separatedBy: .newlines)
 
-        let lineRegex = try? NSRegularExpression(pattern: "^\\[(\\d+),(\\d+)\\]", options: [])
-        let sylRegex = try? NSRegularExpression(pattern: "[<\\(](\\d+),(\\d+)[>\\)]([^<\\(\\[]*)", options: [])
+        let lineRegex = try? NSRegularExpression(pattern: #"^\[(\d+),(\d+)\]"#, options: [])
+        let sylRegex = try? NSRegularExpression(pattern: #"[<\(](\d+),(\d+)[>\)]([^<\[\(\)]*)"#, options: [])
 
         for rawLine in rawLines {
             let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
