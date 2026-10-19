@@ -290,8 +290,6 @@ struct NowPlayingView: View {
                                         Text(trans)
                                             .font(.system(size: 16, weight: .medium, design: .default))
                                             .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
-                                            .blur(radius: isCurrent ? 0 : (reduceTransparency ? 0 : 1.2))
-                                            .animation(.easeInOut(duration: 0.35), value: isCurrent)
                                     }
                                 }
                                 .fixedSize(horizontal: false, vertical: true)

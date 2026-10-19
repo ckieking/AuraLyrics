@@ -10,7 +10,6 @@ public struct AppleMusicKaraokeText: View {
     let currentPlaybackTimeMs: Int
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public init(
         text: String,
@@ -38,27 +37,41 @@ public struct AppleMusicKaraokeText: View {
             } else if let validSyllables = syllables, !validSyllables.isEmpty {
                 // 逐字音節時間軸：
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
-                // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地銳利聚焦並擦亮
-                let lineChars = buildLineChars(from: validSyllables)
-                let continuousFocus = isCurrent ? calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars) : -999.0
-                let playMs = isCurrent ? currentPlaybackTimeMs : 0
+                // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
+                if !isCurrent {
+                    // 非當前行：採用輕量化單純音節文字排版，保持相同的 SyllableFlowLayout 與 32pt Bold 字重
+                    // 零陰影、零離屏遮罩、零額外渲染負載，徹底釋放 GPU 算力，維持 120fps 極致流暢
+                    SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+                        ForEach(validSyllables) { syl in
+                            if syl.text.trimmingCharacters(in: .whitespaces).isEmpty {
+                                Text(syl.text)
+                                    .font(.system(size: 32, weight: .bold, design: .default))
+                                    .hidden()
+                            } else {
+                                Text(syl.text)
+                                    .font(.system(size: 32, weight: .bold, design: .default))
+                                    .foregroundColor(Color.white.opacity(0.35))
+                            }
+                        }
+                    }
+                } else {
+                    let lineChars = buildLineChars(from: validSyllables)
+                    let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
 
-                SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
-                    ForEach(validSyllables) { syl in
-                        let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
-                        SyllablePieceView(
-                            syllable: syl,
-                            chars: charsInSyllable,
-                            continuousFocus: continuousFocus,
-                            currentPlayMs: playMs
-                        )
+                    SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+                        ForEach(validSyllables) { syl in
+                            let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
+                            SyllablePieceView(
+                                syllable: syl,
+                                chars: charsInSyllable,
+                                continuousFocus: continuousFocus,
+                                currentPlayMs: currentPlaybackTimeMs
+                            )
+                        }
                     }
                 }
             }
         }
-        // Apple Music 官方原生質感：非當前行添加景深毛玻璃模糊散景 (Out-of-Focus Defocus Blur)
-        .blur(radius: isCurrent ? 0 : (reduceTransparency ? 0 : 2.0))
-        .animation(.easeInOut(duration: 0.35), value: isCurrent)
     }
 
     // MARK: - 構建整行字元時間軸映射
