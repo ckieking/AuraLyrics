@@ -261,12 +261,12 @@ struct NowPlayingView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 100)
                 } else {
-                    LazyVStack(spacing: 24) {
+                    LazyVStack(spacing: 26) {
                         ForEach(Array(monitor.currentLyrics.lines.enumerated()), id: \.element.id) { index, line in
                             let isCurrent = (index == monitor.currentLineIndex)
 
                             HStack(alignment: .top, spacing: 0) {
-                                VStack(alignment: .leading, spacing: 8) {
+                                VStack(alignment: .leading, spacing: 6) {
                                     if isCurrent {
                                         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying)) { _ in
                                             let currentPlayMs = monitor.interpolatedPlaybackTimeMs()
@@ -288,10 +288,11 @@ struct NowPlayingView: View {
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
-                                            .font(.system(.body, design: .default).weight(.medium))
+                                            .font(.system(size: 15, weight: .medium, design: .default))
                                             .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
                                     }
                                 }
+                                .fixedSize(horizontal: false, vertical: true)
                                 Spacer()
                             }
                             .padding(.horizontal, 20)
