@@ -11,6 +11,7 @@ struct NowPlayingView: View {
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var showSearchSheet = false
     @State private var showFileImporter = false
@@ -358,6 +359,41 @@ struct NowPlayingView: View {
             }
             .onChange(of: monitor.currentLyrics.id) { _, _ in
                 scrollToTop(proxy: proxy)
+            }
+            // 需求 7：當使用者重新將本頁面作為焦點頁面時（App 回到前景、分頁切回），強制定位到目前歌詞進度並恢復跟隨
+            .onAppear {
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 120_000_000)
+                    forceScrollToCurrentLine(proxy: proxy, animated: false)
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                if newPhase == .active {
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 120_000_000)
+                        forceScrollToCurrentLine(proxy: proxy, animated: true)
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    forceScrollToCurrentLine(proxy: proxy, animated: true)
+                }
+            }
+        }
+    }
+
+    /// 強制滾動定位至當前正在播放的歌詞行（居中），並自然將其納入 visibleLineIndices 以恢復智能跟隨
+    private func forceScrollToCurrentLine(proxy: ScrollViewProxy, animated: Bool = true) {
+        guard let currentIndex = monitor.currentLineIndex,
+              monitor.currentLyrics.lines.indices.contains(currentIndex) else { return }
+
+        if reduceMotion || !animated {
+            proxy.scrollTo(currentIndex, anchor: .center)
+        } else {
+            withAnimation(.easeInOut(duration: 0.40)) {
+                proxy.scrollTo(currentIndex, anchor: .center)
             }
         }
     }
