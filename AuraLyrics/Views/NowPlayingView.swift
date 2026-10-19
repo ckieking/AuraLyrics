@@ -294,7 +294,7 @@ struct NowPlayingView: View {
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
-                                            .font(.system(.subheadline, design: .rounded).weight(.medium))
+                                            .font(.system(.subheadline, design: .default).weight(.medium))
                                             .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
                                     }
                                 }

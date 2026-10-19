@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Apple Music 逐字卡拉OK流光與節奏律動歌詞組件
-/// 支援獨立音節流式自動換行 (SyllableFlowLayout)、真實字寬動態羽化遮罩、
-/// 音節微上浮 (Lift) 與長音呼吸光暈 (Sustained Note Glow)
+/// 支援音節流式自動換行 (SyllableFlowLayout)、全行統一字級（不縮放）、
+/// 蘋果官方字體 (SF Pro, design: .default) 以及精細到每個字母的獨立波浪上浮律動 (Per-Character Wave Lift)
 public struct AppleMusicKaraokeText: View {
     let text: String
     let syllables: [LyricSyllable]?
@@ -25,21 +25,21 @@ public struct AppleMusicKaraokeText: View {
 
     public var body: some View {
         if !isCurrent {
-            // 非當前行：靜態次級文字，極致省電且保持背景層次深度
+            // 非當前行：字體大小與當前行完全一致 (.title2, design: .default)，切換時不縮放跳動
             Text(text)
-                .font(.system(.title3, design: .rounded).weight(.medium))
-                .foregroundColor(.secondary)
+                .font(.system(.title2, design: .default).weight(.semibold))
+                .foregroundColor(Color.white.opacity(0.32))
                 .multilineTextAlignment(.leading)
         } else if reduceMotion || syllables == nil || syllables?.isEmpty == true {
             // 當前行但無逐字資料（或開啟減弱動態）：
-            // Apple Music 經典整行高亮純白搭配粉光微暈，誠實呈現、絕不假裝勻速掃過避免掉拍
+            // Apple Music 官方 SF Pro 實心純白搭配粉光微暈，字體大小一致不縮放
             Text(text)
-                .font(.system(.title2, design: .rounded).weight(.bold))
+                .font(.system(.title2, design: .default).weight(.bold))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.leading)
                 .shadow(color: Color.pink.opacity(0.38), radius: 8, x: 0, y: 0)
         } else if let validSyllables = syllables, !validSyllables.isEmpty {
-            // 當前行且具備逐字音節時間軸：以 SyllableFlowLayout 進行音節獨立渲染
+            // 當前行且具備逐字音節時間軸：以 SyllableFlowLayout 進行逐音節、逐字母獨立波浪渲染
             SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 6) {
                 ForEach(validSyllables) { syl in
                     SyllablePieceView(
@@ -52,7 +52,7 @@ public struct AppleMusicKaraokeText: View {
     }
 }
 
-// MARK: - 單音節獨立流光與律動渲染單元
+// MARK: - 單音節獨立單元（內部支援精細到每個字母的波浪律動）
 private struct SyllablePieceView: View {
     let syllable: LyricSyllable
     let currentPlayMs: Int
@@ -61,7 +61,7 @@ private struct SyllablePieceView: View {
     private var durationMs: Int { max(10, syllable.durationMs) }
     private var endMs: Int { startMs + durationMs }
 
-    /// 音節播放進度 0.0 ~ 1.0
+    /// 音節整體播放進度 0.0 ~ 1.0
     private var progress: Double {
         if currentPlayMs <= startMs { return 0.0 }
         if currentPlayMs >= endMs { return 1.0 }
@@ -73,85 +73,111 @@ private struct SyllablePieceView: View {
         currentPlayMs >= startMs && currentPlayMs < endMs
     }
 
-    /// 是否為拉長音（>= 600ms）
-    private var isLongNote: Bool {
-        syllable.durationMs >= 600
+    private var characters: [Character] {
+        Array(syllable.text)
     }
 
     var body: some View {
-        // 純空白音節直接保留版面間隙
+        // 純空白音節直接保留版面間隔
         if syllable.text.trimmingCharacters(in: .whitespaces).isEmpty {
             Text(syllable.text)
-                .font(.system(.title2, design: .rounded).weight(.bold))
+                .font(.system(.title2, design: .default).weight(.bold))
                 .hidden()
         } else {
-            // 律動物理回饋：發音時微幅上浮 (Syllable Lift)，唱完後維持輕微浮起
-            let liftY: CGFloat = {
-                if progress <= 0 { return 0 }
-                if isSinging {
-                    return -1.0 - 1.4 * sin(progress * .pi)
-                }
-                return -1.0
-            }()
+            HStack(spacing: 0) {
+                ForEach(Array(characters.enumerated()), id: \.offset) { idx, char in
+                    let charStr = String(char)
+                    let lift = charLiftY(at: idx, total: characters.count, progress: progress)
+                    let (charProgress, isCharActive) = charProgressInfo(at: idx, total: characters.count, progress: progress)
 
-            // 長音呼吸微放大 (Sustained Note Scale)
-            let scale: CGFloat = {
-                if isSinging && isLongNote {
-                    return 1.0 + 0.05 * sin(progress * .pi)
-                }
-                return 1.0
-            }()
+                    ZStack(alignment: .leading) {
+                        // 底層：未唱到的暗色底襯（Apple 官方字體 SF Pro，32% 次級白）
+                        Text(charStr)
+                            .font(.system(.title2, design: .default).weight(.bold))
+                            .foregroundColor(Color.white.opacity(0.32))
 
-            ZStack(alignment: .leading) {
-                // 底層：未唱到的暗色底襯（Apple HIG 32% 半透明次級白）
-                Text(syllable.text)
-                    .font(.system(.title2, design: .rounded).weight(.bold))
-                    .foregroundColor(Color.white.opacity(0.32))
+                        // 頂層：唱到的高亮純白發光字母（僅在當前字母開始發音時才渲染）
+                        if isCharActive {
+                            Text(charStr)
+                                .font(.system(.title2, design: .default).weight(.bold))
+                                .foregroundColor(.white)
+                                .shadow(
+                                    color: isSinging ? Color.pink.opacity(0.48) : Color.pink.opacity(0.32),
+                                    radius: isSinging ? 8 : 5,
+                                    x: 0,
+                                    y: 0
+                                )
+                                .mask {
+                                    if charProgress >= 1.0 {
+                                        Color.white
+                                    } else {
+                                        GeometryReader { geo in
+                                            let width = geo.size.width
+                                            let currentX = width * charProgress
+                                            let feather: CGFloat = 3
 
-                // 頂層：唱到的高亮純白發光文字（僅在 progress > 0 時渲染，徹底根除單字開頭提前亮起問題）
-                if progress > 0 {
-                    Text(syllable.text)
-                        .font(.system(.title2, design: .rounded).weight(.bold))
-                        .foregroundColor(.white)
-                        .shadow(
-                            color: (isSinging && isLongNote) ? Color.pink.opacity(0.65) : Color.pink.opacity(0.38),
-                            radius: (isSinging && isLongNote) ? 10 : 8,
-                            x: 0,
-                            y: 0
-                        )
-                        .mask {
-                            if progress >= 1.0 {
-                                // 唱完：全字純白實心填滿
-                                Color.white
-                            } else {
-                                // 正在唱：自左向右動態線性漸層羽化推進
-                                GeometryReader { geo in
-                                    let width = geo.size.width
-                                    let currentX = width * progress
-                                    let feather: CGFloat = 4
+                                            HStack(spacing: 0) {
+                                                Rectangle()
+                                                    .fill(Color.white)
+                                                    .frame(width: max(0, currentX - feather / 2))
 
-                                    HStack(spacing: 0) {
-                                        Rectangle()
-                                            .fill(Color.white)
-                                            .frame(width: max(0, currentX - feather / 2))
+                                                LinearGradient(
+                                                    colors: [Color.white, Color.clear],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                )
+                                                .frame(width: feather)
 
-                                        LinearGradient(
-                                            colors: [Color.white, Color.clear],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                        .frame(width: feather)
-
-                                        Spacer(minLength: 0)
+                                                Spacer(minLength: 0)
+                                            }
+                                            .frame(width: width, alignment: .leading)
+                                        }
                                     }
-                                    .frame(width: width, alignment: .leading)
                                 }
-                            }
                         }
+                    }
+                    .offset(y: lift)
                 }
             }
-            .offset(y: liftY)
-            .scaleEffect(scale)
+        }
+    }
+
+    /// 計算單一字母的波浪微上浮高度 (Per-Character Wave Lift)
+    private func charLiftY(at index: Int, total: Int, progress: Double) -> CGFloat {
+        if progress <= 0 { return 0 }
+        guard total > 0 else { return 0 }
+
+        let step = 1.0 / Double(total)
+        let charStart = Double(index) * step
+        let charEnd = charStart + step
+
+        if progress >= charEnd {
+            // 唱過該字母：維持輕微微浮 -1.0pt
+            return -1.0
+        } else if progress >= charStart {
+            // 正在唱該字母：依局部正弦波躍起 -1.8pt，呈現漣漪波浪律動
+            let localRatio = (progress - charStart) / step
+            return -1.0 - 1.8 * sin(localRatio * .pi)
+        } else {
+            // 尚未唱到該字母：原位不動
+            return 0.0
+        }
+    }
+
+    /// 計算單一字母內部的擦亮進度 (0.0 ~ 1.0) 與是否已啟動發音
+    private func charProgressInfo(at index: Int, total: Int, progress: Double) -> (charProgress: Double, isActive: Bool) {
+        guard total > 0 else { return (0.0, false) }
+        let step = 1.0 / Double(total)
+        let charStart = Double(index) * step
+        let charEnd = charStart + step
+
+        if progress <= charStart {
+            return (0.0, false)
+        } else if progress >= charEnd {
+            return (1.0, true)
+        } else {
+            let localProgress = (progress - charStart) / step
+            return (localProgress, true)
         }
     }
 }
