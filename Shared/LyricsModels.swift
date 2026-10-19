@@ -110,6 +110,16 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         source: "None"
     )
 
+    /// 是否包含逐字音節時間軸資料
+    public var hasSyllables: Bool {
+        lines.contains { line in
+            if let syllables = line.syllables, !syllables.isEmpty {
+                return true
+            }
+            return false
+        }
+    }
+
     /// 根據當前播放時間（毫秒）與全域微調偏移量，取得當前正在唱的歌詞行索引
     public func currentLineIndex(at currentPlaybackTimeMs: Int, globalOffsetMs: Int = 0) -> Int? {
         guard !lines.isEmpty else { return nil }

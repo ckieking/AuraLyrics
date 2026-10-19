@@ -275,12 +275,12 @@ struct NowPlayingView: View {
                                 VStack(alignment: .leading, spacing: 6) {
                                     if isCurrent {
                                         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying)) { _ in
-                                            let progress = calculateLineProgress(index: index)
+                                            let currentPlayMs = monitor.interpolatedPlaybackTimeMs()
                                             AppleMusicKaraokeText(
                                                 text: line.text,
                                                 syllables: line.syllables,
                                                 isCurrent: true,
-                                                lineProgress: progress
+                                                currentPlaybackTimeMs: currentPlayMs
                                             )
                                         }
                                     } else {
@@ -288,7 +288,7 @@ struct NowPlayingView: View {
                                             text: line.text,
                                             syllables: line.syllables,
                                             isCurrent: false,
-                                            lineProgress: 0.0
+                                            currentPlaybackTimeMs: 0
                                         )
                                     }
 
@@ -357,56 +357,6 @@ struct NowPlayingView: View {
             withAnimation(.easeInOut(duration: 0.35)) {
                 proxy.scrollTo("LyricsTopAnchor", anchor: .top)
             }
-        }
-    }
-
-    /// 計算當前歌詞行的流光播放進度 (0.0 ~ 1.0)
-    /// 支援逐字音節 (Enhanced LRC) 與行級平滑插值 (Standard LRC)
-    private func calculateLineProgress(index: Int) -> Double {
-        let lines = monitor.currentLyrics.lines
-        guard lines.indices.contains(index) else { return 0.0 }
-        let currentLine = lines[index]
-        let currentPlayMs = monitor.interpolatedPlaybackTimeMs()
-
-        // 情況 A：含有逐字音節時間軸 (Enhanced LRC)
-        if let syllables = currentLine.syllables, !syllables.isEmpty {
-            let totalChars = max(1, currentLine.text.count)
-            var accumulatedProgress: Double = 0.0
-
-            for syl in syllables {
-                let sylWeight = Double(syl.text.count) / Double(totalChars)
-                let sylStart = syl.timeMs
-                let sylEnd = syl.timeMs + max(50, syl.durationMs)
-
-                if currentPlayMs <= sylStart {
-                    break
-                } else if currentPlayMs >= sylEnd {
-                    accumulatedProgress += sylWeight
-                } else {
-                    let sylRatio = Double(currentPlayMs - sylStart) / Double(sylEnd - sylStart)
-                    accumulatedProgress += sylWeight * sylRatio
-                    break
-                }
-            }
-            return min(max(accumulatedProgress, 0.0), 1.0)
-        }
-
-        // 情況 B：標準行級時間軸 (Standard LRC)
-        let startTimeMs = currentLine.timeMs
-        let endTimeMs: Int
-        if index + 1 < lines.count {
-            endTimeMs = lines[index + 1].timeMs
-        } else {
-            endTimeMs = startTimeMs + 4000
-        }
-
-        let durationMs = max(400, endTimeMs - startTimeMs)
-        if currentPlayMs <= startTimeMs {
-            return 0.0
-        } else if currentPlayMs >= endTimeMs {
-            return 1.0
-        } else {
-            return Double(currentPlayMs - startTimeMs) / Double(durationMs)
         }
     }
 }
