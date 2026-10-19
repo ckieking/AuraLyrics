@@ -266,28 +266,29 @@ private struct CharacterPieceView: View {
                     .foregroundColor(.white)
                     // 第一層：緊貼文字的純白立體高光（Core Highlight）
                     .shadow(
-                        color: Color.white.opacity(0.65 * g),
-                        radius: 5 * g,
+                        color: (g > 0.04) ? Color.white.opacity(0.65 * g) : .clear,
+                        radius: (g > 0.04) ? 5 * g : 0,
                         x: 0,
                         y: 0
                     )
-                    // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow）
+                    // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow，僅在唱到焦點時綻放，唱完後乾淨歸零避免光斑疊加）
                     .shadow(
-                        color: Color.pink.opacity(0.60 + 0.35 * g),
-                        radius: 14 + 8 * g,
+                        color: (g > 0.04) ? Color.pink.opacity(0.60 + 0.35 * g) : .clear,
+                        radius: (g > 0.04) ? 14 + 8 * g : 0,
                         x: 0,
                         y: 0
                     )
                     // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
                     .shadow(
-                        color: Color.pink.opacity(0.35 * g),
-                        radius: 26 * g,
+                        color: (g > 0.04) ? Color.pink.opacity(0.35 * g) : .clear,
+                        radius: (g > 0.04) ? 26 * g : 0,
                         x: 0,
                         y: 0
                     )
                     .opacity(min(1.0, max(0.0, p)))
             }
             .offset(y: liftY)
+            .transaction { $0.animation = nil }
         }
     }
 }
@@ -452,7 +453,6 @@ private struct InactiveSyllableLyricView: View, Equatable {
                 }
             }
         }
-        .drawingGroup()
         .blur(radius: blurRadius)
     }
 }
