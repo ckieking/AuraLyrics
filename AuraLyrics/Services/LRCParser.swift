@@ -419,7 +419,7 @@ public final class LRCParser {
     }
 
     /// 解析 LRC 並直接分離 Credits
-    public func parseWithCredits(lrcContent: String) -> (lines: [LyricLine], credits: [String]) {
+    public func parseWithCredits(lrcContent: String) -> (cleanLines: [LyricLine], credits: [String]) {
         let raw = parse(lrcContent: lrcContent)
         return extractCredits(from: raw)
     }
