@@ -20,22 +20,6 @@ struct NowPlayingView: View {
     /// 記錄當前在螢幕可視範圍內的歌詞行索引（支援 Apple Music 智能跟隨）
     @State private var visibleLineIndices: Set<Int> = []
 
-    /// 記錄使用者是否正在手動滑動螢幕（手動瀏覽時取消景深柔焦散景）
-    @State private var isUserInteracting = false
-    @State private var idleResetTask: Task<Void, Never>? = nil
-
-    /// 焦點歌詞當前是否在螢幕可視範圍內
-    private var isCurrentLineVisible: Bool {
-        guard let current = monitor.currentLineIndex else { return false }
-        return visibleLineIndices.contains(current) || current <= 1
-    }
-
-    /// 是否啟用 Apple Music 景深柔焦散景效果
-    /// 僅在「焦點歌詞在畫面中」且「使用者未手動滑動螢幕」時生效；滑出螢幕或手動滑動時自動取消效果，全篇還原清晰純文字
-    private var isDefocusActive: Bool {
-        isCurrentLineVisible && !isUserInteracting
-    }
-
     var body: some View {
         NavigationStack {
             ZStack(alignment: .topTrailing) {
@@ -290,8 +274,7 @@ struct NowPlayingView: View {
                                                 text: line.text,
                                                 syllables: line.syllables,
                                                 isCurrent: true,
-                                                currentPlaybackTimeMs: currentPlayMs,
-                                                isDefocusActive: false
+                                                currentPlaybackTimeMs: currentPlayMs
                                             )
                                         }
                                     } else {
@@ -299,22 +282,14 @@ struct NowPlayingView: View {
                                             text: line.text,
                                             syllables: line.syllables,
                                             isCurrent: false,
-                                            currentPlaybackTimeMs: 0,
-                                            isDefocusActive: isDefocusActive
+                                            currentPlaybackTimeMs: 0
                                         )
                                     }
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
                                             .font(.system(size: 16, weight: .medium, design: .default))
-                                            .foregroundColor(isCurrent ? .pink : (isDefocusActive ? Color(.secondaryLabel).opacity(0.5) : Color(.secondaryLabel)))
-                                            .shadow(
-                                                color: (isDefocusActive && !isCurrent) ? Color.white.opacity(0.3) : .clear,
-                                                radius: (isDefocusActive && !isCurrent) ? 1.5 : 0,
-                                                x: 0,
-                                                y: 0
-                                            )
-                                            .animation(.easeInOut(duration: 0.30), value: isDefocusActive)
+                                            .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
                                     }
                                 }
                                 .fixedSize(horizontal: false, vertical: true)
@@ -324,10 +299,6 @@ struct NowPlayingView: View {
                             .id(index)
                             .contentShape(Rectangle())
                             .onTapGesture {
-                                idleResetTask?.cancel()
-                                withAnimation(.easeInOut(duration: 0.25)) {
-                                    isUserInteracting = false
-                                }
                                 monitor.currentLineIndex = index
                                 withAnimation(.easeInOut(duration: 0.35)) {
                                     proxy.scrollTo(index, anchor: .center)
@@ -369,27 +340,6 @@ struct NowPlayingView: View {
                     .padding(.bottom, 24)
                 }
             }
-            // Apple Music 原生互動：使用者手動滑動螢幕時立即取消柔焦散景，全篇還原清晰；停止滑動後平滑淡入柔焦
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 4)
-                    .onChanged { _ in
-                        idleResetTask?.cancel()
-                        if !isUserInteracting {
-                            withAnimation(.easeInOut(duration: 0.25)) {
-                                isUserInteracting = true
-                            }
-                        }
-                    }
-                    .onEnded { _ in
-                        idleResetTask?.cancel()
-                        idleResetTask = Task { @MainActor in
-                            try? await Task.sleep(nanoseconds: 2_500_000_000)
-                            withAnimation(.easeInOut(duration: 0.35)) {
-                                isUserInteracting = false
-                            }
-                        }
-                    }
-            )
             // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 guard let index = newIndex else { return }

@@ -8,7 +8,6 @@ public struct AppleMusicKaraokeText: View {
     let syllables: [LyricSyllable]?
     let isCurrent: Bool
     let currentPlaybackTimeMs: Int
-    let isDefocusActive: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -16,14 +15,12 @@ public struct AppleMusicKaraokeText: View {
         text: String,
         syllables: [LyricSyllable]? = nil,
         isCurrent: Bool,
-        currentPlaybackTimeMs: Int = 0,
-        isDefocusActive: Bool = false
+        currentPlaybackTimeMs: Int = 0
     ) {
         self.text = text
         self.syllables = syllables
         self.isCurrent = isCurrent
         self.currentPlaybackTimeMs = currentPlaybackTimeMs
-        self.isDefocusActive = isDefocusActive
     }
 
     public var body: some View {
@@ -31,26 +28,20 @@ public struct AppleMusicKaraokeText: View {
             if syllables == nil || syllables?.isEmpty == true || reduceMotion {
                 // 普通行級時間軸（或減弱動態）：
                 // 無論是否唱到，字級與字重嚴格統一為 SF Pro 32pt Bold，折行點完全一致，絕不因播放而突發性換行
+                // 非當前行零陰影開銷，僅當前行綻放立體粉光
                 Text(text)
                     .font(.system(size: 32, weight: .bold, design: .default))
-                    .foregroundColor(isCurrent ? .white : (isDefocusActive ? Color.white.opacity(0.18) : Color.white.opacity(0.40)))
+                    .foregroundColor(isCurrent ? .white : Color.white.opacity(0.35))
                     .multilineTextAlignment(.leading)
-                    .shadow(
-                        color: isCurrent ? Color.white.opacity(0.45) : (isDefocusActive ? Color.white.opacity(0.45) : .clear),
-                        radius: isCurrent ? 5 : 3.0,
-                        x: 0,
-                        y: 0
-                    )
-                    .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: 14, x: 0, y: 0)
+                    .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: isCurrent ? 5 : 0, x: 0, y: 0)
+                    .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: isCurrent ? 14 : 0, x: 0, y: 0)
             } else if let validSyllables = syllables, !validSyllables.isEmpty {
                 // 逐字音節時間軸：
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
                 // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
                 if !isCurrent {
                     // 非當前行：採用輕量化單純音節文字排版，保持相同的 SyllableFlowLayout 與 32pt Bold 字重
-                    // 零離屏渲染通道（Offscreen Pass = 0），維持 120fps 極致流暢！
-                    // 當 isDefocusActive == true 時套用硬體原生的文字輪廓散焦光暈（Shadow Defocus），呈現鏡頭景深毛玻璃失焦質感；
-                    // 當使用者滑動螢幕或焦點行不在畫面時，自動取消散焦，還原清晰純文字
+                    // 零陰影、零離屏遮罩、零額外渲染負載，徹底釋放 GPU 算力，維持 120fps 極致流暢！
                     SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
                         ForEach(validSyllables) { syl in
                             if syl.text.trimmingCharacters(in: .whitespaces).isEmpty {
@@ -60,17 +51,10 @@ public struct AppleMusicKaraokeText: View {
                             } else {
                                 Text(syl.text)
                                     .font(.system(size: 32, weight: .bold, design: .default))
-                                    .foregroundColor(isDefocusActive ? Color.white.opacity(0.18) : Color.white.opacity(0.40))
-                                    .shadow(
-                                        color: isDefocusActive ? Color.white.opacity(0.45) : .clear,
-                                        radius: isDefocusActive ? 3.0 : 0,
-                                        x: 0,
-                                        y: 0
-                                    )
+                                    .foregroundColor(Color.white.opacity(0.35))
                             }
                         }
                     }
-                    .animation(.easeInOut(duration: 0.30), value: isDefocusActive)
                 } else {
                     let lineChars = buildLineChars(from: validSyllables)
                     let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
