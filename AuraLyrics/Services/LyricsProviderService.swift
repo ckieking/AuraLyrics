@@ -108,7 +108,12 @@ public final class LyricsProviderService: ObservableObject {
 
         // 1. 若本地快取已包含逐字音節時間軸，或為使用者本地手動匯入，直接採用
         if let cached = cached, (cached.hasSyllables || cached.source == "Local") {
-            return cached
+            // 自動異常檢測與自癒：若曲目非 Remix/Live，但快取第一句時間嚴重延遲（> 10 秒，例如舊版誤抓之 Remix 歌詞），自動作廢並重新查詢
+            let firstLineTime = cached.lines.first?.timeMs ?? 0
+            let isSuspiciousLag = (firstLineTime > 10_000 && !cleanTitle.lowercased().contains("remix") && !cleanTitle.lowercased().contains("live"))
+            if !isSuspiciousLag {
+                return cached
+            }
         }
 
         // 2. 優先向網易雲音樂請求原生逐字時間軸 (YRC/KRC) 與雙語翻譯
