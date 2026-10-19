@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Apple Music 逐字卡拉OK流光與高斯流體聚焦連鎖光暈組件 (Gaussian Fluid Focus Wave & Lens Ripple)
-/// 實作 Apple Music 標誌性物理動效：發音字連鎖帶動周圍相鄰字一起平滑放大，並伴隨粉白呼吸光暈擴散
+/// Apple Music 逐字卡拉OK流光與連續高斯流體聚焦連鎖組件 (Continuous Gaussian Focus Wave & Lens Ripple)
+/// 實作 Apple Music 原生連續動態：下一個字母在播放時從「已被相鄰帶動的大小」平滑無縫繼續放大至波峰，絕不突跳抽搐
 public struct AppleMusicKaraokeText: View {
     let text: String
     let syllables: [LyricSyllable]?
@@ -24,7 +24,7 @@ public struct AppleMusicKaraokeText: View {
 
     public var body: some View {
         if !isCurrent {
-            // 非當前行：字級與當前行完全一致 (.title2, SF Pro)，切換時不縮放跳動
+            // 非當前行：字級與當前行完全一致 (.title2, SF Pro)，切換行時不縮放跳動
             Text(text)
                 .font(.system(.title2, design: .default).weight(.semibold))
                 .foregroundColor(Color.white.opacity(0.32))
@@ -38,9 +38,9 @@ public struct AppleMusicKaraokeText: View {
                 .multilineTextAlignment(.leading)
                 .shadow(color: Color.pink.opacity(0.38), radius: 8, x: 0, y: 0)
         } else if let validSyllables = syllables, !validSyllables.isEmpty {
-            // 當前行且具備逐字音節時間軸：計算全行字元時間軸與高斯流體發音焦點
+            // 當前行且具備逐字音節時間軸：計算全行連續不斷流的發音焦點 (Continuous Monotonic Focus)
             let lineChars = buildLineChars(from: validSyllables)
-            let focusIndex = calculateFocusIndex(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
+            let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
 
             SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 8) {
                 ForEach(validSyllables) { syl in
@@ -48,7 +48,7 @@ public struct AppleMusicKaraokeText: View {
                     SyllablePieceView(
                         syllable: syl,
                         chars: charsInSyllable,
-                        focusIndex: focusIndex,
+                        continuousFocus: continuousFocus,
                         currentPlayMs: currentPlaybackTimeMs
                     )
                 }
@@ -83,20 +83,43 @@ public struct AppleMusicKaraokeText: View {
         return result
     }
 
-    // MARK: - 計算全行當前發音能量焦點位置 (Focus Index)
-    private func calculateFocusIndex(currentPlayMs: Int, lineChars: [LineCharInfo]) -> Double? {
-        guard let first = lineChars.first, let last = lineChars.last else { return nil }
-        if currentPlayMs < first.startMs || currentPlayMs > last.endMs {
-            return nil
+    // MARK: - 計算全行 100% 連續平滑的能量焦點 (Continuous Focus Tracker)
+    /// 即使在字元交界或字間停頓空隙，焦點依然平滑插值連續滑動，絕不中斷為 nil，保證大小連續無縫
+    private func calculateContinuousFocus(currentPlayMs: Int, lineChars: [LineCharInfo]) -> Double {
+        guard let first = lineChars.first else { return 0.0 }
+        guard let last = lineChars.last else { return 0.0 }
+
+        // 若尚未開始唱本行：焦點平滑停在行首外側
+        if currentPlayMs <= first.startMs {
+            let diff = Double(first.startMs - currentPlayMs) / 400.0
+            return max(-3.0, Double(first.id) - diff)
         }
 
-        for char in lineChars {
-            if currentPlayMs >= char.startMs && currentPlayMs <= char.endMs {
-                let ratio = Double(currentPlayMs - char.startMs) / Double(max(1, char.durationMs))
-                return Double(char.id) + min(max(ratio, 0.0), 1.0)
+        // 若已唱完本行：焦點平滑移向行尾外側
+        if currentPlayMs >= last.endMs {
+            let diff = Double(currentPlayMs - last.endMs) / 400.0
+            return min(Double(last.id) + 3.0, Double(last.id) + 1.0 + diff)
+        }
+
+        // 處於唱段中：尋找當前所在的精確時空區間，並進行平滑插值
+        for i in 0..<lineChars.count {
+            let cur = lineChars[i]
+            if currentPlayMs >= cur.startMs && currentPlayMs <= cur.endMs {
+                let ratio = Double(currentPlayMs - cur.startMs) / Double(max(1, cur.durationMs))
+                return Double(cur.id) + min(max(ratio, 0.0), 1.0)
+            }
+
+            // 若落在當前字與下一個字之間的停頓空隙，進行線性插值過渡
+            if i + 1 < lineChars.count {
+                let next = lineChars[i + 1]
+                if currentPlayMs > cur.endMs && currentPlayMs < next.startMs {
+                    let gapDuration = Double(next.startMs - cur.endMs)
+                    let gapProgress = Double(currentPlayMs - cur.endMs) / max(1.0, gapDuration)
+                    return Double(cur.id) + 1.0 + gapProgress * (Double(next.id) - Double(cur.id) - 1.0)
+                }
             }
         }
-        return nil
+        return Double(first.id)
     }
 }
 
@@ -110,11 +133,11 @@ private struct LineCharInfo: Identifiable {
     var endMs: Int { startMs + max(5, durationMs) }
 }
 
-// MARK: - 單音節渲染區塊（支援高斯連鎖放大與光暈漣漪）
+// MARK: - 單音節渲染區塊
 private struct SyllablePieceView: View {
     let syllable: LyricSyllable
     let chars: [LineCharInfo]
-    let focusIndex: Double?
+    let continuousFocus: Double
     let currentPlayMs: Int
 
     var body: some View {
@@ -128,7 +151,7 @@ private struct SyllablePieceView: View {
                 ForEach(chars) { char in
                     CharacterPieceView(
                         char: char,
-                        focusIndex: focusIndex,
+                        continuousFocus: continuousFocus,
                         currentPlayMs: currentPlayMs
                     )
                 }
@@ -137,105 +160,110 @@ private struct SyllablePieceView: View {
     }
 }
 
-// MARK: - 單字母連鎖動態渲染單元 (Per-Character Ripple & Gaussian Bloom)
+// MARK: - 單字母連鎖動態渲染單元 (無縫連續縮放 + 連鎖光暈)
 private struct CharacterPieceView: View {
     let char: LineCharInfo
-    let focusIndex: Double?
+    let continuousFocus: Double
     let currentPlayMs: Int
 
-    /// 單字元進度 0.0 ~ 1.0
+    /// 單字元擦亮進度 0.0 ~ 1.0
     private var charProgress: Double {
         if currentPlayMs <= char.startMs { return 0.0 }
         if currentPlayMs >= char.endMs { return 1.0 }
         return Double(currentPlayMs - char.startMs) / Double(max(5, char.durationMs))
     }
 
-    /// 高斯連鎖影響力 (0.0 ~ 1.0，核心字元 = 1.0，相鄰 1~2 字元柔和衰減)
+    /// 高斯連鎖影響力 (0.0 ~ 1.0)
+    /// 由於 continuousFocus 絕對連續，此權重在時間軸上完全平滑，下一個字母在被播放時從「已被帶動的大小」平滑膨脹至頂峰
     private var gaussianWeight: Double {
-        guard let focus = focusIndex else { return 0.0 }
-        let dist = abs(Double(char.id) - focus)
-        // sigma = 1.35 確保緊鄰 1 個字母被帶動放大約 6.7%，相鄰 2 個字母放大約 2.8%
-        return exp(-(dist * dist) / (2.0 * 1.35 * 1.35))
+        let dist = abs(Double(char.id) - continuousFocus)
+        // sigma = 1.4 確保相鄰字元獲得自然連貫的預熱膨脹
+        return exp(-(dist * dist) / (2.0 * 1.4 * 1.4))
     }
 
     var body: some View {
         let g = gaussianWeight
-        // 1. 連鎖放大：核心發音字元放大 9%，相鄰字母被柔和連鎖帶動放大
+
+        // 1. 連鎖縮放：錨定在底部基線，字元在播放前已被相鄰字帶動放大，播放時自然順承放大至 1.09x
         let scale = 1.0 + 0.09 * g
 
-        // 2. 連鎖波浪上浮：核心躍起 -2.2pt，相鄰字元受波及微揚
+        // 2. 連鎖波浪上浮：從預熱微揚平滑銜接至發音波峰
         let liftY: CGFloat = {
             if currentPlayMs < char.startMs {
+                // 尚未唱到：受前字連鎖波及柔和預熱微揚
                 return -1.6 * g
             } else if currentPlayMs >= char.endMs {
-                return -1.0 - 1.2 * g
+                // 唱完後：平穩維持 -1.0pt，疊加微弱連鎖波動
+                return -1.0 - 1.0 * g
             } else {
-                return -1.0 - 2.2 * sin(charProgress * .pi)
+                // 正在發音：依字元內部進度順滑躍至波峰
+                let localWave = sin(charProgress * .pi)
+                return -1.0 - (1.2 + 1.0 * g) * localWave
             }
         }()
 
         ZStack(alignment: .leading) {
-            // 底層：未唱到的暗色底襯（Apple 官方字體 SF Pro，32% 次級白）
-            // 緊鄰被帶動的字元會泛起被波及的粉色微光 (Bloom Aura)
+            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro，32% 次級白）
+            // 緊鄰被帶動的字元泛起柔和環境微光 (Bloom Aura)
             Text(char.text)
                 .font(.system(.title2, design: .default).weight(.bold))
                 .foregroundColor(Color.white.opacity(0.32))
                 .shadow(
-                    color: (g > 0.05) ? Color.pink.opacity(0.42 * g) : Color.clear,
-                    radius: (g > 0.05) ? 8 * g : 0,
+                    color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
+                    radius: (g > 0.04) ? 8 * g : 0,
                     x: 0,
                     y: 0
                 )
 
-            // 頂層：唱到的高亮純白發光字母（僅在當前字母開始發音後才渲染）
-            if charProgress > 0 {
-                Text(char.text)
-                    .font(.system(.title2, design: .default).weight(.bold))
-                    .foregroundColor(.white)
-                    // 雙重粉白動態光暈：焦點核心字元綻放明亮高光
-                    .shadow(
-                        color: Color.white.opacity(0.40 * g),
-                        radius: 4 * g,
-                        x: 0,
-                        y: 0
-                    )
-                    .shadow(
-                        color: Color.pink.opacity(0.35 + 0.45 * g),
-                        radius: 6 + 10 * g,
-                        x: 0,
-                        y: 0
-                    )
-                    .mask {
-                        if charProgress >= 1.0 {
-                            Color.white
-                        } else {
-                            GeometryReader { geo in
-                                let width = geo.size.width
-                                let currentX = width * charProgress
-                                let feather: CGFloat = 3
+            // 頂層：唱到的高亮純白發光文字（始終保持在視圖中以遮罩推進，避免 if 條件硬切閃爍）
+            Text(char.text)
+                .font(.system(.title2, design: .default).weight(.bold))
+                .foregroundColor(.white)
+                .shadow(
+                    color: Color.white.opacity(0.40 * g),
+                    radius: 4 * g,
+                    x: 0,
+                    y: 0
+                )
+                .shadow(
+                    color: Color.pink.opacity(0.35 + 0.45 * g),
+                    radius: 6 + 10 * g,
+                    x: 0,
+                    y: 0
+                )
+                .opacity(charProgress > 0 ? 1.0 : 0.0)
+                .mask {
+                    if charProgress >= 1.0 {
+                        Color.white
+                    } else if charProgress <= 0.0 {
+                        Color.clear
+                    } else {
+                        GeometryReader { geo in
+                            let width = geo.size.width
+                            let currentX = width * charProgress
+                            let feather: CGFloat = 3
 
-                                HStack(spacing: 0) {
-                                    Rectangle()
-                                        .fill(Color.white)
-                                        .frame(width: max(0, currentX - feather / 2))
+                            HStack(spacing: 0) {
+                                Rectangle()
+                                    .fill(Color.white)
+                                    .frame(width: max(0, currentX - feather / 2))
 
-                                    LinearGradient(
-                                        colors: [Color.white, Color.clear],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                    .frame(width: feather)
+                                LinearGradient(
+                                    colors: [Color.white, Color.clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                                .frame(width: feather)
 
-                                    Spacer(minLength: 0)
-                                }
-                                .frame(width: width, alignment: .leading)
+                                Spacer(minLength: 0)
                             }
+                            .frame(width: width, alignment: .leading)
                         }
                     }
-            }
+                }
         }
         .offset(y: liftY)
-        .scaleEffect(scale)
+        .scaleEffect(scale, anchor: .bottom)
     }
 }
 
