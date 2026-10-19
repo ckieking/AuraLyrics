@@ -31,13 +31,14 @@ struct NowPlayingView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                // 右上角：兩顆獨立放大的 Liquid Glass 圓形按鈕（按鈕即為最底層，無外層膠囊底襯）
+                // 獨立 ToolbarItem：畫中畫 (PiP 懸浮窗) 按鈕
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 10) {
-                        pipIndependentButton
-                        moreMenuIndependentButton
-                    }
-                    .padding(.trailing, 20)
+                    pipIndependentButton
+                }
+
+                // 獨立 ToolbarItem：更多操作選單按鈕
+                ToolbarItem(placement: .topBarTrailing) {
+                    moreMenuIndependentButton
                 }
             }
             .sheet(isPresented: $showSearchSheet) {
