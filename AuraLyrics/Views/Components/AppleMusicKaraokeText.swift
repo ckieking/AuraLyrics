@@ -10,6 +10,7 @@ public struct AppleMusicKaraokeText: View {
     let currentPlaybackTimeMs: Int
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public init(
         text: String,
@@ -24,35 +25,40 @@ public struct AppleMusicKaraokeText: View {
     }
 
     public var body: some View {
-        if syllables == nil || syllables?.isEmpty == true || reduceMotion {
-            // 普通行級時間軸（或減弱動態）：
-            // 無論是否唱到，字級與字重嚴格統一為 SF Pro 22pt Bold，折行點完全一致，絕不因播放而突發性換行
-            Text(text)
-                .font(.system(size: 22, weight: .bold, design: .default))
-                .foregroundColor(isCurrent ? .white : Color.white.opacity(0.32))
-                .multilineTextAlignment(.leading)
-                .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: 4, x: 0, y: 0)
-                .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: 12, x: 0, y: 0)
-        } else if let validSyllables = syllables, !validSyllables.isEmpty {
-            // 逐字音節時間軸：
-            // 當前行與非當前行全面採用完全相同的 SyllableFlowLayout！
-            // 若歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，僅原地擦亮與浮現光暈，杜絕任何擠壓重疊
-            let lineChars = buildLineChars(from: validSyllables)
-            let continuousFocus = isCurrent ? calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars) : -999.0
-            let playMs = isCurrent ? currentPlaybackTimeMs : 0
+        Group {
+            if syllables == nil || syllables?.isEmpty == true || reduceMotion {
+                // 普通行級時間軸（或減弱動態）：
+                // 無論是否唱到，字級與字重嚴格統一為 SF Pro 32pt Bold，折行點完全一致，絕不因播放而突發性換行
+                Text(text)
+                    .font(.system(size: 32, weight: .bold, design: .default))
+                    .foregroundColor(isCurrent ? .white : Color.white.opacity(0.35))
+                    .multilineTextAlignment(.leading)
+                    .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: 5, x: 0, y: 0)
+                    .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: 14, x: 0, y: 0)
+            } else if let validSyllables = syllables, !validSyllables.isEmpty {
+                // 逐字音節時間軸：
+                // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
+                // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地銳利聚焦並擦亮
+                let lineChars = buildLineChars(from: validSyllables)
+                let continuousFocus = isCurrent ? calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars) : -999.0
+                let playMs = isCurrent ? currentPlaybackTimeMs : 0
 
-            SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 8) {
-                ForEach(validSyllables) { syl in
-                    let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
-                    SyllablePieceView(
-                        syllable: syl,
-                        chars: charsInSyllable,
-                        continuousFocus: continuousFocus,
-                        currentPlayMs: playMs
-                    )
+                SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+                    ForEach(validSyllables) { syl in
+                        let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
+                        SyllablePieceView(
+                            syllable: syl,
+                            chars: charsInSyllable,
+                            continuousFocus: continuousFocus,
+                            currentPlayMs: playMs
+                        )
+                    }
                 }
             }
         }
+        // Apple Music 官方原生質感：非當前行添加景深毛玻璃模糊散景 (Out-of-Focus Defocus Blur)
+        .blur(radius: isCurrent ? 0 : (reduceTransparency ? 0 : 2.0))
+        .animation(.easeInOut(duration: 0.35), value: isCurrent)
     }
 
     // MARK: - 構建整行字元時間軸映射
@@ -142,7 +148,7 @@ private struct SyllablePieceView: View {
         if syllable.text.trimmingCharacters(in: .whitespaces).isEmpty {
             // 純空白保留原生字元寬度間隔
             Text(syllable.text)
-                .font(.system(size: 22, weight: .bold, design: .default))
+                .font(.system(size: 32, weight: .bold, design: .default))
                 .hidden()
         } else {
             HStack(spacing: 0) {
@@ -184,26 +190,26 @@ private struct CharacterPieceView: View {
         let liftY: CGFloat = {
             if currentPlayMs < char.startMs {
                 // 尚未唱到：隨周圍波及產生極其細微的預熱響應
-                return -0.8 * g
+                return -1.0 * g
             } else if currentPlayMs >= char.endMs {
-                // 唱完後：平穩維持 -0.5pt 微浮
-                return -0.5
+                // 唱完後：平穩維持 -0.8pt 微浮
+                return -0.8
             } else {
-                // 正在發音：柔和微揚 -0.9pt
+                // 正在發音：柔和微揚 -1.4pt
                 let localWave = sin(charProgress * .pi)
-                return -0.5 - 0.4 * localWave
+                return -0.8 - 0.6 * localWave
             }
         }()
 
         ZStack(alignment: .leading) {
-            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 22pt，32% 次級白）
+            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 32pt 大字，35% 次級白）
             // 緊鄰字元泛起被環境散射照亮的柔和微光
             Text(char.text)
-                .font(.system(size: 22, weight: .bold, design: .default))
-                .foregroundColor(Color.white.opacity(0.32))
+                .font(.system(size: 32, weight: .bold, design: .default))
+                .foregroundColor(Color.white.opacity(0.35))
                 .shadow(
                     color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
-                    radius: (g > 0.04) ? 7 * g : 0,
+                    radius: (g > 0.04) ? 10 * g : 0,
                     x: 0,
                     y: 0
                 )
@@ -211,26 +217,26 @@ private struct CharacterPieceView: View {
             // 頂層：唱到的高亮純白發光文字
             // 向螢幕方向浮出的多層空間光暈：白核心 + 明亮立體粉紅光暈 + 外部空氣擴散層
             Text(char.text)
-                .font(.system(size: 22, weight: .bold, design: .default))
+                .font(.system(size: 32, weight: .bold, design: .default))
                 .foregroundColor(.white)
                 // 第一層：緊貼文字的純白立體高光（Core Highlight）
                 .shadow(
                     color: Color.white.opacity(0.65 * g),
-                    radius: 3.5 * g,
+                    radius: 5 * g,
                     x: 0,
                     y: 0
                 )
                 // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow）
                 .shadow(
                     color: Color.pink.opacity(0.60 + 0.35 * g),
-                    radius: 9 + 5 * g,
+                    radius: 14 + 8 * g,
                     x: 0,
                     y: 0
                 )
                 // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
                 .shadow(
                     color: Color.pink.opacity(0.35 * g),
-                    radius: 18 * g,
+                    radius: 26 * g,
                     x: 0,
                     y: 0
                 )
