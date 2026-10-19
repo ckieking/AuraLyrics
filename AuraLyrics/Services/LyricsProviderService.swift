@@ -8,8 +8,20 @@ public final class LyricsProviderService: ObservableObject {
     private let cacheDirectoryName = "LyricsCache"
     private let urlSession = URLSession.shared
 
+    private let currentCacheSchemaVersion = 2
+
     private init() {
+        checkAndMigrateCache()
         createCacheDirectoryIfNeeded()
+    }
+
+    private func checkAndMigrateCache() {
+        let storedVersion = UserDefaults.standard.integer(forKey: "lyricsCacheSchemaVersion")
+        if storedVersion < currentCacheSchemaVersion {
+            // 升級至支援時長與歌手評分比對之快取架構，自動清理舊版本未評分之快取
+            try? FileManager.default.removeItem(at: cacheDirectoryURL)
+            UserDefaults.standard.set(currentCacheSchemaVersion, forKey: "lyricsCacheSchemaVersion")
+        }
     }
 
     // MARK: - 本地快取路徑
@@ -112,7 +124,7 @@ public final class LyricsProviderService: ObservableObject {
         }
 
         // 2. 優先向網易雲音樂請求原生逐字時間軸 (YRC/KRC) 與雙語翻譯
-        if let netEaseResult = await fetchFromNetEase(title: cleanTitle, artist: cleanArtist) {
+        if let netEaseResult = await fetchFromNetEase(title: cleanTitle, artist: cleanArtist, durationSec: track.duration) {
             if netEaseResult.hasSyllables {
                 saveLyricsToCache(netEaseResult)
                 return netEaseResult
@@ -194,7 +206,7 @@ public final class LyricsProviderService: ObservableObject {
     }
 
     // MARK: - 網易雲音樂公開 API 請求（支援 YRC 原生逐字時間軸 + KRC + LRC + 雙語翻譯）
-    public func fetchFromNetEase(title: String, artist: String) async -> SyncedLyrics? {
+    public func fetchFromNetEase(title: String, artist: String, durationSec: TimeInterval = 0) async -> SyncedLyrics? {
         let searchQuery = "\(title) \(artist)".trimmingCharacters(in: .whitespaces)
         guard var searchComponents = URLComponents(string: "https://music.163.com/api/search/get/web") else { return nil }
         searchComponents.queryItems = [
@@ -203,7 +215,7 @@ public final class LyricsProviderService: ObservableObject {
             URLQueryItem(name: "type", value: "1"),
             URLQueryItem(name: "offset", value: "0"),
             URLQueryItem(name: "total", value: "true"),
-            URLQueryItem(name: "limit", value: "3")
+            URLQueryItem(name: "limit", value: "5")
         ]
 
         guard let searchUrl = searchComponents.url else { return nil }
@@ -220,6 +232,11 @@ public final class LyricsProviderService: ObservableObject {
                     struct Song: Codable {
                         let id: Int
                         let name: String
+                        let duration: Int?
+                        struct Artist: Codable {
+                            let name: String?
+                        }
+                        let artists: [Artist]?
                     }
                     let songs: [Song]?
                 }
@@ -227,9 +244,57 @@ public final class LyricsProviderService: ObservableObject {
             }
 
             let searchDecoded = try JSONDecoder().decode(NetEaseSearchResult.self, from: searchData)
-            guard let songId = searchDecoded.result?.songs?.first?.id else {
+            guard let candidateSongs = searchDecoded.result?.songs, !candidateSongs.isEmpty else {
                 return nil
             }
+
+            // 智慧最佳匹配演算法：精準命中原版，排除 Remix / Live / 伴奏干擾
+            let targetTitleLower = title.lowercased()
+            let targetArtistLower = artist.lowercased()
+
+            let scoredSongs = candidateSongs.map { song -> (song: NetEaseSearchResult.ResultData.Song, score: Double) in
+                let nameLower = song.name.lowercased()
+                var score: Double = 100.0
+
+                // 扣分項：原曲非 Remix/Live 但搜尋結果帶有
+                if nameLower.contains("remix") && !targetTitleLower.contains("remix") {
+                    score -= 50.0
+                }
+                if nameLower.contains("live") && !targetTitleLower.contains("live") {
+                    score -= 40.0
+                }
+                if nameLower.contains("instrumental") || song.name.contains("伴奏") {
+                    score -= 60.0
+                }
+
+                // 時長吻合加分（時長最能代表是否為同一錄音版本）
+                if durationSec > 0, let songDurMs = song.duration, songDurMs > 0 {
+                    let songDurSec = Double(songDurMs) / 1000.0
+                    let diff = abs(songDurSec - durationSec)
+                    if diff < 3.0 {
+                        score += 40.0
+                    } else if diff < 8.0 {
+                        score += 15.0
+                    } else {
+                        score -= min(30.0, diff * 2.0)
+                    }
+                }
+
+                // 歌手名稱匹配加分
+                if let artists = song.artists {
+                    let artistNames = artists.compactMap { $0.name }.joined(separator: " ").lowercased()
+                    if artistNames.contains(targetArtistLower) || targetArtistLower.contains(artistNames) {
+                        score += 20.0
+                    }
+                }
+
+                return (song, score)
+            }
+
+            guard let bestSong = scoredSongs.max(by: { $0.score < $1.score })?.song else {
+                return nil
+            }
+            let songId = bestSong.id
 
             // 請求歌詞：帶上 yv=-1 以取得網易雲 YRC 原生逐字時間軸
             guard let lyricUrl = URL(string: "https://music.163.com/api/song/lyric?os=pc&id=\(songId)&lv=-1&kv=-1&tv=-1&yv=-1") else {

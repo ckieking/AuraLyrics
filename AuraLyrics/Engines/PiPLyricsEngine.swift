@@ -9,12 +9,12 @@ public final class PiPLyricsViewModel: ObservableObject {
     public static let shared = PiPLyricsViewModel()
 
     @Published public var primaryLine: String = "AuraLyrics 靈動歌詞"
-    @Published public var secondaryLine: String? = "等待播放音樂中..."
+    @Published public var secondaryLine: String? = nil
     @Published public var progress: Double = 0.0
     @Published public var theme: PiPVisualTheme = .dynamicIsland
 }
 
-// MARK: - PiP 懸浮歌詞原生畫面（Apple HIG 極致深黑動態島膠囊設計）
+// MARK: - PiP 懸浮歌詞原生畫面（Apple HIG 極致深黑動態島膠囊設計，純原文歌詞）
 public struct PiPLyricsView: View {
     @ObservedObject var vm: PiPLyricsViewModel
 
@@ -32,7 +32,7 @@ public struct PiPLyricsView: View {
                         .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
                 )
 
-            VStack(spacing: 3) {
+            VStack(spacing: 0) {
                 // 頂部進度條
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
@@ -50,34 +50,21 @@ public struct PiPLyricsView: View {
 
                 Spacer(minLength: 0)
 
-                // 主歌詞行 (高對比加粗)
-                HStack(spacing: 7) {
+                // 原文歌詞行 (居中大氣、高對比加粗，可適度折行)
+                HStack(spacing: 8) {
                     Image(systemName: "music.note")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.pink)
 
                     Text(vm.primaryLine)
                         .font(.system(size: 16, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Spacer()
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 14)
-
-                // 次要行（雙語翻譯或下一句預覽）
-                if let secondary = vm.secondaryLine, !secondary.isEmpty {
-                    HStack {
-                        Text(secondary)
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundColor(Color.white.opacity(0.72))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 6)
-                }
 
                 Spacer(minLength: 0)
             }
@@ -207,17 +194,11 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
         let monitor = AppleMusicMonitor.shared
         if let index = monitor.currentLineIndex, monitor.currentLyrics.lines.indices.contains(index) {
             let current = monitor.currentLyrics.lines[index]
-            var sec: String? = nil
-            if let trans = current.translation, !trans.isEmpty {
-                sec = trans
-            } else if index + 1 < monitor.currentLyrics.lines.count {
-                sec = monitor.currentLyrics.lines[index + 1].text
-            }
-            updateLyrics(line: current.text, secondaryLine: sec, progress: monitor.playbackProgress)
+            updateLyrics(line: current.text, secondaryLine: nil, progress: monitor.playbackProgress)
         } else if monitor.currentTrack.title != "尚未播放音樂" {
-            updateLyrics(line: monitor.currentTrack.title, secondaryLine: monitor.currentTrack.artist, progress: monitor.playbackProgress)
+            updateLyrics(line: monitor.currentTrack.title, secondaryLine: nil, progress: monitor.playbackProgress)
         } else {
-            updateLyrics(line: "AuraLyrics 靈動歌詞", secondaryLine: "請在 Apple Music 開始播放音樂", progress: 0.0)
+            updateLyrics(line: "AuraLyrics 靈動歌詞", secondaryLine: nil, progress: 0.0)
         }
     }
 }

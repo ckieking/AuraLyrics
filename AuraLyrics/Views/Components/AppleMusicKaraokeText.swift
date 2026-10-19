@@ -8,20 +8,22 @@ public struct AppleMusicKaraokeText: View {
     let syllables: [LyricSyllable]?
     let isCurrent: Bool
     let currentPlaybackTimeMs: Int
+    let blurRadius: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public init(
         text: String,
         syllables: [LyricSyllable]? = nil,
         isCurrent: Bool,
-        currentPlaybackTimeMs: Int = 0
+        currentPlaybackTimeMs: Int = 0,
+        blurRadius: CGFloat = 0
     ) {
         self.text = text
         self.syllables = syllables
         self.isCurrent = isCurrent
         self.currentPlaybackTimeMs = currentPlaybackTimeMs
+        self.blurRadius = blurRadius
     }
 
     public var body: some View {
@@ -29,36 +31,44 @@ public struct AppleMusicKaraokeText: View {
             if syllables == nil || syllables?.isEmpty == true || reduceMotion {
                 // 普通行級時間軸（或減弱動態）：
                 // 無論是否唱到，字級與字重嚴格統一為 SF Pro 32pt Bold，折行點完全一致，絕不因播放而突發性換行
+                // 非當前行零陰影開銷，僅當前行綻放立體粉光
                 Text(text)
                     .font(.system(size: 32, weight: .bold, design: .default))
                     .foregroundColor(isCurrent ? .white : Color.white.opacity(0.35))
                     .multilineTextAlignment(.leading)
-                    .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: 5, x: 0, y: 0)
-                    .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: 14, x: 0, y: 0)
+                    .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: isCurrent ? 5 : 0, x: 0, y: 0)
+                    .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: isCurrent ? 14 : 0, x: 0, y: 0)
+                    .blur(radius: isCurrent ? 0 : blurRadius)
             } else if let validSyllables = syllables, !validSyllables.isEmpty {
                 // 逐字音節時間軸：
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
-                // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地銳利聚焦並擦亮
-                let lineChars = buildLineChars(from: validSyllables)
-                let continuousFocus = isCurrent ? calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars) : -999.0
-                let playMs = isCurrent ? currentPlaybackTimeMs : 0
+                // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
+                if !isCurrent {
+                    // 非當前行：採用 Equatable 隔離視圖，並透過 drawingGroup() 預合成為單一 Metal 紋理快取
+                    // 當模糊半徑未改變時（如距離 >= 3 行的所有歌詞），SwiftUI 100% 複用 GPU 紋理，穩跑 120fps！
+                    InactiveSyllableLyricView(
+                        text: text,
+                        syllables: validSyllables,
+                        blurRadius: blurRadius
+                    )
+                } else {
+                    let lineChars = buildLineChars(from: validSyllables)
+                    let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
 
-                SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
-                    ForEach(validSyllables) { syl in
-                        let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
-                        SyllablePieceView(
-                            syllable: syl,
-                            chars: charsInSyllable,
-                            continuousFocus: continuousFocus,
-                            currentPlayMs: playMs
-                        )
+                    SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+                        ForEach(validSyllables) { syl in
+                            let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
+                            SyllablePieceView(
+                                syllable: syl,
+                                chars: charsInSyllable,
+                                continuousFocus: continuousFocus,
+                                currentPlayMs: currentPlaybackTimeMs
+                            )
+                        }
                     }
                 }
             }
         }
-        // Apple Music 官方原生質感：非當前行添加景深毛玻璃模糊散景 (Out-of-Focus Defocus Blur)
-        .blur(radius: isCurrent ? 0 : (reduceTransparency ? 0 : 2.0))
-        .animation(.easeInOut(duration: 0.35), value: isCurrent)
     }
 
     // MARK: - 構建整行字元時間軸映射
@@ -137,7 +147,7 @@ private struct LineCharInfo: Identifiable {
     var endMs: Int { startMs + max(5, durationMs) }
 }
 
-// MARK: - 單音節渲染區塊
+// MARK: - 單音節渲染區塊 (鎖定佈局尺寸 + 逐字元掃描動態)
 private struct SyllablePieceView: View {
     let syllable: LyricSyllable
     let chars: [LineCharInfo]
@@ -151,20 +161,30 @@ private struct SyllablePieceView: View {
                 .font(.system(size: 32, weight: .bold, design: .default))
                 .hidden()
         } else {
-            HStack(spacing: 0) {
-                ForEach(chars) { char in
-                    CharacterPieceView(
-                        char: char,
-                        continuousFocus: continuousFocus,
-                        currentPlayMs: currentPlayMs
-                    )
+            // 關鍵排版鎖定：
+            // 底層採用與 InactiveSyllableLyricView 100% 相同的純文字作為 Layout 骨架基準，
+            // 傳遞給 SyllableFlowLayout 的 sizeThatFits 尺寸與非當前行精確到 0.000000pt 恆等！
+            // 內部逐字元掃描與微物理動態全封裝在 .overlay 內，
+            // 既完整保留英文單字內部的逐字母平滑擦亮與立體波浪，又絕對不改變外部行寬判定，永不跳行！
+            Text(syllable.text)
+                .font(.system(size: 32, weight: .bold, design: .default))
+                .hidden()
+                .overlay(alignment: .leading) {
+                    HStack(spacing: 0) {
+                        ForEach(chars) { char in
+                            CharacterPieceView(
+                                char: char,
+                                continuousFocus: continuousFocus,
+                                currentPlayMs: currentPlayMs
+                            )
+                        }
+                    }
                 }
-            }
         }
     }
 }
 
-// MARK: - 單字母連鎖動態渲染單元 (空間立體浮現 + 多層立體光暈)
+// MARK: - 單字母連鎖動態渲染單元 (空間立體浮現 + 多層立體光暈 + 逐字擦亮)
 private struct CharacterPieceView: View {
     let char: LineCharInfo
     let continuousFocus: Double
@@ -184,99 +204,84 @@ private struct CharacterPieceView: View {
     }
 
     var body: some View {
-        let g = gaussianWeight
+        let isSpace = char.text.trimmingCharacters(in: .whitespaces).isEmpty
 
-        // 1. 極細微 Y 軸微上浮 (Micro-Lift)
-        let liftY: CGFloat = {
-            if currentPlayMs < char.startMs {
-                // 尚未唱到：隨周圍波及產生極其細微的預熱響應
-                return -1.0 * g
-            } else if currentPlayMs >= char.endMs {
-                // 唱完後：平穩維持 -0.8pt 微浮
-                return -0.8
-            } else {
-                // 正在發音：柔和微揚 -1.4pt
-                let localWave = sin(charProgress * .pi)
-                return -0.8 - 0.6 * localWave
-            }
-        }()
-
-        ZStack(alignment: .leading) {
-            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 32pt 大字，35% 次級白）
-            // 緊鄰字元泛起被環境散射照亮的柔和微光
+        if isSpace {
+            // 空格僅保留寬度，不繪製任何陰影與上浮
             Text(char.text)
                 .font(.system(size: 32, weight: .bold, design: .default))
-                .foregroundColor(Color.white.opacity(0.35))
-                .shadow(
-                    color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
-                    radius: (g > 0.04) ? 10 * g : 0,
-                    x: 0,
-                    y: 0
-                )
+                .hidden()
+        } else {
+            let g = gaussianWeight
+            let p = charProgress
 
-            // 頂層：唱到的高亮純白發光文字
-            // 向螢幕方向浮出的多層空間光暈：白核心 + 明亮立體粉紅光暈 + 外部空氣擴散層
-            Text(char.text)
-                .font(.system(size: 32, weight: .bold, design: .default))
-                .foregroundColor(.white)
-                // 第一層：緊貼文字的純白立體高光（Core Highlight）
-                .shadow(
-                    color: Color.white.opacity(0.65 * g),
-                    radius: 5 * g,
-                    x: 0,
-                    y: 0
-                )
-                // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow）
-                .shadow(
-                    color: Color.pink.opacity(0.60 + 0.35 * g),
-                    radius: 14 + 8 * g,
-                    x: 0,
-                    y: 0
-                )
-                // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
-                .shadow(
-                    color: Color.pink.opacity(0.35 * g),
-                    radius: 26 * g,
-                    x: 0,
-                    y: 0
-                )
-                .opacity(charProgress > 0 ? 1.0 : 0.0)
-                .mask {
-                    if charProgress >= 1.0 {
-                        Color.white
-                    } else if charProgress <= 0.0 {
-                        Color.clear
-                    } else {
-                        GeometryReader { geo in
-                            let width = geo.size.width
-                            let currentX = width * charProgress
-                            let feather: CGFloat = 4
-
-                            HStack(spacing: 0) {
-                                Rectangle()
-                                    .fill(Color.white)
-                                    .frame(width: max(0, currentX - feather / 2))
-
-                                LinearGradient(
-                                    colors: [Color.white, Color.clear],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                                .frame(width: feather)
-
-                                Spacer(minLength: 0)
-                            }
-                            .frame(width: width, alignment: .leading)
-                        }
-                    }
+            // 極細微 Y 軸微上浮 (Micro-Lift)
+            let liftY: CGFloat = {
+                if currentPlayMs < char.startMs {
+                    // 尚未唱到：隨周圍波及產生極其細微的預熱響應
+                    return -1.0 * g
+                } else if currentPlayMs >= char.endMs {
+                    // 唱完後：平穩維持 -0.8pt 微浮
+                    return -0.8
+                } else {
+                    // 正在發音：柔和微揚 -1.4pt
+                    let localWave = sin(p * .pi)
+                    return -0.8 - 0.6 * localWave
                 }
+            }()
+
+            ZStack(alignment: .leading) {
+                // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 32pt 大字，35% 次級白）
+                // 緊鄰字元泛起被環境散射照亮的柔和微光
+                Text(char.text)
+                    .font(.system(size: 32, weight: .bold, design: .default))
+                    .foregroundColor(Color.white.opacity(0.35))
+                    .shadow(
+                        color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
+                        radius: (g > 0.04) ? 10 * g : 0,
+                        x: 0,
+                        y: 0
+                    )
+
+                // 頂層：唱到的高亮純白發光文字
+                // 向螢幕方向浮出的多層空間光暈：白核心 + 明亮立體粉紅光暈 + 外部空氣擴散層
+                // 隨字元進度 p (0.0 ~ 1.0) 平滑淡入擦亮，純向量文字渲染，徹底杜絕白色色塊
+                Text(char.text)
+                    .font(.system(size: 32, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    // 第一層：緊貼文字的純白立體高光（Core Highlight）
+                    .shadow(
+                        color: Color.white.opacity(0.65 * g),
+                        radius: 5 * g,
+                        x: 0,
+                        y: 0
+                    )
+                    // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow）
+                    .shadow(
+                        color: Color.pink.opacity(0.60 + 0.35 * g),
+                        radius: 14 + 8 * g,
+                        x: 0,
+                        y: 0
+                    )
+                    // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
+                    .shadow(
+                        color: Color.pink.opacity(0.35 * g),
+                        radius: 26 * g,
+                        x: 0,
+                        y: 0
+                    )
+                    .opacity(min(1.0, max(0.0, p)))
+            }
+            .offset(y: liftY)
         }
-        .offset(y: liftY)
     }
 }
 
-// MARK: - 音節流式自動換行排版 (SwiftUI Layout Protocol)
-/// 解決多行歌詞換行與不同字寬對齊問題，確保唱完第一行才依序點亮第二行
+// MARK: - 音節流式自動換行排版 (Apple Music 智慧兩行平衡折行演算法)
+/// 解決多行歌詞換行與不同字寬對齊問題；
+/// 採用兩行平衡拆分演算法（Balanced 2-Line Partitioning），整句歌詞優先在兩行內最優均勻分折，
+/// 徹底杜絕因行尾貪婪溢出而產生孤零零單字的第 3 行，
+/// 同時強制鎖死每行所屬音節，杜絕播放亮起時的任何跳行現象！
 public struct SyllableFlowLayout: Layout {
     public var horizontalSpacing: CGFloat = 0
     public var verticalSpacing: CGFloat = 10
@@ -286,43 +291,153 @@ public struct SyllableFlowLayout: Layout {
         self.verticalSpacing = verticalSpacing
     }
 
+    /// 根據可用寬度，計算最優的行劃分（每行所包含的子視圖索引）
+    private func computeLineBreaks(subviews: Subviews, maxWidth: CGFloat) -> [[Int]] {
+        guard !subviews.isEmpty else { return [] }
+
+        let count = subviews.count
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+
+        // 1. 檢查整句是否能在 1 行內完全放下
+        var line1Width: CGFloat = 0
+        for i in 0..<count {
+            line1Width += sizes[i].width + (i > 0 ? horizontalSpacing : 0)
+        }
+        if line1Width <= maxWidth {
+            return [Array(0..<count)]
+        }
+
+        // 2. 智慧兩行平衡劃分（Balanced 2-Line Split）：
+        // 在所有可能的分割點中，尋找讓兩行都能放下且長度最平衡的最佳分割點
+        var bestSplit: Int? = nil
+        var minDiff: CGFloat = .infinity
+
+        var prefixWidths = [CGFloat](repeating: 0, count: count + 1)
+        for i in 0..<count {
+            prefixWidths[i + 1] = prefixWidths[i] + sizes[i].width + (i > 0 ? horizontalSpacing : 0)
+        }
+
+        let totalW = prefixWidths[count]
+
+        for split in 1..<count {
+            let w1 = prefixWidths[split]
+            let w2 = totalW - prefixWidths[split]
+
+            // 給予 8pt 的安全容差（允許極輕微自然延伸至 20pt 的左右 padding 內，優先維持兩行）
+            if w1 <= maxWidth + 8.0 && w2 <= maxWidth + 8.0 {
+                let diff = abs(w1 - w2)
+                if diff < minDiff {
+                    minDiff = diff
+                    bestSplit = split
+                }
+            }
+        }
+
+        if let split = bestSplit {
+            // 成功在兩行內均衡收斂，徹底杜絕第三行！
+            return [Array(0..<split), Array(split..<count)]
+        }
+
+        // 3. 安全回退：若極長句子兩行確實無法容納，進行貪婪折行
+        var lines: [[Int]] = []
+        var currentLine: [Int] = []
+        var currentW: CGFloat = 0
+
+        for i in 0..<count {
+            let w = sizes[i].width
+            if currentW + w > maxWidth + 4.0 && !currentLine.isEmpty {
+                lines.append(currentLine)
+                currentLine = [i]
+                currentW = w
+            } else {
+                currentLine.append(i)
+                currentW += w + horizontalSpacing
+            }
+        }
+        if !currentLine.isEmpty {
+            lines.append(currentLine)
+        }
+
+        return lines
+    }
+
     public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var totalWidth: CGFloat = 0
+        let lineIndices = computeLineBreaks(subviews: subviews, maxWidth: maxWidth)
+        guard !lineIndices.isEmpty else { return .zero }
 
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > maxWidth && currentX > 0 {
-                currentX = 0
-                currentY += lineHeight + verticalSpacing
-                lineHeight = 0
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        var totalHeight: CGFloat = 0
+        var maxLineWidth: CGFloat = 0
+
+        for (lineIdx, indices) in lineIndices.enumerated() {
+            var lineWidth: CGFloat = 0
+            var lineHeight: CGFloat = 0
+            for (idxInLine, i) in indices.enumerated() {
+                lineWidth += sizes[i].width + (idxInLine > 0 ? horizontalSpacing : 0)
+                lineHeight = max(lineHeight, sizes[i].height)
             }
-            currentX += size.width + horizontalSpacing
-            lineHeight = max(lineHeight, size.height)
-            totalWidth = max(totalWidth, currentX)
+            maxLineWidth = max(maxLineWidth, lineWidth)
+            totalHeight += lineHeight + (lineIdx > 0 ? verticalSpacing : 0)
         }
-        return CGSize(width: min(totalWidth, maxWidth), height: currentY + lineHeight)
+
+        return CGSize(width: min(maxLineWidth, maxWidth), height: totalHeight)
     }
 
     public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let maxWidth = bounds.width
-        var currentX: CGFloat = bounds.minX
-        var currentY: CGFloat = bounds.minY
-        var lineHeight: CGFloat = 0
+        let lineIndices = computeLineBreaks(subviews: subviews, maxWidth: maxWidth)
+        guard !lineIndices.isEmpty else { return }
 
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > bounds.maxX && currentX > bounds.minX {
-                currentX = bounds.minX
-                currentY += lineHeight + verticalSpacing
-                lineHeight = 0
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        var currentY = bounds.minY
+
+        for (lineIdx, indices) in lineIndices.enumerated() {
+            var currentX = bounds.minX
+            var lineHeight: CGFloat = 0
+
+            for (idxInLine, i) in indices.enumerated() {
+                let size = sizes[i]
+                subviews[i].place(
+                    at: CGPoint(x: currentX, y: currentY),
+                    proposal: ProposedViewSize(size)
+                )
+                currentX += size.width + horizontalSpacing
+                lineHeight = max(lineHeight, size.height)
             }
-            subview.place(at: CGPoint(x: currentX, y: currentY), proposal: ProposedViewSize(size))
-            currentX += size.width + horizontalSpacing
-            lineHeight = max(lineHeight, size.height)
+
+            currentY += lineHeight + verticalSpacing
         }
+    }
+}
+
+// MARK: - 非當前播放行 Equatable 快取視圖 (預合成 Metal 紋理並執行階梯景深模糊)
+private struct InactiveSyllableLyricView: View, Equatable {
+    let text: String
+    let syllables: [LyricSyllable]
+    let blurRadius: CGFloat
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.text == rhs.text &&
+        lhs.syllables.count == rhs.syllables.count &&
+        lhs.blurRadius == rhs.blurRadius
+    }
+
+    var body: some View {
+        SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+            ForEach(syllables) { syl in
+                if syl.text.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text(syl.text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .hidden()
+                } else {
+                    Text(syl.text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(Color.white.opacity(0.35))
+                }
+            }
+        }
+        .drawingGroup()
+        .blur(radius: blurRadius)
     }
 }

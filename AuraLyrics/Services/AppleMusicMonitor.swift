@@ -12,9 +12,9 @@ public final class AppleMusicMonitor: ObservableObject {
     @Published public private(set) var currentLyrics: SyncedLyrics = .empty
     @Published public var currentLineIndex: Int? = nil
     @Published public private(set) var isPlaying: Bool = false
-    @Published public private(set) var playbackProgress: Double = 0.0
-    @Published public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
-    @Published public private(set) var lastTickTimestamp: CFTimeInterval = CACurrentMediaTime()
+    public private(set) var playbackProgress: Double = 0.0
+    public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
+    public private(set) var lastTickTimestamp: CFTimeInterval = CACurrentMediaTime()
     @Published public private(set) var isLoadingLyrics: Bool = false
 
     /// 全域歌詞同步時間微調偏移量（毫秒，每首歌共用）
@@ -99,11 +99,13 @@ public final class AppleMusicMonitor: ObservableObject {
         handlePlaybackStateChanged()
 
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+        let newTimer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.tick()
             }
         }
+        RunLoop.main.add(newTimer, forMode: .common)
+        self.timer = newTimer
     }
 
     public func stopMonitoring() {
@@ -182,8 +184,11 @@ public final class AppleMusicMonitor: ObservableObject {
             guard !Task.isCancelled else { return }
             if let fetched = fetched {
                 self.currentLyrics = fetched
+                let currentMs = self.interpolatedPlaybackTimeMs()
+                self.currentLineIndex = fetched.currentLineIndex(at: currentMs, globalOffsetMs: self.globalOffsetMs)
             } else {
                 self.currentLyrics = SyncedLyrics.empty
+                self.currentLineIndex = nil
             }
             self.isLoadingLyrics = false
         }
@@ -233,27 +238,57 @@ public final class AppleMusicMonitor: ObservableObject {
             return
         }
 
-        currentPlaybackTimeSec = playTime
-        lastPlaybackTimeSec = playTime
         let now = CACurrentMediaTime()
         lastTickTimestamp = now
 
-        // 平滑防抖校正：比較實測播放時間與時鐘線性推估值的差值
-        let predictedTime = anchorPlaybackTimeSec + (isPlaying ? max(0, now - anchorMediaTime) : 0)
-        let drift = abs(playTime - predictedTime)
-
-        // 若誤差超過 120ms（發生拖曳跳轉或暫停），立即重設基準錨點；否則維持平滑推進
-        if drift >= 0.12 || anchorMediaTime == 0 || !isPlaying {
+        // 2. 即時同步播放狀態（主動偵測，不完全依賴可能延遲的跨行程通知）
+        let actualIsPlaying = (musicPlayer.playbackState == .playing)
+        if isPlaying != actualIsPlaying {
+            isPlaying = actualIsPlaying
             anchorPlaybackTimeSec = playTime
             anchorMediaTime = now
         }
 
-        if currentTrack.duration > 0 {
-            playbackProgress = min(max(playTime / currentTrack.duration, 0.0), 1.0)
+        // 3. 高精度時鐘平滑推進與智慧防抖校準
+        if isPlaying {
+            let predictedTime = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
+            let playTimeJump = abs(playTime - lastPlaybackTimeSec)
+
+            // 判定使用者真實跳轉 (User Seek)：系統實測時間本身發生顯著跳躍且與線性推估時間有偏差
+            let isUserSeek = (playTimeJump > 1.2 && abs(playTime - predictedTime) > 1.0)
+
+            // 判定串流緩衝結束首次起跑對齊（剛切歌前幾秒系統 IPC 卡在 0.0，首次回傳有效進度）
+            let isInitialStart = (anchorPlaybackTimeSec == 0 && playTime > 0.05 && playTime < 3.0 && playTimeJump > 0.05)
+
+            if isUserSeek || isInitialStart || anchorMediaTime == 0 {
+                anchorPlaybackTimeSec = playTime
+                anchorMediaTime = now
+            } else if playTime > 0.5 && abs(playTime - predictedTime) > 2.0 {
+                // 長期嚴重漂移安全保護（持續偏差超過 2.0 秒時平滑對齊）
+                anchorPlaybackTimeSec = playTime
+                anchorMediaTime = now
+            }
+            // 其餘情況（系統 playTime 卡在 0.0 或階梯取樣延遲）：
+            // 堅定維持本地高精度 CACurrentMediaTime() 線性前進，絕不被未更新的 0.0 往回拉！
+            currentPlaybackTimeSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
+        } else {
+            anchorPlaybackTimeSec = playTime
+            anchorMediaTime = now
+            currentPlaybackTimeSec = playTime
         }
 
-        let timeMs = Int(playTime * 1000)
-        let newIndex = currentLyrics.currentLineIndex(at: timeMs, globalOffsetMs: globalOffsetMs)
+        lastPlaybackTimeSec = playTime
+
+        if currentTrack.duration > 0 {
+            playbackProgress = min(max(currentPlaybackTimeSec / currentTrack.duration, 0.0), 1.0)
+            if PiPLyricsEngine.shared.isPiPActive {
+                PiPLyricsViewModel.shared.progress = playbackProgress
+            }
+        }
+
+        // 核心修復：行索引比對必須採用高精度插值播放時間，絕不可使用可能因 IPC 卡在 0.0 的原始 playTime
+        let accurateTimeMs = interpolatedPlaybackTimeMs()
+        let newIndex = currentLyrics.currentLineIndex(at: accurateTimeMs, globalOffsetMs: 0)
 
         if newIndex != currentLineIndex {
             currentLineIndex = newIndex
