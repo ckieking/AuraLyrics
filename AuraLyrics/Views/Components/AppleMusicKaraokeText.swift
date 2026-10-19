@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// Apple Music 逐字卡拉OK流光與連續高斯流體聚焦連鎖組件 (Continuous Gaussian Focus Wave & Lens Ripple)
-/// 實作 Apple Music 原生連續動態：下一個字母在播放時從「已被相鄰帶動的大小」平滑無縫繼續放大至波峰，絕不突跳抽搐
+/// Apple Music 逐字卡拉OK流光與空間立體懸浮光暈組件 (Spatial Depth Float & Bloom Glow)
+/// 移除文字放大縮放，全面升級為 32pt 蘋果官方大字 (SF Pro)；
+/// 實作 Apple Music 標誌性物理動態：極細微上浮結合多層空間光暈，營造向螢幕方向懸浮浮出的高級立體景深感
 public struct AppleMusicKaraokeText: View {
     let text: String
     let syllables: [LyricSyllable]?
@@ -24,19 +25,20 @@ public struct AppleMusicKaraokeText: View {
 
     public var body: some View {
         if !isCurrent {
-            // 非當前行：字級與當前行完全一致 (26pt, SF Pro)，切換行時不縮放跳動
+            // 非當前行：字級與當前行完全一致 (32pt, SF Pro)，切換行時不縮放跳動
             Text(text)
-                .font(.system(size: 26, weight: .semibold, design: .default))
+                .font(.system(size: 32, weight: .semibold, design: .default))
                 .foregroundColor(Color.white.opacity(0.32))
                 .multilineTextAlignment(.leading)
         } else if reduceMotion || syllables == nil || syllables?.isEmpty == true {
             // 當前行但無逐字資料（或開啟減弱動態）：
-            // Apple Music 官方 SF Pro 實心純白搭配粉光微暈，全行字體一致
+            // Apple Music 官方 SF Pro 32pt 實心純白搭配多層立體粉光微暈，字體一致不縮放
             Text(text)
-                .font(.system(size: 26, weight: .bold, design: .default))
+                .font(.system(size: 32, weight: .bold, design: .default))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.leading)
-                .shadow(color: Color.pink.opacity(0.38), radius: 8, x: 0, y: 0)
+                .shadow(color: Color.white.opacity(0.45), radius: 6, x: 0, y: 0)
+                .shadow(color: Color.pink.opacity(0.55), radius: 16, x: 0, y: 0)
         } else if let validSyllables = syllables, !validSyllables.isEmpty {
             // 當前行且具備逐字音節時間軸：計算全行連續不斷流的發音焦點 (Continuous Monotonic Focus)
             let lineChars = buildLineChars(from: validSyllables)
@@ -84,7 +86,6 @@ public struct AppleMusicKaraokeText: View {
     }
 
     // MARK: - 計算全行 100% 連續平滑的能量焦點 (Continuous Focus Tracker)
-    /// 即使在字元交界或字間停頓空隙，焦點依然平滑插值連續滑動，絕不中斷為 nil，保證大小連續無縫
     private func calculateContinuousFocus(currentPlayMs: Int, lineChars: [LineCharInfo]) -> Double {
         guard let first = lineChars.first else { return 0.0 }
         guard let last = lineChars.last else { return 0.0 }
@@ -144,7 +145,7 @@ private struct SyllablePieceView: View {
         if syllable.text.trimmingCharacters(in: .whitespaces).isEmpty {
             // 純空白保留原生字元寬度間隔
             Text(syllable.text)
-                .font(.system(size: 26, weight: .bold, design: .default))
+                .font(.system(size: 32, weight: .bold, design: .default))
                 .hidden()
         } else {
             HStack(spacing: 0) {
@@ -160,7 +161,7 @@ private struct SyllablePieceView: View {
     }
 }
 
-// MARK: - 單字母連鎖動態渲染單元 (無縫連續縮放 + 連鎖光暈)
+// MARK: - 單字母連鎖動態渲染單元 (空間立體浮現 + 多層立體光暈)
 private struct CharacterPieceView: View {
     let char: LineCharInfo
     let continuousFocus: Double
@@ -174,7 +175,6 @@ private struct CharacterPieceView: View {
     }
 
     /// 高斯連鎖影響力 (0.0 ~ 1.0)
-    /// sigma = 2.0 擴大相鄰連鎖波及範圍，大幅放緩放大與縮小的坡度速率，舒展優雅
     private var gaussianWeight: Double {
         let dist = abs(Double(char.id) - continuousFocus)
         return exp(-(dist * dist) / (2.0 * 2.0 * 2.0))
@@ -183,50 +183,57 @@ private struct CharacterPieceView: View {
     var body: some View {
         let g = gaussianWeight
 
-        // 1. 連鎖縮放：錨定在底部基線，放大縮小節奏放緩至悠揚呼吸
-        let scale = 1.0 + 0.09 * g
-
-        // 2. 連鎖波浪上浮：從預熱微揚平滑銜接至發音波峰
+        // 1. 極細微 Y 軸微上浮 (Micro-Lift)
         let liftY: CGFloat = {
             if currentPlayMs < char.startMs {
-                // 尚未唱到：受前字連鎖波及柔和預熱微揚
-                return -1.6 * g
+                // 尚未唱到：隨周圍波及產生極其細微的預熱響應
+                return -1.0 * g
             } else if currentPlayMs >= char.endMs {
-                // 唱完後：平穩維持 -1.0pt，疊加微弱連鎖波動
-                return -1.0 - 1.0 * g
+                // 唱完後：平穩維持 -0.8pt 微浮
+                return -0.8
             } else {
-                // 正在發音：依字元內部進度順滑躍至波峰
+                // 正在發音：柔和微揚 -1.4pt
                 let localWave = sin(charProgress * .pi)
-                return -1.0 - (1.2 + 1.0 * g) * localWave
+                return -0.8 - 0.6 * localWave
             }
         }()
 
         ZStack(alignment: .leading) {
-            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 26pt，32% 次級白）
-            // 緊鄰被帶動的字元泛起柔和環境微光 (Bloom Aura)
+            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 32pt 大字，32% 次級白）
+            // 緊鄰字元泛起被環境散射照亮的柔和微光
             Text(char.text)
-                .font(.system(size: 26, weight: .bold, design: .default))
+                .font(.system(size: 32, weight: .bold, design: .default))
                 .foregroundColor(Color.white.opacity(0.32))
                 .shadow(
                     color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
-                    radius: (g > 0.04) ? 8 * g : 0,
+                    radius: (g > 0.04) ? 10 * g : 0,
                     x: 0,
                     y: 0
                 )
 
-            // 頂層：唱到的高亮純白發光文字（始終保持在視圖中以遮罩推進，避免 if 條件硬切閃爍）
+            // 頂層：唱到的高亮純白發光文字
+            // 向螢幕方向浮出的多層空間光暈：白核心 + 明亮立體粉紅光暈 + 外部空氣擴散層
             Text(char.text)
-                .font(.system(size: 26, weight: .bold, design: .default))
+                .font(.system(size: 32, weight: .bold, design: .default))
                 .foregroundColor(.white)
+                // 第一層：緊貼文字的純白立體高光（Core Highlight）
                 .shadow(
-                    color: Color.white.opacity(0.40 * g),
-                    radius: 4 * g,
+                    color: Color.white.opacity(0.65 * g),
+                    radius: 5 * g,
                     x: 0,
                     y: 0
                 )
+                // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow）
                 .shadow(
-                    color: Color.pink.opacity(0.35 + 0.45 * g),
-                    radius: 6 + 10 * g,
+                    color: Color.pink.opacity(0.60 + 0.35 * g),
+                    radius: 14 + 8 * g,
+                    x: 0,
+                    y: 0
+                )
+                // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
+                .shadow(
+                    color: Color.pink.opacity(0.35 * g),
+                    radius: 26 * g,
                     x: 0,
                     y: 0
                 )
@@ -240,7 +247,7 @@ private struct CharacterPieceView: View {
                         GeometryReader { geo in
                             let width = geo.size.width
                             let currentX = width * charProgress
-                            let feather: CGFloat = 3
+                            let feather: CGFloat = 4
 
                             HStack(spacing: 0) {
                                 Rectangle()
@@ -262,7 +269,6 @@ private struct CharacterPieceView: View {
                 }
         }
         .offset(y: liftY)
-        .scaleEffect(scale, anchor: .bottom)
     }
 }
 
@@ -270,9 +276,9 @@ private struct CharacterPieceView: View {
 /// 解決多行歌詞換行與不同字寬對齊問題，確保唱完第一行才依序點亮第二行
 public struct SyllableFlowLayout: Layout {
     public var horizontalSpacing: CGFloat = 0
-    public var verticalSpacing: CGFloat = 8
+    public var verticalSpacing: CGFloat = 10
 
-    public init(horizontalSpacing: CGFloat = 0, verticalSpacing: CGFloat = 8) {
+    public init(horizontalSpacing: CGFloat = 0, verticalSpacing: CGFloat = 10) {
         self.horizontalSpacing = horizontalSpacing
         self.verticalSpacing = verticalSpacing
     }

@@ -264,15 +264,8 @@ struct NowPlayingView: View {
                         ForEach(Array(monitor.currentLyrics.lines.enumerated()), id: \.element.id) { index, line in
                             let isCurrent = (index == monitor.currentLineIndex)
 
-                            HStack(alignment: .top, spacing: 10) {
-                                // 當前歌詞行指示色條
-                                Capsule()
-                                    .fill(isCurrent ? Color.pink : Color.clear)
-                                    .frame(width: 4)
-                                    .frame(maxHeight: .infinity)
-                                    .accessibilityHidden(true)
-
-                                VStack(alignment: .leading, spacing: 6) {
+                            HStack(alignment: .top, spacing: 0) {
+                                VStack(alignment: .leading, spacing: 8) {
                                     if isCurrent {
                                         TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying)) { _ in
                                             let currentPlayMs = monitor.interpolatedPlaybackTimeMs()
@@ -294,7 +287,7 @@ struct NowPlayingView: View {
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
-                                            .font(.system(.subheadline, design: .default).weight(.medium))
+                                            .font(.system(.body, design: .default).weight(.medium))
                                             .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
                                     }
                                 }
