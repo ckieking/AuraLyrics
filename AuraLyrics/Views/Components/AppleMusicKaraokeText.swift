@@ -24,16 +24,16 @@ public struct AppleMusicKaraokeText: View {
 
     public var body: some View {
         if !isCurrent {
-            // 非當前行：字級與當前行完全一致 (.title2, SF Pro)，切換行時不縮放跳動
+            // 非當前行：字級與當前行完全一致 (26pt, SF Pro)，切換行時不縮放跳動
             Text(text)
-                .font(.system(.title2, design: .default).weight(.semibold))
+                .font(.system(size: 26, weight: .semibold, design: .default))
                 .foregroundColor(Color.white.opacity(0.32))
                 .multilineTextAlignment(.leading)
         } else if reduceMotion || syllables == nil || syllables?.isEmpty == true {
             // 當前行但無逐字資料（或開啟減弱動態）：
             // Apple Music 官方 SF Pro 實心純白搭配粉光微暈，全行字體一致
             Text(text)
-                .font(.system(.title2, design: .default).weight(.bold))
+                .font(.system(size: 26, weight: .bold, design: .default))
                 .foregroundColor(.white)
                 .multilineTextAlignment(.leading)
                 .shadow(color: Color.pink.opacity(0.38), radius: 8, x: 0, y: 0)
@@ -42,7 +42,7 @@ public struct AppleMusicKaraokeText: View {
             let lineChars = buildLineChars(from: validSyllables)
             let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
 
-            SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 8) {
+            SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
                 ForEach(validSyllables) { syl in
                     let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
                     SyllablePieceView(
@@ -91,13 +91,13 @@ public struct AppleMusicKaraokeText: View {
 
         // 若尚未開始唱本行：焦點平滑停在行首外側
         if currentPlayMs <= first.startMs {
-            let diff = Double(first.startMs - currentPlayMs) / 400.0
+            let diff = Double(first.startMs - currentPlayMs) / 600.0
             return max(-3.0, Double(first.id) - diff)
         }
 
         // 若已唱完本行：焦點平滑移向行尾外側
         if currentPlayMs >= last.endMs {
-            let diff = Double(currentPlayMs - last.endMs) / 400.0
+            let diff = Double(currentPlayMs - last.endMs) / 600.0
             return min(Double(last.id) + 3.0, Double(last.id) + 1.0 + diff)
         }
 
@@ -144,7 +144,7 @@ private struct SyllablePieceView: View {
         if syllable.text.trimmingCharacters(in: .whitespaces).isEmpty {
             // 純空白保留原生字元寬度間隔
             Text(syllable.text)
-                .font(.system(.title2, design: .default).weight(.bold))
+                .font(.system(size: 26, weight: .bold, design: .default))
                 .hidden()
         } else {
             HStack(spacing: 0) {
@@ -174,17 +174,16 @@ private struct CharacterPieceView: View {
     }
 
     /// 高斯連鎖影響力 (0.0 ~ 1.0)
-    /// 由於 continuousFocus 絕對連續，此權重在時間軸上完全平滑，下一個字母在被播放時從「已被帶動的大小」平滑膨脹至頂峰
+    /// sigma = 2.0 擴大相鄰連鎖波及範圍，大幅放緩放大與縮小的坡度速率，舒展優雅
     private var gaussianWeight: Double {
         let dist = abs(Double(char.id) - continuousFocus)
-        // sigma = 1.4 確保相鄰字元獲得自然連貫的預熱膨脹
-        return exp(-(dist * dist) / (2.0 * 1.4 * 1.4))
+        return exp(-(dist * dist) / (2.0 * 2.0 * 2.0))
     }
 
     var body: some View {
         let g = gaussianWeight
 
-        // 1. 連鎖縮放：錨定在底部基線，字元在播放前已被相鄰字帶動放大，播放時自然順承放大至 1.09x
+        // 1. 連鎖縮放：錨定在底部基線，放大縮小節奏放緩至悠揚呼吸
         let scale = 1.0 + 0.09 * g
 
         // 2. 連鎖波浪上浮：從預熱微揚平滑銜接至發音波峰
@@ -203,10 +202,10 @@ private struct CharacterPieceView: View {
         }()
 
         ZStack(alignment: .leading) {
-            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro，32% 次級白）
+            // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 26pt，32% 次級白）
             // 緊鄰被帶動的字元泛起柔和環境微光 (Bloom Aura)
             Text(char.text)
-                .font(.system(.title2, design: .default).weight(.bold))
+                .font(.system(size: 26, weight: .bold, design: .default))
                 .foregroundColor(Color.white.opacity(0.32))
                 .shadow(
                     color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
@@ -217,7 +216,7 @@ private struct CharacterPieceView: View {
 
             // 頂層：唱到的高亮純白發光文字（始終保持在視圖中以遮罩推進，避免 if 條件硬切閃爍）
             Text(char.text)
-                .font(.system(.title2, design: .default).weight(.bold))
+                .font(.system(size: 26, weight: .bold, design: .default))
                 .foregroundColor(.white)
                 .shadow(
                     color: Color.white.opacity(0.40 * g),
