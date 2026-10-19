@@ -42,10 +42,10 @@ public struct PiPLyricsView: View {
                         .strokeBorder(strokeColor, lineWidth: 0.8)
                 )
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 4) {
                 // 上方大字：播放中當前歌詞（固定字級不縮放、不省略，過長時自然換行至下一行）
                 Text(vm.primaryLine)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(primaryTextColor)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -54,7 +54,7 @@ public struct PiPLyricsView: View {
                 // 下方小字：下一句歌詞（淺灰，被上方折行大字自然往下推，不縮放）
                 if let nextLine = vm.secondaryLine, !nextLine.isEmpty {
                     Text(nextLine)
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
                         .foregroundColor(secondaryTextColor)
                         .lineLimit(1)
                         .multilineTextAlignment(.leading)
