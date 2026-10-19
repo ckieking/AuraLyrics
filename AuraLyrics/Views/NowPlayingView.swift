@@ -318,10 +318,10 @@ struct NowPlayingView: View {
                     .padding(.bottom, 24)
                 }
             }
-            // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續）
+            // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 guard let index = newIndex else { return }
-                let isVisible = visibleLineIndices.contains(index)
+                let isVisible = visibleLineIndices.contains(index) || index <= 1
                 if isVisible {
                     if reduceMotion {
                         proxy.scrollTo(index, anchor: .center)
@@ -333,7 +333,7 @@ struct NowPlayingView: View {
                 }
             }
             // 需求 6：每首歌播完切換下一首時顯示新歌詞並同時滾動回最上方（無視歌詞是否在畫面內外）
-            .onChange(of: monitor.currentTrack.title) { _, _ in
+            .onChange(of: monitor.currentTrack) { _, _ in
                 scrollToTop(proxy: proxy)
             }
             .onChange(of: monitor.currentLyrics.id) { _, _ in

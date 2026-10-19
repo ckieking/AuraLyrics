@@ -31,12 +31,18 @@ public final class AppleMusicMonitor: ObservableObject {
     private var anchorPlaybackTimeSec: TimeInterval = 0.0
     private var anchorMediaTime: CFTimeInterval = 0.0
 
+    // MARK: - 換歌追蹤與非同步任務管理
+    private var lastPersistentID: MPMediaEntityPersistentID = 0
+    private var lastPlaybackStoreID: String = ""
+    private var lastPlaybackTimeSec: TimeInterval = 0.0
+    private var lyricsFetchTask: Task<Void, Never>? = nil
+
     private init() {
         self.globalOffsetMs = UserDefaults.standard.integer(forKey: "globalLyricsOffsetMs")
         setupNotifications()
     }
 
-    // MARK: - 系統通知設定
+    // MARK: - 系統通知與生命週期設定
     private func setupNotifications() {
         musicPlayer.beginGeneratingPlaybackNotifications()
 
@@ -59,11 +65,37 @@ public final class AppleMusicMonitor: ObservableObject {
                 self?.handlePlaybackStateChanged()
             }
         }
+
+        // App 回到前景時主動重新同步播放器狀態，防止自然切歌時系統通知脫鉤
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.musicPlayer.beginGeneratingPlaybackNotifications()
+                self.handleTrackChanged(force: true)
+                self.handlePlaybackStateChanged()
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.handleTrackChanged()
+                self.handlePlaybackStateChanged()
+            }
+        }
     }
 
     // MARK: - 啟動監聽與高精度時間軸定時器
     public func startMonitoring() {
-        handleTrackChanged()
+        handleTrackChanged(force: true)
         handlePlaybackStateChanged()
 
         timer?.invalidate()
@@ -77,24 +109,42 @@ public final class AppleMusicMonitor: ObservableObject {
     public func stopMonitoring() {
         timer?.invalidate()
         timer = nil
+        lyricsFetchTask?.cancel()
+        lyricsFetchTask = nil
+        musicPlayer.endGeneratingPlaybackNotifications()
     }
 
-    // MARK: - 曲目變更處理
-    private func handleTrackChanged() {
+    // MARK: - 曲目變更處理 (支援強制刷新與即時清空舊歌詞)
+    private func handleTrackChanged(force: Bool = false) {
         guard let nowPlaying = musicPlayer.nowPlayingItem else {
+            lyricsFetchTask?.cancel()
+            lyricsFetchTask = nil
             currentTrack = .placeholder
             currentLyrics = .empty
             currentLineIndex = nil
             playbackProgress = 0.0
             anchorPlaybackTimeSec = 0
             anchorMediaTime = 0
+            lastPersistentID = 0
+            lastPlaybackStoreID = ""
+            lastPlaybackTimeSec = 0
             return
         }
 
+        let persistentID = nowPlaying.persistentID
+        let playbackStoreID = nowPlaying.playbackStoreID ?? ""
         let title = nowPlaying.title ?? "未知曲目"
         let artist = nowPlaying.artist ?? "未知歌手"
         let album = nowPlaying.albumTitle ?? ""
         let duration = nowPlaying.playbackDuration
+
+        // 若非強制重整，且 persistentID 或 storeID 與當前曲目完全相符，且已有歌詞或正在載入，避免無謂重複請求
+        if !force && lastPersistentID != 0 && lastPersistentID == persistentID && currentTrack.title == title && currentTrack.artist == artist && (!currentLyrics.lines.isEmpty || isLoadingLyrics) {
+            return
+        }
+
+        lastPersistentID = persistentID
+        lastPlaybackStoreID = playbackStoreID
 
         var artworkData: Data? = nil
         if let artwork = nowPlaying.artwork {
@@ -111,7 +161,9 @@ public final class AppleMusicMonitor: ObservableObject {
             artworkData: artworkData
         )
 
+        // 核心修復：立即更新曲目並清空舊歌詞，杜絕上一首歌詞殘留並在 0 秒處被錯誤重新點亮
         currentTrack = newTrack
+        currentLyrics = .empty
         currentLineIndex = nil
         playbackProgress = 0.0
 
@@ -119,16 +171,21 @@ public final class AppleMusicMonitor: ObservableObject {
         currentPlaybackTimeSec = playTime
         anchorPlaybackTimeSec = playTime
         anchorMediaTime = CACurrentMediaTime()
+        lastPlaybackTimeSec = playTime
 
-        // 載入歌詞
-        Task {
-            isLoadingLyrics = true
-            if let fetched = await LyricsProviderService.shared.fetchLyrics(track: newTrack) {
-                currentLyrics = fetched
+        // 取消先前可能未完成的非同步歌詞請求，避免競態覆蓋
+        lyricsFetchTask?.cancel()
+        lyricsFetchTask = Task { [weak self] in
+            guard let self = self else { return }
+            self.isLoadingLyrics = true
+            let fetched = await LyricsProviderService.shared.fetchLyrics(track: newTrack)
+            guard !Task.isCancelled else { return }
+            if let fetched = fetched {
+                self.currentLyrics = fetched
             } else {
-                currentLyrics = SyncedLyrics.empty
+                self.currentLyrics = SyncedLyrics.empty
             }
-            isLoadingLyrics = false
+            self.isLoadingLyrics = false
         }
     }
 
@@ -145,18 +202,39 @@ public final class AppleMusicMonitor: ObservableObject {
 
     // MARK: - 時間軸定時器循環
     private func tick() {
-        // 即時檢查當前播放曲目是否已換歌（增強換歌偵測）
-        if let nowPlaying = musicPlayer.nowPlayingItem {
+        let playTime = musicPlayer.currentPlaybackTime
+        let nowPlaying = musicPlayer.nowPlayingItem
+
+        // 1. 多維度換歌偵測 (Persistent ID, Store ID, 曲目基本資訊, 或時間突變 Wrap-around)
+        if let nowPlaying = nowPlaying {
+            let pid = nowPlaying.persistentID
+            let storeID = nowPlaying.playbackStoreID ?? ""
             let title = nowPlaying.title ?? ""
             let artist = nowPlaying.artist ?? ""
-            if !title.isEmpty && (title != currentTrack.title || artist != currentTrack.artist) {
+
+            let isPidChanged = (pid != 0 && pid != lastPersistentID)
+            let isStoreIDChanged = (!storeID.isEmpty && storeID != lastPlaybackStoreID)
+            let isInfoChanged = (!title.isEmpty && (title != currentTrack.title || artist != currentTrack.artist))
+
+            // 自然播完切歌或單曲重播之時間突變偵測 (Time Wrap-around)
+            // 當前時間已歸零至 < 2.5 秒，而前一拍時間 > 5 秒且前首歌進度已超過 70%
+            let isTimeWrapped = (playTime < 2.5 && lastPlaybackTimeSec > 5.0 && (currentTrack.duration > 0 ? (lastPlaybackTimeSec / currentTrack.duration > 0.70) : true))
+
+            if isPidChanged || isStoreIDChanged || isInfoChanged {
                 handleTrackChanged()
                 return
+            } else if isTimeWrapped {
+                handleTrackChanged(force: true)
+                return
             }
+        } else if currentTrack.title != TrackInfo.placeholder.title {
+            // 播放器已被關閉或曲目為空
+            handleTrackChanged()
+            return
         }
 
-        let playTime = musicPlayer.currentPlaybackTime
         currentPlaybackTimeSec = playTime
+        lastPlaybackTimeSec = playTime
         let now = CACurrentMediaTime()
         lastTickTimestamp = now
 
