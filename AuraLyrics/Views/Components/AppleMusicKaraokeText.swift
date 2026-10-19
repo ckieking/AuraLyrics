@@ -24,25 +24,22 @@ public struct AppleMusicKaraokeText: View {
     }
 
     public var body: some View {
-        if !isCurrent {
-            // 非當前行：字級與當前行完全一致 (22pt, SF Pro)，精緻適中不膨脹，切換行時不縮放跳動
-            Text(text)
-                .font(.system(size: 22, weight: .semibold, design: .default))
-                .foregroundColor(Color.white.opacity(0.32))
-                .multilineTextAlignment(.leading)
-        } else if reduceMotion || syllables == nil || syllables?.isEmpty == true {
-            // 當前行但無逐字資料（或開啟減弱動態）：
-            // Apple Music 官方 SF Pro 22pt 實心純白搭配多層立體粉光微暈，字體一致不縮放
+        if syllables == nil || syllables?.isEmpty == true || reduceMotion {
+            // 普通行級時間軸（或減弱動態）：
+            // 無論是否唱到，字級與字重嚴格統一為 SF Pro 22pt Bold，折行點完全一致，絕不因播放而突發性換行
             Text(text)
                 .font(.system(size: 22, weight: .bold, design: .default))
-                .foregroundColor(.white)
+                .foregroundColor(isCurrent ? .white : Color.white.opacity(0.32))
                 .multilineTextAlignment(.leading)
-                .shadow(color: Color.white.opacity(0.45), radius: 4, x: 0, y: 0)
-                .shadow(color: Color.pink.opacity(0.55), radius: 12, x: 0, y: 0)
+                .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: 4, x: 0, y: 0)
+                .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: 12, x: 0, y: 0)
         } else if let validSyllables = syllables, !validSyllables.isEmpty {
-            // 當前行且具備逐字音節時間軸：計算全行連續不斷流的發音焦點 (Continuous Monotonic Focus)
+            // 逐字音節時間軸：
+            // 當前行與非當前行全面採用完全相同的 SyllableFlowLayout！
+            // 若歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，僅原地擦亮與浮現光暈，杜絕任何擠壓重疊
             let lineChars = buildLineChars(from: validSyllables)
-            let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
+            let continuousFocus = isCurrent ? calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars) : -999.0
+            let playMs = isCurrent ? currentPlaybackTimeMs : 0
 
             SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 8) {
                 ForEach(validSyllables) { syl in
@@ -51,7 +48,7 @@ public struct AppleMusicKaraokeText: View {
                         syllable: syl,
                         chars: charsInSyllable,
                         continuousFocus: continuousFocus,
-                        currentPlayMs: currentPlaybackTimeMs
+                        currentPlayMs: playMs
                     )
                 }
             }
