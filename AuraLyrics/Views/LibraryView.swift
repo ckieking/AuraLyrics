@@ -87,7 +87,7 @@ struct LibraryView: View {
     private var lyricsListView: some View {
         List {
             Section {
-                ForEach(filteredLyrics, id: \.trackTitle) { lyrics in
+                ForEach(filteredLyrics) { lyrics in
                     let isPlaying = isCurrentPlaying(lyrics)
 
                     HStack(spacing: 12) {

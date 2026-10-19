@@ -5,6 +5,7 @@ import SwiftUI
 import Combine
 
 // MARK: - PiP 懸浮視窗專用 ViewModel
+@MainActor
 public final class PiPLyricsViewModel: ObservableObject {
     public static let shared = PiPLyricsViewModel()
 
@@ -12,6 +13,8 @@ public final class PiPLyricsViewModel: ObservableObject {
     @Published public var secondaryLine: String? = nil
     @Published public var progress: Double = 0.0
     @Published public var theme: PiPVisualTheme = .dynamicIsland
+
+    private init() {}
 }
 
 // MARK: - PiP 懸浮歌詞原生畫面（Apple HIG 極致深黑動態島膠囊設計，純原文歌詞）
@@ -185,9 +188,16 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
     // MARK: - 更新歌詞狀態至 ViewModel
     public func updateLyrics(line: String, secondaryLine: String?, progress: Double) {
-        PiPLyricsViewModel.shared.primaryLine = line
-        PiPLyricsViewModel.shared.secondaryLine = secondaryLine
-        PiPLyricsViewModel.shared.progress = progress
+        let vm = PiPLyricsViewModel.shared
+        if vm.primaryLine != line {
+            vm.primaryLine = line
+        }
+        if vm.secondaryLine != secondaryLine {
+            vm.secondaryLine = secondaryLine
+        }
+        if abs(vm.progress - progress) > 0.002 {
+            vm.progress = progress
+        }
     }
 
     private func syncCurrentLyricsToViewModel() {
@@ -195,8 +205,8 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
         if let index = monitor.currentLineIndex, monitor.currentLyrics.lines.indices.contains(index) {
             let current = monitor.currentLyrics.lines[index]
             updateLyrics(line: current.text, secondaryLine: nil, progress: monitor.playbackProgress)
-        } else if monitor.currentTrack.title != "尚未播放音樂" {
-            updateLyrics(line: monitor.currentTrack.title, secondaryLine: nil, progress: monitor.playbackProgress)
+        } else if monitor.currentTrack.title != TrackInfo.placeholder.title {
+            updateLyrics(line: "♪ \(monitor.currentTrack.title)", secondaryLine: nil, progress: monitor.playbackProgress)
         } else {
             updateLyrics(line: "AuraLyrics 靈動歌詞", secondaryLine: nil, progress: 0.0)
         }

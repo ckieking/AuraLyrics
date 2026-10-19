@@ -11,7 +11,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     @Published public private(set) var lastErrorMessage: String? = nil
 
     private var currentActivity: Activity<LyricsActivityAttributes>?
-    private var lastUpdatedLine: String = ""
+    private var lastSentState: LyricsActivityAttributes.ContentState?
+    private var updateTask: Task<Void, Never>?
 
     private init() {}
 
@@ -57,6 +58,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
                 pushType: nil
             )
             self.currentActivity = activity
+            self.lastSentState = initialContentState
             self.isActivityActive = true
             self.lastErrorMessage = nil
         } catch {
@@ -69,11 +71,15 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     public func updateLyrics(line: String, secondaryLine: String?, track: TrackInfo, isPlaying: Bool, progress: Double) {
         guard let activity = currentActivity else { return }
 
-        // 若歌詞未改變則不重複更新，節省電池與系統頻寬
-        if line == lastUpdatedLine {
+        // 若主要歌詞、雙語副行、曲目與播放狀態皆未改變，則不重複發送 IPC 更新，節省電池與系統頻寬
+        if let last = lastSentState,
+           last.currentLine == line,
+           last.secondaryLine == secondaryLine,
+           last.trackTitle == track.title,
+           last.artistName == track.artist,
+           last.isPlaying == isPlaying {
             return
         }
-        lastUpdatedLine = line
 
         let updatedState = LyricsActivityAttributes.ContentState(
             currentLine: line,
@@ -83,8 +89,10 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: isPlaying,
             progress: progress
         )
+        lastSentState = updatedState
 
-        Task {
+        updateTask?.cancel()
+        updateTask = Task {
             await activity.update(
                 ActivityContent(state: updatedState, staleDate: nil)
             )
@@ -93,11 +101,14 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
     // MARK: - 結束即時動態
     public func endActivity() {
+        updateTask?.cancel()
+        updateTask = nil
+        lastSentState = nil
         guard let activity = currentActivity else { return }
+        self.currentActivity = nil
+        self.isActivityActive = false
         Task {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
-        self.currentActivity = nil
-        self.isActivityActive = false
     }
 }

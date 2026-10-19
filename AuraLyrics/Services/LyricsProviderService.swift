@@ -56,9 +56,10 @@ public final class LyricsProviderService: ObservableObject {
 
     // MARK: - 儲存至本地快取
     public func saveLyricsToCache(_ lyrics: SyncedLyrics) {
+        createCacheDirectoryIfNeeded()
         let fileURL = cacheFileURL(title: lyrics.trackTitle, artist: lyrics.artistName)
         if let data = try? JSONEncoder().encode(lyrics) {
-            try? data.write(to: fileURL)
+            try? data.write(to: fileURL, options: [.atomic])
         }
     }
 
@@ -109,6 +110,11 @@ public final class LyricsProviderService: ObservableObject {
         try? FileManager.default.removeItem(at: fileURL)
     }
 
+    public func clearAllCache() {
+        try? FileManager.default.removeItem(at: cacheDirectoryURL)
+        createCacheDirectoryIfNeeded()
+    }
+
     // MARK: - 線上自動搜尋歌詞（優先查詢具備逐字音節來源 -> 自動升級舊快取）
     public func fetchLyrics(track: TrackInfo) async -> SyncedLyrics? {
         let cleanTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -117,6 +123,7 @@ public final class LyricsProviderService: ObservableObject {
         guard !cleanTitle.isEmpty else { return nil }
 
         let cached = loadCachedLyrics(title: cleanTitle, artist: cleanArtist)
+        var fallbackResult: SyncedLyrics? = cached
 
         // 1. 若本地快取已包含逐字音節時間軸，或為使用者本地手動匯入，直接採用
         if let cached = cached, (cached.hasSyllables || cached.source == "Local") {
@@ -129,9 +136,10 @@ public final class LyricsProviderService: ObservableObject {
                 saveLyricsToCache(netEaseResult)
                 return netEaseResult
             }
-            // 若網易雲僅有普通行級歌詞，但本地尚無任何快取，暫存該備援結果
-            if cached == nil {
+            // 若網易雲僅有普通行級歌詞，但本地尚無任何快取，暫存該備援結果並更新 fallbackResult
+            if fallbackResult == nil {
                 saveLyricsToCache(netEaseResult)
+                fallbackResult = netEaseResult
             }
         }
 
@@ -141,22 +149,38 @@ public final class LyricsProviderService: ObservableObject {
                 saveLyricsToCache(lrclibResult)
                 return lrclibResult
             }
-            if cached == nil {
+            if fallbackResult == nil {
                 saveLyricsToCache(lrclibResult)
-                return lrclibResult
+                fallbackResult = lrclibResult
             }
         }
 
         // 4. 若無逐字來源，回退至既有快取或普通行級歌詞
-        if let cached = cached {
-            return cached
-        }
+        return fallbackResult
+    }
 
-        return nil
+    // MARK: - 手動搜尋跨庫歌詞（Structured Concurrency 並行請求，不污染快取直到使用者點選）
+    public func searchOnlineLyrics(query: String, durationSec: TimeInterval = 0) async -> [SyncedLyrics] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        async let netEaseTask = fetchFromNetEase(title: trimmed, artist: "", durationSec: durationSec)
+        async let lrclibTask = fetchFromLRCLIB(title: trimmed, artist: "", durationSec: durationSec)
+
+        let (netEaseResult, lrclibResult) = await (netEaseTask, lrclibTask)
+        var results: [SyncedLyrics] = []
+        if let netEase = netEaseResult {
+            results.append(netEase)
+        }
+        if let lrclib = lrclibResult,
+           !results.contains(where: { $0.id == lrclib.id }) {
+            results.append(lrclib)
+        }
+        return results
     }
 
     // MARK: - LRCLIB API 請求
-    private func fetchFromLRCLIB(title: String, artist: String, durationSec: TimeInterval) async -> SyncedLyrics? {
+    public func fetchFromLRCLIB(title: String, artist: String, durationSec: TimeInterval) async -> SyncedLyrics? {
         guard var components = URLComponents(string: "https://lrclib.net/api/get") else { return nil }
         var queryItems = [
             URLQueryItem(name: "track_name", value: title),

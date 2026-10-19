@@ -10,6 +10,7 @@ struct LyricsSearchSheet: View {
     @State private var isSearching: Bool = false
     @State private var searchResults: [SyncedLyrics] = []
     @State private var errorMessage: String? = nil
+    @State private var searchTask: Task<Void, Never>? = nil
 
     var body: some View {
         NavigationStack {
@@ -37,6 +38,7 @@ struct LyricsSearchSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("取消") {
+                        searchTask?.cancel()
                         dismiss()
                     }
                     .font(.body)
@@ -52,10 +54,14 @@ struct LyricsSearchSheet: View {
                 }
             }
             .onAppear {
-                if searchText.isEmpty && !currentTrack.title.isEmpty && currentTrack.title != "尚未播放音樂" {
+                if searchText.isEmpty && !currentTrack.title.isEmpty && currentTrack.title != TrackInfo.placeholder.title {
                     searchText = "\(currentTrack.title) \(currentTrack.artist)".trimmingCharacters(in: .whitespaces)
                     performSearch()
                 }
+            }
+            .onDisappear {
+                searchTask?.cancel()
+                searchTask = nil
             }
         }
         .presentationDetents([.medium, .large])
@@ -66,10 +72,17 @@ struct LyricsSearchSheet: View {
     private var resultsListView: some View {
         List {
             Section {
-                ForEach(searchResults, id: \.trackTitle) { lyrics in
+                ForEach(searchResults) { lyrics in
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        onSelect(lyrics)
+                        // 若正在播放真實曲目，以當前曲目標題與歌手寫入本地快取，確保下次自動命中
+                        var selected = lyrics
+                        if !currentTrack.title.isEmpty && currentTrack.title != TrackInfo.placeholder.title {
+                            selected.trackTitle = currentTrack.title
+                            selected.artistName = currentTrack.artist
+                        }
+                        LyricsProviderService.shared.saveLyricsToCache(selected)
+                        onSelect(selected)
                         dismiss()
                     } label: {
                         VStack(alignment: .leading, spacing: 6) {
@@ -100,6 +113,17 @@ struct LyricsSearchSheet: View {
 
                             // 標籤群組 (雙語 + 行數)
                             HStack(spacing: 6) {
+                                if lyrics.hasSyllables {
+                                    Text("逐字音節")
+                                        .font(.caption2)
+                                        .fontWeight(.semibold)
+                                        .foregroundColor(.pink)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.pink.opacity(0.12))
+                                        .cornerRadius(4)
+                                }
+
                                 if lyrics.lines.contains(where: { $0.translation != nil && !($0.translation?.isEmpty ?? true) }) {
                                     Text("雙語歌詞")
                                         .font(.caption2)
@@ -218,37 +242,27 @@ struct LyricsSearchSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - 搜尋邏輯
+    // MARK: - 搜尋邏輯（支援任務取消與並行檢索）
     private func performSearch() {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return }
 
+        searchTask?.cancel()
         isSearching = true
         errorMessage = nil
         searchResults = []
 
-        Task {
-            var results: [SyncedLyrics] = []
-
-            // 同步嘗試網易雲公開 API
-            if let netEaseResult = await LyricsProviderService.shared.fetchFromNetEase(title: query, artist: "") {
-                results.append(netEaseResult)
-            }
-
-            // 同步嘗試 LRCLIB
-            let dummyTrack = TrackInfo(title: query, artist: "", album: "", duration: 0)
-            if let lrcResult = await LyricsProviderService.shared.fetchLyrics(track: dummyTrack) {
-                if !results.contains(where: { $0.source == lrcResult.source && $0.trackTitle == lrcResult.trackTitle }) {
-                    results.append(lrcResult)
-                }
-            }
-
-            await MainActor.run {
-                self.searchResults = results
-                self.isSearching = false
-                if results.isEmpty {
-                    self.errorMessage = "未找到與「\(query)」相符的時間軸歌詞，請嘗試簡化關鍵字或去除特殊符號。"
-                }
+        let duration = currentTrack.duration
+        searchTask = Task { @MainActor in
+            let results = await LyricsProviderService.shared.searchOnlineLyrics(
+                query: query,
+                durationSec: duration
+            )
+            guard !Task.isCancelled else { return }
+            self.searchResults = results
+            self.isSearching = false
+            if results.isEmpty {
+                self.errorMessage = "未找到與「\(query)」相符的時間軸歌詞，請嘗試簡化關鍵字或去除特殊符號。"
             }
         }
     }

@@ -152,7 +152,7 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
     /// 根據當前播放時間（毫秒）與全域微調偏移量，取得當前正在唱的歌詞行索引
     public func currentLineIndex(at currentPlaybackTimeMs: Int, globalOffsetMs: Int = 0) -> Int? {
         guard !lines.isEmpty else { return nil }
-        let adjustedTime = currentPlaybackTimeMs + globalOffsetMs
+        let adjustedTime = currentPlaybackTimeMs + globalOffsetMs + offsetMs
 
         // 若尚未到達第一句歌詞時間
         if adjustedTime < lines[0].timeMs {
@@ -178,7 +178,7 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
 }
 
 /// 顯示引擎模式
-public enum DisplayEngineMode: String, CaseIterable, Identifiable, Codable {
+public enum DisplayEngineMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case automatic = "auto"
     case pipCapsule = "pip"
     case liveActivity = "dynamicIsland"
@@ -197,7 +197,7 @@ public enum DisplayEngineMode: String, CaseIterable, Identifiable, Codable {
 }
 
 /// PiP 懸浮窗樣式風格
-public enum PiPVisualTheme: String, CaseIterable, Identifiable, Codable {
+public enum PiPVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     case dynamicIsland = "dynamicIsland"
     case standardCard = "standardCard"
     case minimalLine = "minimalLine"
