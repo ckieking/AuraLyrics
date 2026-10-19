@@ -155,7 +155,7 @@ private struct CharacterPieceView: View {
         guard let focus = focusIndex else { return 0.0 }
         let dist = abs(Double(char.id) - focus)
         // sigma = 1.35 確保緊鄰 1 個字母被帶動放大約 6.7%，相鄰 2 個字母放大約 2.8%
-        return exp(- (dist * dist) / (2.0 * 1.35 * 1.35))
+        return exp(-(dist * dist) / (2.0 * 1.35 * 1.35))
     }
 
     var body: some View {
