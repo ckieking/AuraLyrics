@@ -52,16 +52,15 @@ public struct AppleMusicKaraokeText: View {
                         blurRadius: blurRadius
                     )
                 } else {
-                    let continuousFocus = calculateContinuousFocus(
-                        currentPlayMs: currentPlaybackTimeMs,
-                        syllables: validSyllables
-                    )
+                    let lineChars = buildLineChars(from: validSyllables)
+                    let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
 
                     SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
-                        ForEach(Array(validSyllables.enumerated()), id: \.element.id) { idx, syl in
-                            ActiveSyllablePieceView(
+                        ForEach(validSyllables) { syl in
+                            let charsInSyllable = lineChars.filter { $0.syllableId == syl.id }
+                            SyllablePieceView(
                                 syllable: syl,
-                                sylIndex: idx,
+                                chars: charsInSyllable,
                                 continuousFocus: continuousFocus,
                                 currentPlayMs: currentPlaybackTimeMs
                             )
@@ -72,147 +71,208 @@ public struct AppleMusicKaraokeText: View {
         }
     }
 
-    // MARK: - 計算全行 100% 連續平滑的音節能量焦點 (Continuous Focus Tracker)
-    private func calculateContinuousFocus(currentPlayMs: Int, syllables: [LyricSyllable]) -> Double {
-        guard let first = syllables.first else { return 0.0 }
-        guard let last = syllables.last else { return 0.0 }
+    // MARK: - 構建整行字元時間軸映射
+    private func buildLineChars(from syllables: [LyricSyllable]) -> [LineCharInfo] {
+        var result: [LineCharInfo] = []
+        var globalIdx = 0
 
-        let firstStart = first.timeMs
-        let lastEnd = last.timeMs + max(5, last.durationMs)
+        for syl in syllables {
+            let chars = Array(syl.text)
+            guard !chars.isEmpty else { continue }
+            let count = chars.count
+            let duration = max(10, syl.durationMs)
+            let step = max(5, duration / count)
+
+            for (i, char) in chars.enumerated() {
+                let charStart = syl.timeMs + i * step
+                result.append(LineCharInfo(
+                    id: globalIdx,
+                    text: String(char),
+                    syllableId: syl.id,
+                    startMs: charStart,
+                    durationMs: step
+                ))
+                globalIdx += 1
+            }
+        }
+        return result
+    }
+
+    // MARK: - 計算全行 100% 連續平滑的能量焦點 (Continuous Focus Tracker)
+    private func calculateContinuousFocus(currentPlayMs: Int, lineChars: [LineCharInfo]) -> Double {
+        guard let first = lineChars.first else { return 0.0 }
+        guard let last = lineChars.last else { return 0.0 }
 
         // 若尚未開始唱本行：焦點平滑停在行首外側
-        if currentPlayMs <= firstStart {
-            let diff = Double(firstStart - currentPlayMs) / 600.0
-            return max(-3.0, 0.0 - diff)
+        if currentPlayMs <= first.startMs {
+            let diff = Double(first.startMs - currentPlayMs) / 600.0
+            return max(-3.0, Double(first.id) - diff)
         }
 
         // 若已唱完本行：焦點平滑移向行尾外側
-        if currentPlayMs >= lastEnd {
-            let diff = Double(currentPlayMs - lastEnd) / 600.0
-            return min(Double(syllables.count) + 2.0, Double(syllables.count - 1) + 1.0 + diff)
+        if currentPlayMs >= last.endMs {
+            let diff = Double(currentPlayMs - last.endMs) / 600.0
+            return min(Double(last.id) + 3.0, Double(last.id) + 1.0 + diff)
         }
 
         // 處於唱段中：尋找當前所在的精確時空區間，並進行平滑插值
-        for i in 0..<syllables.count {
-            let cur = syllables[i]
-            let curEnd = cur.timeMs + max(5, cur.durationMs)
-            if currentPlayMs >= cur.timeMs && currentPlayMs <= curEnd {
-                let ratio = Double(currentPlayMs - cur.timeMs) / Double(max(1, cur.durationMs))
-                return Double(i) + min(max(ratio, 0.0), 1.0)
+        for i in 0..<lineChars.count {
+            let cur = lineChars[i]
+            if currentPlayMs >= cur.startMs && currentPlayMs <= cur.endMs {
+                let ratio = Double(currentPlayMs - cur.startMs) / Double(max(1, cur.durationMs))
+                return Double(cur.id) + min(max(ratio, 0.0), 1.0)
             }
 
-            // 若落在當前音節與下一個音節之間的停頓空隙，進行線性插值過渡
-            if i + 1 < syllables.count {
-                let next = syllables[i + 1]
-                if currentPlayMs > curEnd && currentPlayMs < next.timeMs {
-                    let gapDuration = Double(next.timeMs - curEnd)
-                    let gapProgress = Double(currentPlayMs - curEnd) / max(1.0, gapDuration)
-                    return Double(i) + 1.0 + gapProgress * (Double(i + 1) - Double(i) - 1.0)
+            // 若落在當前字與下一個字之間的停頓空隙，進行線性插值過渡
+            if i + 1 < lineChars.count {
+                let next = lineChars[i + 1]
+                if currentPlayMs > cur.endMs && currentPlayMs < next.startMs {
+                    let gapDuration = Double(next.startMs - cur.endMs)
+                    let gapProgress = Double(currentPlayMs - cur.endMs) / max(1.0, gapDuration)
+                    return Double(cur.id) + 1.0 + gapProgress * (Double(next.id) - Double(cur.id) - 1.0)
                 }
             }
         }
-        return 0.0
+        return Double(first.id)
     }
 }
 
-// MARK: - 當前播放行單音節渲染組件 (固定佈局尺寸 + 空間立體浮現 + 多層光暈)
-private struct ActiveSyllablePieceView: View {
+// MARK: - 全行字元時空模型
+private struct LineCharInfo: Identifiable {
+    let id: Int // 全域字元索引 0, 1, 2...
+    let text: String
+    let syllableId: UUID
+    let startMs: Int
+    let durationMs: Int
+    var endMs: Int { startMs + max(5, durationMs) }
+}
+
+// MARK: - 單音節渲染區塊 (鎖定佈局尺寸 + 逐字元掃描動態)
+private struct SyllablePieceView: View {
     let syllable: LyricSyllable
-    let sylIndex: Int
+    let chars: [LineCharInfo]
     let continuousFocus: Double
     let currentPlayMs: Int
 
-    /// 單音節擦亮進度 0.0 ~ 1.0
-    private var sylProgress: Double {
-        if currentPlayMs <= syllable.timeMs { return 0.0 }
-        let endMs = syllable.timeMs + max(5, syllable.durationMs)
-        if currentPlayMs >= endMs { return 1.0 }
-        return Double(currentPlayMs - syllable.timeMs) / Double(max(5, syllable.durationMs))
-    }
-
-    /// 高斯連鎖影響力 (0.0 ~ 1.0)
-    private var gaussianWeight: Double {
-        let dist = abs(Double(sylIndex) - continuousFocus)
-        return exp(-(dist * dist) / (2.0 * 2.0 * 2.0))
-    }
-
     var body: some View {
-        let isWhitespace = syllable.text.trimmingCharacters(in: .whitespaces).isEmpty
-        let g = gaussianWeight
-        let p = sylProgress
-
-        // 極細微 Y 軸微上浮 (Micro-Lift)
-        let liftY: CGFloat = {
-            if currentPlayMs < syllable.timeMs {
-                return -1.0 * g
-            } else if currentPlayMs >= (syllable.timeMs + max(5, syllable.durationMs)) {
-                return -0.8
-            } else {
-                let localWave = sin(p * .pi)
-                return -0.8 - 0.6 * localWave
-            }
-        }()
-
-        if isWhitespace {
+        if syllable.text.trimmingCharacters(in: .whitespaces).isEmpty {
             // 純空白保留原生字元寬度間隔
             Text(syllable.text)
                 .font(.system(size: 32, weight: .bold, design: .default))
                 .hidden()
         } else {
             // 關鍵排版鎖定：
-            // Base View 嚴格採用與 InactiveSyllableLyricView 100% 相同的純文字，
-            // 確保 sizeThatFits 尺寸完全鎖死恆等，折行點原地鎖定！
-            // 所有光暈、陰影、微浮均在 .overlay 內呈現，絕不影響外部 Layout 的 sizeThatFits，
-            // 徹底根除播放時歌詞因陰影或字距微調擴展而從兩行爆成三行的排版瑕疵！
+            // 底層採用與 InactiveSyllableLyricView 100% 相同的純文字作為 Layout 骨架基準，
+            // 傳遞給 SyllableFlowLayout 的 sizeThatFits 尺寸與非當前行精確到 0.000000pt 恆等！
+            // 內部逐字元掃描與微物理動態全封裝在 .overlay 內，
+            // 既完整保留英文單字內部的逐字母平滑擦亮與立體波浪，又絕對不改變外部行寬判定，永不跳行！
             Text(syllable.text)
                 .font(.system(size: 32, weight: .bold, design: .default))
-                .foregroundColor(Color.white.opacity(0.35))
+                .hidden()
                 .overlay(alignment: .leading) {
-                    ZStack(alignment: .leading) {
-                        // 1. 底層鄰近連鎖粉紅微光（Bloom 連鎖）
-                        if g > 0.04 {
-                            Text(syllable.text)
-                                .font(.system(size: 32, weight: .bold, design: .default))
-                                .foregroundColor(Color.white.opacity(0.35))
-                                .shadow(
-                                    color: Color.pink.opacity(0.40 * g),
-                                    radius: 10 * g,
-                                    x: 0,
-                                    y: 0
-                                )
-                        }
-
-                        // 2. 頂層高亮純白發光文字（Core Highlight + Depth Pop Glow + Ambient Bloom）
-                        if p > 0 {
-                            Text(syllable.text)
-                                .font(.system(size: 32, weight: .bold, design: .default))
-                                .foregroundColor(.white)
-                                // 第一層：緊貼文字的純白立體高光（Core Highlight）
-                                .shadow(
-                                    color: Color.white.opacity(0.65 * g),
-                                    radius: 5 * g,
-                                    x: 0,
-                                    y: 0
-                                )
-                                // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow）
-                                .shadow(
-                                    color: Color.pink.opacity(0.60 + 0.35 * g),
-                                    radius: 14 + 8 * g,
-                                    x: 0,
-                                    y: 0
-                                )
-                                // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
-                                .shadow(
-                                    color: Color.pink.opacity(0.35 * g),
-                                    radius: 26 * g,
-                                    x: 0,
-                                    y: 0
-                                )
-                                .opacity(min(1.0, max(0.0, p)))
+                    HStack(spacing: 0) {
+                        ForEach(chars) { char in
+                            CharacterPieceView(
+                                char: char,
+                                continuousFocus: continuousFocus,
+                                currentPlayMs: currentPlayMs
+                            )
                         }
                     }
-                    .offset(y: liftY)
                 }
+        }
+    }
+}
+
+// MARK: - 單字母連鎖動態渲染單元 (空間立體浮現 + 多層立體光暈 + 逐字擦亮)
+private struct CharacterPieceView: View {
+    let char: LineCharInfo
+    let continuousFocus: Double
+    let currentPlayMs: Int
+
+    /// 單字元擦亮進度 0.0 ~ 1.0
+    private var charProgress: Double {
+        if currentPlayMs <= char.startMs { return 0.0 }
+        if currentPlayMs >= char.endMs { return 1.0 }
+        return Double(currentPlayMs - char.startMs) / Double(max(5, char.durationMs))
+    }
+
+    /// 高斯連鎖影響力 (0.0 ~ 1.0)
+    private var gaussianWeight: Double {
+        let dist = abs(Double(char.id) - continuousFocus)
+        return exp(-(dist * dist) / (2.0 * 2.0 * 2.0))
+    }
+
+    var body: some View {
+        let isSpace = char.text.trimmingCharacters(in: .whitespaces).isEmpty
+
+        if isSpace {
+            // 空格僅保留寬度，不繪製任何陰影與上浮
+            Text(char.text)
+                .font(.system(size: 32, weight: .bold, design: .default))
+                .hidden()
+        } else {
+            let g = gaussianWeight
+            let p = charProgress
+
+            // 極細微 Y 軸微上浮 (Micro-Lift)
+            let liftY: CGFloat = {
+                if currentPlayMs < char.startMs {
+                    // 尚未唱到：隨周圍波及產生極其細微的預熱響應
+                    return -1.0 * g
+                } else if currentPlayMs >= char.endMs {
+                    // 唱完後：平穩維持 -0.8pt 微浮
+                    return -0.8
+                } else {
+                    // 正在發音：柔和微揚 -1.4pt
+                    let localWave = sin(p * .pi)
+                    return -0.8 - 0.6 * localWave
+                }
+            }()
+
+            ZStack(alignment: .leading) {
+                // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 32pt 大字，35% 次級白）
+                // 緊鄰字元泛起被環境散射照亮的柔和微光
+                Text(char.text)
+                    .font(.system(size: 32, weight: .bold, design: .default))
+                    .foregroundColor(Color.white.opacity(0.35))
+                    .shadow(
+                        color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
+                        radius: (g > 0.04) ? 10 * g : 0,
+                        x: 0,
+                        y: 0
+                    )
+
+                // 頂層：唱到的高亮純白發光文字
+                // 向螢幕方向浮出的多層空間光暈：白核心 + 明亮立體粉紅光暈 + 外部空氣擴散層
+                // 隨字元進度 p (0.0 ~ 1.0) 平滑淡入擦亮，純向量文字渲染，徹底杜絕白色色塊
+                Text(char.text)
+                    .font(.system(size: 32, weight: .bold, design: .default))
+                    .foregroundColor(.white)
+                    // 第一層：緊貼文字的純白立體高光（Core Highlight）
+                    .shadow(
+                        color: Color.white.opacity(0.65 * g),
+                        radius: 5 * g,
+                        x: 0,
+                        y: 0
+                    )
+                    // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow）
+                    .shadow(
+                        color: Color.pink.opacity(0.60 + 0.35 * g),
+                        radius: 14 + 8 * g,
+                        x: 0,
+                        y: 0
+                    )
+                    // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
+                    .shadow(
+                        color: Color.pink.opacity(0.35 * g),
+                        radius: 26 * g,
+                        x: 0,
+                        y: 0
+                    )
+                    .opacity(min(1.0, max(0.0, p)))
+            }
+            .offset(y: liftY)
         }
     }
 }
