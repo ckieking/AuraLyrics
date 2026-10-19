@@ -75,10 +75,10 @@ struct NowPlayingView: View {
                     secondaryText = monitor.currentLyrics.lines[index + 1].text
                 }
 
-                // 推送至 PiP 引擎
+                // 推送至 PiP 懸浮視窗引擎（懸浮窗內僅顯示原文歌詞）
                 pipEngine.updateLyrics(
                     line: current.text,
-                    secondaryLine: secondaryText,
+                    secondaryLine: nil,
                     progress: monitor.playbackProgress
                 )
 
