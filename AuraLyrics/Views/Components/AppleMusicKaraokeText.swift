@@ -108,39 +108,47 @@ private struct SyllablePieceView: View {
                     .font(.system(.title2, design: .rounded).weight(.bold))
                     .foregroundColor(Color.white.opacity(0.32))
 
-                // 頂層：唱到的高亮純白發光文字，由真實毫秒進度進行動態線性漸層遮罩
-                Text(syllable.text)
-                    .font(.system(.title2, design: .rounded).weight(.bold))
-                    .foregroundColor(.white)
-                    .shadow(
-                        color: (isSinging && isLongNote) ? Color.pink.opacity(0.65) : Color.pink.opacity(0.38),
-                        radius: (isSinging && isLongNote) ? 10 : 8,
-                        x: 0,
-                        y: 0
-                    )
-                    .mask {
-                        GeometryReader { geo in
-                            let width = geo.size.width
-                            let currentX = width * progress
-                            let feather: CGFloat = 4 // 單字精緻柔和羽化
+                // 頂層：唱到的高亮純白發光文字（僅在 progress > 0 時渲染，徹底根除單字開頭提前亮起問題）
+                if progress > 0 {
+                    Text(syllable.text)
+                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .foregroundColor(.white)
+                        .shadow(
+                            color: (isSinging && isLongNote) ? Color.pink.opacity(0.65) : Color.pink.opacity(0.38),
+                            radius: (isSinging && isLongNote) ? 10 : 8,
+                            x: 0,
+                            y: 0
+                        )
+                        .mask {
+                            if progress >= 1.0 {
+                                // 唱完：全字純白實心填滿
+                                Color.white
+                            } else {
+                                // 正在唱：自左向右動態線性漸層羽化推進
+                                GeometryReader { geo in
+                                    let width = geo.size.width
+                                    let currentX = width * progress
+                                    let feather: CGFloat = 4
 
-                            HStack(spacing: 0) {
-                                Rectangle()
-                                    .fill(Color.white)
-                                    .frame(width: max(0, currentX - feather))
+                                    HStack(spacing: 0) {
+                                        Rectangle()
+                                            .fill(Color.white)
+                                            .frame(width: max(0, currentX - feather / 2))
 
-                                LinearGradient(
-                                    colors: [Color.white, Color.white.opacity(0.0)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                                .frame(width: feather * 2)
+                                        LinearGradient(
+                                            colors: [Color.white, Color.clear],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                        .frame(width: feather)
 
-                                Spacer(minLength: 0)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .frame(width: width, alignment: .leading)
+                                }
                             }
-                            .frame(width: width, alignment: .leading)
                         }
-                    }
+                }
             }
             .offset(y: liftY)
             .scaleEffect(scale)
