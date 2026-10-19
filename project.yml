@@ -1,6 +1,6 @@
 name: AuraLyrics
 options:
-  bundleIdPrefix: com.auralyrics
+  bundleIdPrefix: com.auralyrics.preview
   deploymentTarget:
     iOS: "27.0"
 
@@ -23,7 +23,7 @@ targets:
     info:
       path: AuraLyrics/Info.plist
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.auralyrics.app
+      PRODUCT_BUNDLE_IDENTIFIER: com.auralyrics.preview.app
       TARGETED_DEVICE_FAMILY: "1"
       INFOPLIST_FILE: AuraLyrics/Info.plist
       GENERATE_INFOPLIST_FILE: NO
@@ -42,7 +42,7 @@ targets:
     info:
       path: AuraLyricsWidget/Info.plist
     settings:
-      PRODUCT_BUNDLE_IDENTIFIER: com.auralyrics.app.widget
+      PRODUCT_BUNDLE_IDENTIFIER: com.auralyrics.preview.app.widget
       TARGETED_DEVICE_FAMILY: "1"
       INFOPLIST_FILE: AuraLyricsWidget/Info.plist
       GENERATE_INFOPLIST_FILE: NO
