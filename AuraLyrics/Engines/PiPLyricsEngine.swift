@@ -17,63 +17,55 @@ public final class PiPLyricsViewModel: ObservableObject {
     private init() {}
 }
 
-// MARK: - PiP 懸浮歌詞原生畫面（Apple HIG 極致深黑動態島膠囊設計，純原文歌詞）
+// MARK: - PiP 懸浮歌詞原生畫面（支援深淺色自適應：上方大字當前歌詞 + 下方小字淺灰下一句歌詞）
 public struct PiPLyricsView: View {
     @ObservedObject var vm: PiPLyricsViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     public init(viewModel: PiPLyricsViewModel = .shared) {
         self.vm = viewModel
     }
 
     public var body: some View {
+        let isLight = (colorScheme == .light)
+        let backgroundColor = isLight ? Color.white : Color.black
+        let primaryTextColor = isLight ? Color.black : Color.white
+        let secondaryTextColor = isLight ? Color(white: 0.50) : Color.white.opacity(0.55)
+        let strokeColor = isLight ? Color.black.opacity(0.08) : Color.white.opacity(0.16)
+
         ZStack {
-            // 背景底層：深黑高對比圓角膠囊 (呼應動態島同心幾何)
+            // 背景底層：圓角膠囊 (自適應深淺色)
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.black)
+                .fill(backgroundColor)
                 .overlay(
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.16), lineWidth: 0.8)
+                        .strokeBorder(strokeColor, lineWidth: 0.8)
                 )
 
-            VStack(spacing: 0) {
-                // 頂部進度條
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.15))
-                            .frame(height: 2.5)
-                        Capsule()
-                            .fill(Color.pink)
-                            .frame(width: geo.size.width * max(0.02, min(vm.progress, 1.0)), height: 2.5)
-                    }
-                }
-                .frame(height: 2.5)
-                .padding(.horizontal, 14)
-                .padding(.top, 8)
+            VStack(alignment: .leading, spacing: 4) {
+                // 上方大字：播放中當前歌詞（固定字級不縮放、不省略，過長時自然換行至下一行）
+                Text(vm.primaryLine)
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundColor(primaryTextColor)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer(minLength: 0)
-
-                // 原文歌詞行 (居中大氣、高對比加粗，可適度折行)
-                HStack(spacing: 8) {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.pink)
-
-                    Text(vm.primaryLine)
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.75)
+                // 下方小字：下一句歌詞（淺灰，被上方折行大字自然往下推，不縮放）
+                if let nextLine = vm.secondaryLine, !nextLine.isEmpty {
+                    Text(nextLine)
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundColor(secondaryTextColor)
+                        .lineLimit(1)
                         .multilineTextAlignment(.leading)
-                    Spacer(minLength: 0)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 14)
-
-                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
+        .background(backgroundColor)
     }
 }
 
@@ -127,7 +119,7 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
         // 2. 將 SwiftUI View 嵌入 videoCallVC
         let hostingController = UIHostingController(rootView: PiPLyricsView())
-        hostingController.view.backgroundColor = .black
+        hostingController.view.backgroundColor = .clear
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
 
         videoCallVC.addChild(hostingController)
@@ -204,9 +196,11 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
         let monitor = AppleMusicMonitor.shared
         if let index = monitor.currentLineIndex, monitor.currentLyrics.lines.indices.contains(index) {
             let current = monitor.currentLyrics.lines[index]
-            updateLyrics(line: current.text, secondaryLine: nil, progress: monitor.playbackProgress)
+            let nextLineText = (index + 1 < monitor.currentLyrics.lines.count) ? monitor.currentLyrics.lines[index + 1].text : nil
+            updateLyrics(line: current.text, secondaryLine: nextLineText, progress: monitor.playbackProgress)
         } else if monitor.currentTrack.title != TrackInfo.placeholder.title {
-            updateLyrics(line: "♪ \(monitor.currentTrack.title)", secondaryLine: nil, progress: monitor.playbackProgress)
+            let firstLine = monitor.currentLyrics.lines.first?.text
+            updateLyrics(line: monitor.currentTrack.title, secondaryLine: firstLine ?? (monitor.currentTrack.artist.isEmpty ? nil : monitor.currentTrack.artist), progress: monitor.playbackProgress)
         } else {
             updateLyrics(line: "AuraLyrics 靈動歌詞", secondaryLine: nil, progress: 0.0)
         }

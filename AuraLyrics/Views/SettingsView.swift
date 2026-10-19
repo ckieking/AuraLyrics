@@ -26,7 +26,7 @@ struct SettingsView: View {
                                 .fontWeight(.semibold)
                                 .foregroundColor(.secondary)
                             Spacer()
-                            Text("Apple HIG OLED 深黑")
+                            Text("支援深淺色自適應")
                                 .font(.caption2)
                                 .foregroundColor(.secondary.opacity(0.8))
                         }
@@ -35,7 +35,7 @@ struct SettingsView: View {
                         PiPLyricsView(viewModel: pipVM)
                             .frame(height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                            .shadow(color: .black.opacity(0.35), radius: 10, y: 5)
+                            .shadow(color: Color.black.opacity(0.15), radius: 10, y: 4)
                     }
                     .padding(.vertical, 6)
 

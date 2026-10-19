@@ -319,9 +319,12 @@ public final class AppleMusicMonitor: ObservableObject {
                 secondaryText = currentLyrics.lines[index + 1].text
             }
 
+            // 下一句歌詞（供 PiP 懸浮窗下方淺灰小字顯示）
+            let nextLineText = (index + 1 < currentLyrics.lines.count) ? currentLyrics.lines[index + 1].text : nil
+
             PiPLyricsEngine.shared.updateLyrics(
                 line: current.text,
-                secondaryLine: nil,
+                secondaryLine: nextLineText,
                 progress: playbackProgress
             )
             LiveActivityLyricsEngine.shared.updateLyrics(
@@ -332,14 +335,16 @@ public final class AppleMusicMonitor: ObservableObject {
                 progress: playbackProgress
             )
         } else {
-            let introPrimary = (currentTrack.title == TrackInfo.placeholder.title)
+            let isPlaceholder = (currentTrack.title == TrackInfo.placeholder.title)
+            let introPrimary = isPlaceholder
                 ? "AuraLyrics 靈動歌詞"
-                : "♪ \(currentTrack.title)"
-            let introSecondary = currentTrack.artist.isEmpty ? nil : currentTrack.artist
+                : currentTrack.title
+            let firstLineText = currentLyrics.lines.first?.text
+            let introSecondary = isPlaceholder ? nil : (firstLineText ?? (currentTrack.artist.isEmpty ? nil : currentTrack.artist))
 
             PiPLyricsEngine.shared.updateLyrics(
                 line: introPrimary,
-                secondaryLine: nil,
+                secondaryLine: introSecondary,
                 progress: playbackProgress
             )
             LiveActivityLyricsEngine.shared.updateLyrics(
