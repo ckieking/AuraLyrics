@@ -21,26 +21,23 @@ struct NowPlayingView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .topTrailing) {
                 // MARK: - 內容底層：沉浸式動態專輯流光背景 (Ambient Backdrop)
                 ambientBackdrop
 
                 // MARK: - 內容中層：可滾動穿透之歌詞清單
                 lyricsScrollView
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                // 獨立 ToolbarItem：畫中畫 (PiP 懸浮窗) 按鈕
-                ToolbarItem(placement: .topBarTrailing) {
-                    pipIndependentButton
-                }
 
-                // 獨立 ToolbarItem：更多操作選單按鈕
-                ToolbarItem(placement: .topBarTrailing) {
+                // MARK: - 內容頂層：右上角兩顆完全獨立放大的 Liquid Glass 圓形按鈕
+                // 擺脫系統 ToolbarItem 自動分組機制，徹底消除系統膠囊底襯，按鈕即為最底層！
+                HStack(spacing: 12) {
+                    pipIndependentButton
                     moreMenuIndependentButton
                 }
+                .padding(.trailing, 20)
+                .padding(.top, 8)
             }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSearchSheet) {
                 LyricsSearchSheet(currentTrack: monitor.currentTrack) { selectedLyrics in
                     monitor.applyCustomLyrics(selectedLyrics)
