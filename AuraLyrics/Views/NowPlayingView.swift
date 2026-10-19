@@ -264,25 +264,30 @@ struct NowPlayingView: View {
                         ForEach(Array(monitor.currentLyrics.lines.enumerated()), id: \.element.id) { index, line in
                             let isCurrent = (index == monitor.currentLineIndex)
 
-                            HStack(alignment: .top, spacing: 10) {
-                                // 當前歌詞行指示色條
-                                Capsule()
-                                    .fill(isCurrent ? Color.pink : Color.clear)
-                                    .frame(width: 4)
-                                    .frame(maxHeight: .infinity)
-                                    .accessibilityHidden(true)
-
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(line.text)
-                                        .font(.system(isCurrent ? .title2 : .title3, design: .rounded))
-                                        .fontWeight(isCurrent ? .bold : .medium)
-                                        .foregroundColor(isCurrent ? .primary : .secondary)
-                                        .shadow(color: isCurrent ? Color.pink.opacity(0.32) : Color.clear, radius: 8, x: 0, y: 0)
-                                        .multilineTextAlignment(.leading)
+                            HStack(alignment: .top, spacing: 0) {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    if isCurrent {
+                                        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying)) { _ in
+                                            let currentPlayMs = monitor.interpolatedPlaybackTimeMs()
+                                            AppleMusicKaraokeText(
+                                                text: line.text,
+                                                syllables: line.syllables,
+                                                isCurrent: true,
+                                                currentPlaybackTimeMs: currentPlayMs
+                                            )
+                                        }
+                                    } else {
+                                        AppleMusicKaraokeText(
+                                            text: line.text,
+                                            syllables: line.syllables,
+                                            isCurrent: false,
+                                            currentPlaybackTimeMs: 0
+                                        )
+                                    }
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
-                                            .font(.system(.subheadline, design: .rounded).weight(.medium))
+                                            .font(.system(.body, design: .default).weight(.medium))
                                             .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
                                     }
                                 }
@@ -348,3 +353,4 @@ struct NowPlayingView: View {
         }
     }
 }
+

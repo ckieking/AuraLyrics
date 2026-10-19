@@ -96,28 +96,47 @@ public final class LyricsProviderService: ObservableObject {
         try? FileManager.default.removeItem(at: fileURL)
     }
 
-    // MARK: - 線上自動搜尋歌詞（優先查詢快取 -> LRCLIB -> 網易雲）
+    // MARK: - 線上自動搜尋歌詞（優先查詢具備逐字音節來源 -> 自動升級舊快取）
     public func fetchLyrics(track: TrackInfo) async -> SyncedLyrics? {
         let cleanTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !cleanTitle.isEmpty else { return nil }
 
-        // 1. 檢查本地快取
-        if let cached = loadCachedLyrics(title: cleanTitle, artist: cleanArtist) {
+        let cached = loadCachedLyrics(title: cleanTitle, artist: cleanArtist)
+
+        // 1. 若本地快取已包含逐字音節時間軸，或為使用者本地手動匯入，直接採用
+        if let cached = cached, (cached.hasSyllables || cached.source == "Local") {
             return cached
         }
 
-        // 2. 查詢 LRCLIB
-        if let lrclibResult = await fetchFromLRCLIB(title: cleanTitle, artist: cleanArtist, durationSec: track.duration) {
-            saveLyricsToCache(lrclibResult)
-            return lrclibResult
+        // 2. 優先向網易雲音樂請求原生逐字時間軸 (YRC/KRC) 與雙語翻譯
+        if let netEaseResult = await fetchFromNetEase(title: cleanTitle, artist: cleanArtist) {
+            if netEaseResult.hasSyllables {
+                saveLyricsToCache(netEaseResult)
+                return netEaseResult
+            }
+            // 若網易雲僅有普通行級歌詞，但本地尚無任何快取，暫存該備援結果
+            if cached == nil {
+                saveLyricsToCache(netEaseResult)
+            }
         }
 
-        // 3. 備援查詢 網易雲音樂公開 API（含雙語翻譯）
-        if let netEaseResult = await fetchFromNetEase(title: cleanTitle, artist: cleanArtist) {
-            saveLyricsToCache(netEaseResult)
-            return netEaseResult
+        // 3. 查詢 LRCLIB 嘗試比對 Enhanced LRC 逐字標籤
+        if let lrclibResult = await fetchFromLRCLIB(title: cleanTitle, artist: cleanArtist, durationSec: track.duration) {
+            if lrclibResult.hasSyllables {
+                saveLyricsToCache(lrclibResult)
+                return lrclibResult
+            }
+            if cached == nil {
+                saveLyricsToCache(lrclibResult)
+                return lrclibResult
+            }
+        }
+
+        // 4. 若無逐字來源，回退至既有快取或普通行級歌詞
+        if let cached = cached {
+            return cached
         }
 
         return nil
@@ -172,7 +191,7 @@ public final class LyricsProviderService: ObservableObject {
         return nil
     }
 
-    // MARK: - 網易雲音樂公開 API 請求（搜尋曲目與歌詞 + 翻譯）
+    // MARK: - 網易雲音樂公開 API 請求（支援 YRC 原生逐字時間軸 + KRC + LRC + 雙語翻譯）
     public func fetchFromNetEase(title: String, artist: String) async -> SyncedLyrics? {
         let searchQuery = "\(title) \(artist)".trimmingCharacters(in: .whitespaces)
         guard var searchComponents = URLComponents(string: "https://music.163.com/api/search/get/web") else { return nil }
@@ -210,8 +229,8 @@ public final class LyricsProviderService: ObservableObject {
                 return nil
             }
 
-            // 請求歌詞
-            guard let lyricUrl = URL(string: "https://music.163.com/api/song/lyric?os=pc&id=\(songId)&lv=-1&kv=-1&tv=-1") else {
+            // 請求歌詞：帶上 yv=-1 以取得網易雲 YRC 原生逐字時間軸
+            guard let lyricUrl = URL(string: "https://music.163.com/api/song/lyric?os=pc&id=\(songId)&lv=-1&kv=-1&tv=-1&yv=-1") else {
                 return nil
             }
 
@@ -227,30 +246,49 @@ public final class LyricsProviderService: ObservableObject {
                 }
                 let lrc: LyricObj?
                 let tlyric: LyricObj?
+                let yrc: LyricObj?
+                let klyric: LyricObj?
             }
 
             let lyricDecoded = try JSONDecoder().decode(NetEaseLyricResponse.self, from: lyricData)
-            guard let rawLrc = lyricDecoded.lrc?.lyric, !rawLrc.isEmpty else {
+
+            // 優先解析 YRC 逐字時間軸 -> KRC 逐字時間軸 -> 普通 LRC 行級時間軸
+            var origLines: [LyricLine] = []
+            if let rawYrc = lyricDecoded.yrc?.lyric, !rawYrc.isEmpty {
+                let parsed = LRCParser.shared.parseYRC(yrcContent: rawYrc)
+                if !parsed.isEmpty {
+                    origLines = parsed
+                }
+            }
+
+            if origLines.isEmpty, let rawKrc = lyricDecoded.klyric?.lyric, !rawKrc.isEmpty {
+                let parsed = LRCParser.shared.parseKRC(krcContent: rawKrc)
+                if !parsed.isEmpty {
+                    origLines = parsed
+                }
+            }
+
+            if origLines.isEmpty, let rawLrc = lyricDecoded.lrc?.lyric, !rawLrc.isEmpty {
+                origLines = LRCParser.shared.parse(lrcContent: rawLrc)
+            }
+
+            guard !origLines.isEmpty else {
                 return nil
             }
 
-            let origLines = LRCParser.shared.parse(lrcContent: rawLrc)
             var finalLines = origLines
-
             if let rawTrans = lyricDecoded.tlyric?.lyric, !rawTrans.isEmpty {
                 let transLines = LRCParser.shared.parse(lrcContent: rawTrans)
                 finalLines = LRCParser.shared.mergeTranslations(original: origLines, translation: transLines)
             }
 
-            if !finalLines.isEmpty {
-                return SyncedLyrics(
-                    trackTitle: title,
-                    artistName: artist,
-                    lines: finalLines,
-                    offsetMs: 0,
-                    source: "NetEase"
-                )
-            }
+            return SyncedLyrics(
+                trackTitle: title,
+                artistName: artist,
+                lines: finalLines,
+                offsetMs: 0,
+                source: "NetEase"
+            )
         } catch {
             print("[LyricsProvider] 網易雲請求失敗: \(error.localizedDescription)")
         }

@@ -14,6 +14,7 @@ public final class AppleMusicMonitor: ObservableObject {
     @Published public private(set) var isPlaying: Bool = false
     @Published public private(set) var playbackProgress: Double = 0.0
     @Published public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
+    @Published public private(set) var lastTickTimestamp: CFTimeInterval = CACurrentMediaTime()
     @Published public private(set) var isLoadingLyrics: Bool = false
 
     /// 全域歌詞同步時間微調偏移量（毫秒，每首歌共用）
@@ -25,6 +26,10 @@ public final class AppleMusicMonitor: ObservableObject {
 
     private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
     private var timer: Timer?
+
+    // MARK: - 高精度防抖時鐘錨點
+    private var anchorPlaybackTimeSec: TimeInterval = 0.0
+    private var anchorMediaTime: CFTimeInterval = 0.0
 
     private init() {
         self.globalOffsetMs = UserDefaults.standard.integer(forKey: "globalLyricsOffsetMs")
@@ -81,6 +86,8 @@ public final class AppleMusicMonitor: ObservableObject {
             currentLyrics = .empty
             currentLineIndex = nil
             playbackProgress = 0.0
+            anchorPlaybackTimeSec = 0
+            anchorMediaTime = 0
             return
         }
 
@@ -108,6 +115,11 @@ public final class AppleMusicMonitor: ObservableObject {
         currentLineIndex = nil
         playbackProgress = 0.0
 
+        let playTime = musicPlayer.currentPlaybackTime
+        currentPlaybackTimeSec = playTime
+        anchorPlaybackTimeSec = playTime
+        anchorMediaTime = CACurrentMediaTime()
+
         // 載入歌詞
         Task {
             isLoadingLyrics = true
@@ -121,7 +133,14 @@ public final class AppleMusicMonitor: ObservableObject {
     }
 
     private func handlePlaybackStateChanged() {
-        isPlaying = (musicPlayer.playbackState == .playing)
+        let newIsPlaying = (musicPlayer.playbackState == .playing)
+        if isPlaying != newIsPlaying {
+            isPlaying = newIsPlaying
+            let playTime = musicPlayer.currentPlaybackTime
+            currentPlaybackTimeSec = playTime
+            anchorPlaybackTimeSec = playTime
+            anchorMediaTime = CACurrentMediaTime()
+        }
     }
 
     // MARK: - 時間軸定時器循環
@@ -138,6 +157,18 @@ public final class AppleMusicMonitor: ObservableObject {
 
         let playTime = musicPlayer.currentPlaybackTime
         currentPlaybackTimeSec = playTime
+        let now = CACurrentMediaTime()
+        lastTickTimestamp = now
+
+        // 平滑防抖校正：比較實測播放時間與時鐘線性推估值的差值
+        let predictedTime = anchorPlaybackTimeSec + (isPlaying ? max(0, now - anchorMediaTime) : 0)
+        let drift = abs(playTime - predictedTime)
+
+        // 若誤差超過 120ms（發生拖曳跳轉或暫停），立即重設基準錨點；否則維持平滑推進
+        if drift >= 0.12 || anchorMediaTime == 0 || !isPlaying {
+            anchorPlaybackTimeSec = playTime
+            anchorMediaTime = now
+        }
 
         if currentTrack.duration > 0 {
             playbackProgress = min(max(playTime / currentTrack.duration, 0.0), 1.0)
@@ -149,6 +180,13 @@ public final class AppleMusicMonitor: ObservableObject {
         if newIndex != currentLineIndex {
             currentLineIndex = newIndex
         }
+    }
+
+    /// 取得高精度插值播放時間（毫秒，結合平滑防抖時鐘與微秒級幀間差）
+    public func interpolatedPlaybackTimeMs() -> Int {
+        let elapsed = isPlaying ? max(0, CACurrentMediaTime() - anchorMediaTime) : 0
+        let timeSec = anchorPlaybackTimeSec + elapsed
+        return Int(timeSec * 1000) + globalOffsetMs
     }
 
     // MARK: - 調整全域共用之時間軸微調偏移量
