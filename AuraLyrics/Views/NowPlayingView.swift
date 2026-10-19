@@ -271,6 +271,7 @@ struct NowPlayingView: View {
                                             currentPlaybackTimeMs: 0,
                                             blurRadius: blurRadius(for: index)
                                         )
+                                        .animation(.easeInOut(duration: 0.35), value: blurRadius(for: index))
                                     }
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
@@ -278,6 +279,7 @@ struct NowPlayingView: View {
                                             .font(.system(size: 16, weight: .medium, design: .default))
                                             .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
                                             .blur(radius: isCurrent ? 0 : translationBlurRadius(for: index))
+                                            .animation(.easeInOut(duration: 0.35), value: translationBlurRadius(for: index))
                                     }
                                 }
                                 .fixedSize(horizontal: false, vertical: true)
@@ -339,18 +341,14 @@ struct NowPlayingView: View {
                     scrollIdleTask?.cancel()
                     scrollIdleTask = nil
                     if !isUserScrolling {
-                        withAnimation(.easeInOut(duration: 0.20)) {
-                            isUserScrolling = true
-                        }
+                        isUserScrolling = true
                     }
                 } else if newPhase == .idle {
                     scrollIdleTask?.cancel()
                     scrollIdleTask = Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
                         guard !Task.isCancelled else { return }
-                        withAnimation(.easeInOut(duration: 0.35)) {
-                            isUserScrolling = false
-                        }
+                        isUserScrolling = false
                     }
                 }
             }
@@ -436,9 +434,7 @@ struct NowPlayingView: View {
         }
         let isVisible = tracker.visibleIndices.contains(current) || current <= 1
         if isCurrentLineInViewport != isVisible {
-            withAnimation(.easeInOut(duration: 0.25)) {
-                isCurrentLineInViewport = isVisible
-            }
+            isCurrentLineInViewport = isVisible
         }
     }
 
