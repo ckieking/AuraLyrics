@@ -30,6 +30,26 @@ public struct TrackInfo: Codable, Equatable, Sendable {
     )
 }
 
+/// 單字/音節時間軸（支援 Apple Music 逐字卡拉OK播放）
+public struct LyricSyllable: Identifiable, Codable, Equatable, Sendable {
+    public var id: UUID
+    public var text: String
+    public var timeMs: Int
+    public var durationMs: Int
+
+    public init(
+        id: UUID = UUID(),
+        text: String,
+        timeMs: Int,
+        durationMs: Int = 0
+    ) {
+        self.id = id
+        self.text = text
+        self.timeMs = timeMs
+        self.durationMs = durationMs
+    }
+}
+
 /// 單行時間軸歌詞
 public struct LyricLine: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
@@ -39,17 +59,21 @@ public struct LyricLine: Identifiable, Codable, Equatable, Sendable {
     public var text: String
     /// 翻譯歌詞（若無則為 nil）
     public var translation: String?
+    /// 逐字音節時間軸（若有 Enhanced LRC 逐字資料）
+    public var syllables: [LyricSyllable]?
 
     public init(
         id: UUID = UUID(),
         timeMs: Int,
         text: String,
-        translation: String? = nil
+        translation: String? = nil,
+        syllables: [LyricSyllable]? = nil
     ) {
         self.id = id
         self.timeMs = timeMs
         self.text = text
         self.translation = translation
+        self.syllables = syllables
     }
 }
 
