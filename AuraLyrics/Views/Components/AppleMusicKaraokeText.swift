@@ -8,6 +8,7 @@ public struct AppleMusicKaraokeText: View {
     let syllables: [LyricSyllable]?
     let isCurrent: Bool
     let currentPlaybackTimeMs: Int
+    let blurRadius: CGFloat
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -15,12 +16,14 @@ public struct AppleMusicKaraokeText: View {
         text: String,
         syllables: [LyricSyllable]? = nil,
         isCurrent: Bool,
-        currentPlaybackTimeMs: Int = 0
+        currentPlaybackTimeMs: Int = 0,
+        blurRadius: CGFloat = 0
     ) {
         self.text = text
         self.syllables = syllables
         self.isCurrent = isCurrent
         self.currentPlaybackTimeMs = currentPlaybackTimeMs
+        self.blurRadius = blurRadius
     }
 
     public var body: some View {
@@ -35,26 +38,19 @@ public struct AppleMusicKaraokeText: View {
                     .multilineTextAlignment(.leading)
                     .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: isCurrent ? 5 : 0, x: 0, y: 0)
                     .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: isCurrent ? 14 : 0, x: 0, y: 0)
+                    .blur(radius: isCurrent ? 0 : blurRadius)
             } else if let validSyllables = syllables, !validSyllables.isEmpty {
                 // 逐字音節時間軸：
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
                 // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
                 if !isCurrent {
-                    // 非當前行：採用輕量化單純音節文字排版，保持相同的 SyllableFlowLayout 與 32pt Bold 字重
-                    // 零陰影、零離屏遮罩、零額外渲染負載，徹底釋放 GPU 算力，維持 120fps 極致流暢！
-                    SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
-                        ForEach(validSyllables) { syl in
-                            if syl.text.trimmingCharacters(in: .whitespaces).isEmpty {
-                                Text(syl.text)
-                                    .font(.system(size: 32, weight: .bold, design: .default))
-                                    .hidden()
-                            } else {
-                                Text(syl.text)
-                                    .font(.system(size: 32, weight: .bold, design: .default))
-                                    .foregroundColor(Color.white.opacity(0.35))
-                            }
-                        }
-                    }
+                    // 非當前行：採用 Equatable 隔離視圖，並透過 drawingGroup() 預合成為單一 Metal 紋理快取
+                    // 當模糊半徑未改變時（如距離 >= 3 行的所有歌詞），SwiftUI 100% 複用 GPU 紋理，穩跑 120fps！
+                    InactiveSyllableLyricView(
+                        text: text,
+                        syllables: validSyllables,
+                        blurRadius: blurRadius
+                    )
                 } else {
                     let lineChars = buildLineChars(from: validSyllables)
                     let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: lineChars)
@@ -338,5 +334,36 @@ public struct SyllableFlowLayout: Layout {
             currentX += size.width + horizontalSpacing
             lineHeight = max(lineHeight, size.height)
         }
+    }
+}
+
+// MARK: - 非當前播放行 Equatable 快取視圖 (預合成 Metal 紋理並執行階梯景深模糊)
+private struct InactiveSyllableLyricView: View, Equatable {
+    let text: String
+    let syllables: [LyricSyllable]
+    let blurRadius: CGFloat
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.text == rhs.text &&
+        lhs.syllables.count == rhs.syllables.count &&
+        lhs.blurRadius == rhs.blurRadius
+    }
+
+    var body: some View {
+        SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+            ForEach(syllables) { syl in
+                if syl.text.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Text(syl.text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .hidden()
+                } else {
+                    Text(syl.text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(Color.white.opacity(0.35))
+                }
+            }
+        }
+        .drawingGroup()
+        .blur(radius: blurRadius)
     }
 }

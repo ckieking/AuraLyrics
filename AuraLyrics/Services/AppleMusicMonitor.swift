@@ -12,9 +12,9 @@ public final class AppleMusicMonitor: ObservableObject {
     @Published public private(set) var currentLyrics: SyncedLyrics = .empty
     @Published public var currentLineIndex: Int? = nil
     @Published public private(set) var isPlaying: Bool = false
-    @Published public private(set) var playbackProgress: Double = 0.0
-    @Published public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
-    @Published public private(set) var lastTickTimestamp: CFTimeInterval = CACurrentMediaTime()
+    public private(set) var playbackProgress: Double = 0.0
+    public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
+    public private(set) var lastTickTimestamp: CFTimeInterval = CACurrentMediaTime()
     @Published public private(set) var isLoadingLyrics: Bool = false
 
     /// 全域歌詞同步時間微調偏移量（毫秒，每首歌共用）
@@ -250,6 +250,9 @@ public final class AppleMusicMonitor: ObservableObject {
 
         if currentTrack.duration > 0 {
             playbackProgress = min(max(playTime / currentTrack.duration, 0.0), 1.0)
+            if PiPLyricsEngine.shared.isPiPActive {
+                PiPLyricsViewModel.shared.progress = playbackProgress
+            }
         }
 
         let timeMs = Int(playTime * 1000)

@@ -17,8 +17,18 @@ struct NowPlayingView: View {
     @State private var showFileImporter = false
     @AppStorage("showBilingualLyrics") private var showTranslation = true
 
-    /// 記錄當前在螢幕可視範圍內的歌詞行索引（支援 Apple Music 智能跟隨）
-    @State private var visibleLineIndices: Set<Int> = []
+    /// 零重繪之可視行索引追蹤器（參考型別，不觸發全視圖 body 刷新）
+    @State private var tracker = ViewportTracker()
+
+    /// 焦點歌詞當前是否在螢幕可視範圍內（僅在布林值翻轉時更新 @State）
+    @State private var isCurrentLineInViewport: Bool = true
+
+    /// 記錄使用者是否正在手動滑動螢幕（滑動時立即解除模糊，閒置 1.5s 平滑恢復）
+    @State private var isUserScrolling: Bool = false
+    @State private var scrollIdleTask: Task<Void, Never>? = nil
+
+    /// 快取解碼後之專輯封面圖，避免在 body 內高頻重複解碼 PNG
+    @State private var cachedArtworkImage: UIImage? = nil
 
     var body: some View {
         NavigationStack {
@@ -175,12 +185,10 @@ struct NowPlayingView: View {
         .accessibilityLabel("更多歌詞操作選項")
     }
 
-    // MARK: - 沉浸式氛圍背景 (Ambient Backdrop)
+    // MARK: - 沉浸式氛圍背景 (Ambient Backdrop，快取解碼避免每幀 PNG 重複解碼)
     @ViewBuilder
     private var ambientBackdrop: some View {
-        if !reduceTransparency,
-           let artworkData = monitor.currentTrack.artworkData,
-           let uiImage = UIImage(data: artworkData) {
+        if !reduceTransparency, let uiImage = cachedArtworkImage {
             GeometryReader { geo in
                 Image(uiImage: uiImage)
                     .resizable()
@@ -274,7 +282,8 @@ struct NowPlayingView: View {
                                                 text: line.text,
                                                 syllables: line.syllables,
                                                 isCurrent: true,
-                                                currentPlaybackTimeMs: currentPlayMs
+                                                currentPlaybackTimeMs: currentPlayMs,
+                                                blurRadius: 0
                                             )
                                         }
                                     } else {
@@ -282,7 +291,8 @@ struct NowPlayingView: View {
                                             text: line.text,
                                             syllables: line.syllables,
                                             isCurrent: false,
-                                            currentPlaybackTimeMs: 0
+                                            currentPlaybackTimeMs: 0,
+                                            blurRadius: blurRadius(for: index)
                                         )
                                     }
 
@@ -290,6 +300,7 @@ struct NowPlayingView: View {
                                         Text(trans)
                                             .font(.system(size: 16, weight: .medium, design: .default))
                                             .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
+                                            .blur(radius: isCurrent ? 0 : translationBlurRadius(for: index))
                                     }
                                 }
                                 .fixedSize(horizontal: false, vertical: true)
@@ -299,17 +310,23 @@ struct NowPlayingView: View {
                             .id(index)
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                scrollIdleTask?.cancel()
+                                scrollIdleTask = nil
+                                isUserScrolling = false
                                 monitor.currentLineIndex = index
+                                isCurrentLineInViewport = true
                                 withAnimation(.easeInOut(duration: 0.35)) {
                                     proxy.scrollTo(index, anchor: .center)
                                 }
                             }
                             .sensoryFeedback(.impact(weight: .light), trigger: monitor.currentLineIndex)
                             .onAppear {
-                                visibleLineIndices.insert(index)
+                                tracker.visibleIndices.insert(index)
+                                checkCurrentLineVisibility()
                             }
                             .onDisappear {
-                                visibleLineIndices.remove(index)
+                                tracker.visibleIndices.remove(index)
+                                checkCurrentLineVisibility()
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(line.text + (line.translation.map { "，翻譯：\($0)" } ?? ""))
@@ -340,11 +357,31 @@ struct NowPlayingView: View {
                     .padding(.bottom, 24)
                 }
             }
+            .onScrollPhaseChange { oldPhase, newPhase in
+                if newPhase == .interacting || newPhase == .decelerating {
+                    scrollIdleTask?.cancel()
+                    scrollIdleTask = nil
+                    if !isUserScrolling {
+                        withAnimation(.easeInOut(duration: 0.20)) {
+                            isUserScrolling = true
+                        }
+                    }
+                } else if newPhase == .idle {
+                    scrollIdleTask?.cancel()
+                    scrollIdleTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            isUserScrolling = false
+                        }
+                    }
+                }
+            }
             // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
+                checkCurrentLineVisibility()
                 guard let index = newIndex else { return }
-                let isVisible = visibleLineIndices.contains(index) || index <= 1
-                if isVisible {
+                let isVisible = tracker.visibleIndices.contains(index) || index <= 1
+                if isVisible && !isUserScrolling {
                     if reduceMotion {
                         proxy.scrollTo(index, anchor: .center)
                     } else {
@@ -363,10 +400,14 @@ struct NowPlayingView: View {
             }
             // 需求 7：當使用者重新將本頁面作為焦點頁面時（App 回到前景、分頁切回），強制定位到目前歌詞進度並恢復跟隨
             .onAppear {
+                updateCachedArtwork()
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 120_000_000)
                     forceScrollToCurrentLine(proxy: proxy, animated: false)
                 }
+            }
+            .onChange(of: monitor.currentTrack.artworkData) { _, _ in
+                updateCachedArtwork()
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
@@ -385,7 +426,73 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 強制滾動定位至當前正在播放的歌詞行（居中），並自然將其納入 visibleLineIndices 以恢復智能跟隨
+    /// 計算主歌詞行的階梯式景深模糊半徑
+    private func blurRadius(for index: Int) -> CGFloat {
+        guard !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
+            return 0.0
+        }
+        guard let current = monitor.currentLineIndex else {
+            return 0.0
+        }
+        let dist = abs(index - current)
+        switch dist {
+        case 0:
+            return 0.0
+        case 1:
+            return 1.2
+        case 2:
+            return 2.0
+        default:
+            return 2.8
+        }
+    }
+
+    /// 計算翻譯文字的階梯式景深模糊半徑
+    private func translationBlurRadius(for index: Int) -> CGFloat {
+        guard !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
+            return 0.0
+        }
+        guard let current = monitor.currentLineIndex else {
+            return 0.0
+        }
+        let dist = abs(index - current)
+        switch dist {
+        case 0:
+            return 0.0
+        case 1:
+            return 0.8
+        case 2:
+            return 1.3
+        default:
+            return 1.8
+        }
+    }
+
+    /// 檢查焦點行是否在目前畫面可視範圍內（僅在結果翻轉時更新 @State）
+    private func checkCurrentLineVisibility() {
+        guard let current = monitor.currentLineIndex else {
+            if !isCurrentLineInViewport {
+                isCurrentLineInViewport = true
+            }
+            return
+        }
+        let isVisible = tracker.visibleIndices.contains(current) || current <= 1
+        if isCurrentLineInViewport != isVisible {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isCurrentLineInViewport = isVisible
+            }
+        }
+    }
+
+    private func updateCachedArtwork() {
+        if let data = monitor.currentTrack.artworkData {
+            cachedArtworkImage = UIImage(data: data)
+        } else {
+            cachedArtworkImage = nil
+        }
+    }
+
+    /// 強制滾動定位至當前正在播放的歌詞行（居中），並自然將其納入 tracker 以恢復智能跟隨
     private func forceScrollToCurrentLine(proxy: ScrollViewProxy, animated: Bool = true) {
         guard let currentIndex = monitor.currentLineIndex,
               monitor.currentLyrics.lines.indices.contains(currentIndex) else { return }
@@ -400,7 +507,7 @@ struct NowPlayingView: View {
     }
 
     private func scrollToTop(proxy: ScrollViewProxy) {
-        visibleLineIndices.removeAll()
+        tracker.visibleIndices.removeAll()
         if reduceMotion {
             proxy.scrollTo("LyricsTopAnchor", anchor: .top)
         } else {
@@ -409,5 +516,10 @@ struct NowPlayingView: View {
             }
         }
     }
+}
+
+/// 零重繪之可視行索引追蹤器（參考型別，不觸發全視圖 body 刷新）
+private final class ViewportTracker {
+    var visibleIndices: Set<Int> = []
 }
 
