@@ -277,8 +277,11 @@ private struct CharacterPieceView: View {
     }
 }
 
-// MARK: - 音節流式自動換行排版 (SwiftUI Layout Protocol)
-/// 解決多行歌詞換行與不同字寬對齊問題，確保唱完第一行才依序點亮第二行
+// MARK: - 音節流式自動換行排版 (Apple Music 智慧兩行平衡折行演算法)
+/// 解決多行歌詞換行與不同字寬對齊問題；
+/// 採用兩行平衡拆分演算法（Balanced 2-Line Partitioning），整句歌詞優先在兩行內最優均勻分折，
+/// 徹底杜絕因行尾貪婪溢出而產生孤零零單字的第 3 行，
+/// 同時強制鎖死每行所屬音節，杜絕播放亮起時的任何跳行現象！
 public struct SyllableFlowLayout: Layout {
     public var horizontalSpacing: CGFloat = 0
     public var verticalSpacing: CGFloat = 10
@@ -288,43 +291,122 @@ public struct SyllableFlowLayout: Layout {
         self.verticalSpacing = verticalSpacing
     }
 
+    /// 根據可用寬度，計算最優的行劃分（每行所包含的子視圖索引）
+    private func computeLineBreaks(subviews: Subviews, maxWidth: CGFloat) -> [[Int]] {
+        guard !subviews.isEmpty else { return [] }
+
+        let count = subviews.count
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+
+        // 1. 檢查整句是否能在 1 行內完全放下
+        var line1Width: CGFloat = 0
+        for i in 0..<count {
+            line1Width += sizes[i].width + (i > 0 ? horizontalSpacing : 0)
+        }
+        if line1Width <= maxWidth {
+            return [Array(0..<count)]
+        }
+
+        // 2. 智慧兩行平衡劃分（Balanced 2-Line Split）：
+        // 在所有可能的分割點中，尋找讓兩行都能放下且長度最平衡的最佳分割點
+        var bestSplit: Int? = nil
+        var minDiff: CGFloat = .infinity
+
+        var prefixWidths = [CGFloat](repeating: 0, count: count + 1)
+        for i in 0..<count {
+            prefixWidths[i + 1] = prefixWidths[i] + sizes[i].width + (i > 0 ? horizontalSpacing : 0)
+        }
+
+        let totalW = prefixWidths[count]
+
+        for split in 1..<count {
+            let w1 = prefixWidths[split]
+            let w2 = totalW - prefixWidths[split]
+
+            // 給予 8pt 的安全容差（允許極輕微自然延伸至 20pt 的左右 padding 內，優先維持兩行）
+            if w1 <= maxWidth + 8.0 && w2 <= maxWidth + 8.0 {
+                let diff = abs(w1 - w2)
+                if diff < minDiff {
+                    minDiff = diff
+                    bestSplit = split
+                }
+            }
+        }
+
+        if let split = bestSplit {
+            // 成功在兩行內均衡收斂，徹底杜絕第三行！
+            return [Array(0..<split), Array(split..<count)]
+        }
+
+        // 3. 安全回退：若極長句子兩行確實無法容納，進行貪婪折行
+        var lines: [[Int]] = []
+        var currentLine: [Int] = []
+        var currentW: CGFloat = 0
+
+        for i in 0..<count {
+            let w = sizes[i].width
+            if currentW + w > maxWidth + 4.0 && !currentLine.isEmpty {
+                lines.append(currentLine)
+                currentLine = [i]
+                currentW = w
+            } else {
+                currentLine.append(i)
+                currentW += w + horizontalSpacing
+            }
+        }
+        if !currentLine.isEmpty {
+            lines.append(currentLine)
+        }
+
+        return lines
+    }
+
     public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        var totalWidth: CGFloat = 0
+        let lineIndices = computeLineBreaks(subviews: subviews, maxWidth: maxWidth)
+        guard !lineIndices.isEmpty else { return .zero }
 
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > maxWidth && currentX > 0 {
-                currentX = 0
-                currentY += lineHeight + verticalSpacing
-                lineHeight = 0
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        var totalHeight: CGFloat = 0
+        var maxLineWidth: CGFloat = 0
+
+        for (lineIdx, indices) in lineIndices.enumerated() {
+            var lineWidth: CGFloat = 0
+            var lineHeight: CGFloat = 0
+            for (idxInLine, i) in indices.enumerated() {
+                lineWidth += sizes[i].width + (idxInLine > 0 ? horizontalSpacing : 0)
+                lineHeight = max(lineHeight, sizes[i].height)
             }
-            currentX += size.width + horizontalSpacing
-            lineHeight = max(lineHeight, size.height)
-            totalWidth = max(totalWidth, currentX)
+            maxLineWidth = max(maxLineWidth, lineWidth)
+            totalHeight += lineHeight + (lineIdx > 0 ? verticalSpacing : 0)
         }
-        return CGSize(width: min(totalWidth, maxWidth), height: currentY + lineHeight)
+
+        return CGSize(width: min(maxLineWidth, maxWidth), height: totalHeight)
     }
 
     public func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let maxWidth = bounds.width
-        var currentX: CGFloat = bounds.minX
-        var currentY: CGFloat = bounds.minY
-        var lineHeight: CGFloat = 0
+        let lineIndices = computeLineBreaks(subviews: subviews, maxWidth: maxWidth)
+        guard !lineIndices.isEmpty else { return }
 
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-            if currentX + size.width > bounds.maxX && currentX > bounds.minX {
-                currentX = bounds.minX
-                currentY += lineHeight + verticalSpacing
-                lineHeight = 0
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        var currentY = bounds.minY
+
+        for (lineIdx, indices) in lineIndices.enumerated() {
+            var currentX = bounds.minX
+            var lineHeight: CGFloat = 0
+
+            for (idxInLine, i) in indices.enumerated() {
+                let size = sizes[i]
+                subviews[i].place(
+                    at: CGPoint(x: currentX, y: currentY),
+                    proposal: ProposedViewSize(size)
+                )
+                currentX += size.width + horizontalSpacing
+                lineHeight = max(lineHeight, size.height)
             }
-            subview.place(at: CGPoint(x: currentX, y: currentY), proposal: ProposedViewSize(size))
-            currentX += size.width + horizontalSpacing
-            lineHeight = max(lineHeight, size.height)
+
+            currentY += lineHeight + verticalSpacing
         }
     }
 }
