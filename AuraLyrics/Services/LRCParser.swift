@@ -192,7 +192,7 @@ public final class LRCParser {
             var fullText = ""
 
             if let sylRegex = sylRegex {
-                let sylMatches = sylRegex.matches(in: contentString, options: [], range: NSRange(location: 0, length: (contentString as NSString).utf16.count))
+                let sylMatches = sylRegex.matches(in: contentString, options: [], range: NSRange(location: 0, length: contentString.utf16.count))
                 let nsContent = contentString as NSString
 
                 for sylMatch in sylMatches {
@@ -265,7 +265,7 @@ public final class LRCParser {
             var fullText = ""
 
             if let sylRegex = sylRegex {
-                let sylMatches = sylRegex.matches(in: contentString, options: [], range: NSRange(location: 0, length: (contentString as NSString).utf16.count))
+                let sylMatches = sylRegex.matches(in: contentString, options: [], range: NSRange(location: 0, length: contentString.utf16.count))
                 let nsContent = contentString as NSString
 
                 for sylMatch in sylMatches {
