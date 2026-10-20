@@ -5,7 +5,6 @@ import ActivityKit
 struct SettingsView: View {
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
     @ObservedObject var pipEngine = PiPLyricsEngine.shared
-    @ObservedObject var liveEngine = LiveActivityLyricsEngine.shared
     @ObservedObject var keepAlive = BackgroundKeepAliveManager.shared
     @ObservedObject var pipVM = PiPLyricsViewModel.shared
     @ObservedObject var musicMonitor = AppleMusicMonitor.shared
@@ -55,39 +54,6 @@ struct SettingsView: View {
                     Text("畫中畫 (PiP) 懸浮視窗")
                 } footer: {
                     Text("切換至主畫面或其他 App 時，將自動顯示微縮懸浮動態島歌詞視窗；可隨時拖曳與縮放。")
-                }
-
-                // MARK: - 即時訊息與動態島設定入口
-                Section {
-                    NavigationLink {
-                        LiveActivitySettingsView()
-                    } label: {
-                        HStack(spacing: 12) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.pink.gradient)
-                                Image(systemName: "waveform.badge.magnifyingglass")
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(.white)
-                            }
-                            .frame(width: 32, height: 32)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("即時訊息與動態島")
-                                    .font(.body)
-                                Text(liveEngine.isEnabled
-                                     ? "已啟用 · \(liveEngine.compactStyle.title)"
-                                     : "未啟用")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 2)
-                    }
-                } header: {
-                    Text("即時動態 (Live Activities)")
-                } footer: {
-                    Text("自訂動態島微縮膠囊外觀、鎖定畫面歌詞排版、暫停處理策略與原生 60fps 計時進度條。")
                 }
 
                 // MARK: - 歌詞視覺效果

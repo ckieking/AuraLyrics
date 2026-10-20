@@ -1,7 +1,6 @@
 import Foundation
 import AVFoundation
 import Combine
-import UIKit
 
 /// 背景保活管理員
 /// 透過在記憶體中生成極小體積的無聲 PCM 音訊，配合 `.playback` 與 `.mixWithOthers`，
@@ -14,11 +13,10 @@ public final class BackgroundKeepAliveManager: ObservableObject {
     private var audioPlayer: AVAudioPlayer?
 
     private init() {
-        setupObservers()
+        setupInterruptionObserver()
     }
 
-    private func setupObservers() {
-        // 音訊中斷通知（如來電結束後恢復）
+    private func setupInterruptionObserver() {
         NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
@@ -26,59 +24,19 @@ public final class BackgroundKeepAliveManager: ObservableObject {
         ) { [weak self] notification in
             let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
             Task { @MainActor [weak self] in
-                guard let self = self else { return }
+                guard let self = self, self.isRunning else { return }
                 if let typeValue = typeValue,
                    let type = AVAudioSession.InterruptionType(rawValue: typeValue),
                    type == .ended {
-                    self.ensureRunning()
+                    try? AVAudioSession.sharedInstance().setActive(true)
+                    self.audioPlayer?.play()
                 }
-            }
-        }
-
-        // 音訊路由變更通知（如藍牙耳機連接/中斷）
-        NotificationCenter.default.addObserver(
-            forName: AVAudioSession.routeChangeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.ensureRunning()
-            }
-        }
-
-        // 回到前景通知（再次確認並確保音訊運作）
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.ensureRunning()
-            }
-        }
-
-        // 進入背景通知（確保音訊通道處於活躍運作狀態）
-        NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.ensureRunning()
             }
         }
     }
 
     public func startKeepAlive() {
-        ensureRunning()
-    }
-
-    public func ensureRunning() {
-        var bgTask: UIBackgroundTaskIdentifier = .invalid
-        bgTask = UIApplication.shared.beginBackgroundTask(withName: "com.auralyrics.bgKeepAlive") {
-            UIApplication.shared.endBackgroundTask(bgTask)
-            bgTask = .invalid
-        }
+        guard !isRunning else { return }
 
         do {
             let session = AVAudioSession.sharedInstance()
@@ -89,28 +47,14 @@ public final class BackgroundKeepAliveManager: ObservableObject {
                 let silentData = generateSilentWavData(durationSeconds: 1.0)
                 audioPlayer = try AVAudioPlayer(data: silentData)
                 audioPlayer?.numberOfLoops = -1 // 無限循環
-                audioPlayer?.volume = 0.0001 // 極微小音量維持 CoreAudio 運作，防止系統休眠
-                audioPlayer?.prepareToPlay()
+                audioPlayer?.volume = 0.0 // 靜音
             }
 
-            if audioPlayer?.isPlaying != true {
-                let success = audioPlayer?.play() ?? false
-                isRunning = success
-            } else {
-                isRunning = true
-            }
+            audioPlayer?.play()
+            isRunning = true
         } catch {
             print("[BackgroundKeepAliveManager] 啟動背景保活失敗: \(error.localizedDescription)")
             isRunning = false
-        }
-
-        if bgTask != .invalid {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-                if bgTask != .invalid {
-                    UIApplication.shared.endBackgroundTask(bgTask)
-                    bgTask = .invalid
-                }
-            }
         }
     }
 
