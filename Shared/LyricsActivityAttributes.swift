@@ -3,7 +3,7 @@ import Foundation
 
 /// AuraLyrics 的即時動態與動態島資料屬性
 public struct LyricsActivityAttributes: ActivityAttributes {
-    /// 動態更新的狀態資料（每當歌詞行切換或播放狀態變動時傳遞）
+    /// 動態更新的狀態資料（每當歌詞行切換時傳遞）
     public struct ContentState: Codable, Hashable, Sendable {
         /// 當前播放行主歌詞
         public var currentLine: String
@@ -15,18 +15,12 @@ public struct LyricsActivityAttributes: ActivityAttributes {
         public var artistName: String
         /// 播放中狀態
         public var isPlaying: Bool
-        /// 當前曲目播放進度（0.0 ~ 1.0，備用靜態數值）
+        /// 當前曲目播放進度（0.0 ~ 1.0）
         public var progress: Double
-        /// 共享封面縮圖檔案路徑（存於共享 App Group / 沙盒目錄，避免 4KB payload 超限）
+        /// 共享群組內的專輯封面縮圖路徑
         public var artworkPath: String?
-        /// 播放區間起點（供 ProgressView 原生平滑計時器使用）
-        public var playbackStart: Date
-        /// 播放區間終點（供 ProgressView 原生平滑計時器使用）
-        public var playbackEnd: Date
-        /// 動態島緊湊模式樣式標籤 (對應 DynamicIslandCompactStyle.rawValue)
+        /// 緊湊樣式設定
         public var compactStyle: String
-        /// 進度條驅動引擎 (對應 LiveActivityProgressEngine.rawValue)
-        public var progressEngine: String
 
         public init(
             currentLine: String,
@@ -36,10 +30,7 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             isPlaying: Bool = true,
             progress: Double = 0.0,
             artworkPath: String? = nil,
-            playbackStart: Date = Date(),
-            playbackEnd: Date = Date().addingTimeInterval(1),
-            compactStyle: String = DynamicIslandCompactStyle.artworkAndText.rawValue,
-            progressEngine: String = LiveActivityProgressEngine.smoothTimer.rawValue
+            compactStyle: String = DynamicIslandCompactStyle.artworkAndText.rawValue
         ) {
             self.currentLine = currentLine
             self.secondaryLine = secondaryLine
@@ -48,10 +39,7 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             self.isPlaying = isPlaying
             self.progress = progress
             self.artworkPath = artworkPath
-            self.playbackStart = playbackStart
-            self.playbackEnd = playbackEnd
             self.compactStyle = compactStyle
-            self.progressEngine = progressEngine
         }
     }
 

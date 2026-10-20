@@ -119,19 +119,21 @@ struct NowPlayingView: View {
                 }
             }
 
-            // 動態島開關（在非 LiveContainer 環境下提供，雙向同步 isLiveActivityEnabled）
+            // 即時動態與動態島開關（在非 LiveContainer 環境下提供，雙向同步設定）
             if !envDetector.isLiveContainer {
                 Button {
-                    liveActivityEngine.toggleLiveActivity(
-                        track: monitor.currentTrack,
-                        currentPlaybackTimeSec: monitor.currentPlaybackTimeSec
-                    )
-                } label: {
                     if liveActivityEngine.isEnabled {
-                        Label("動態島同步", systemImage: "checkmark")
+                        liveActivityEngine.isEnabled = false
                     } else {
-                        Text("動態島同步")
+                        liveActivityEngine.isEnabled = true
+                        liveActivityEngine.startActivity(track: monitor.currentTrack)
+                        monitor.syncExternalEngines()
                     }
+                } label: {
+                    Label(
+                        liveActivityEngine.isEnabled ? "關閉即時動態與動態島" : "開啟即時動態與動態島",
+                        systemImage: liveActivityEngine.isEnabled ? "waveform.badge.minus" : "waveform.badge.plus"
+                    )
                 }
             }
 

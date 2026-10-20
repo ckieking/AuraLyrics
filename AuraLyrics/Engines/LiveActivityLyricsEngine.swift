@@ -12,6 +12,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     @Published public var isEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: "isLiveActivityEnabled")
+            BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
             if !isEnabled {
                 endActivity()
             }
@@ -44,13 +45,6 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    @Published public var progressEngine: LiveActivityProgressEngine {
-        didSet {
-            UserDefaults.standard.set(progressEngine.rawValue, forKey: "liveActivityProgressEngine")
-            triggerStateRefresh()
-        }
-    }
-
     // MARK: - 運行狀態
     @Published public private(set) var isActivityActive: Bool = false
     @Published public private(set) var lastErrorMessage: String? = nil
@@ -69,8 +63,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         self.compactStyle = DynamicIslandCompactStyle(rawValue: compactRaw) ?? .artworkAndText
 
         let pauseRaw = UserDefaults.standard.string(forKey: "liveActivityPausePolicy")
-            ?? LiveActivityPausePolicy.dismissImmediately.rawValue
-        self.pausePolicy = LiveActivityPausePolicy(rawValue: pauseRaw) ?? .dismissImmediately
+            ?? LiveActivityPausePolicy.keepActiveWithTimeout.rawValue
+        self.pausePolicy = LiveActivityPausePolicy(rawValue: pauseRaw) ?? .keepActiveWithTimeout
 
         let resumeRaw = UserDefaults.standard.string(forKey: "liveActivityResumePolicy")
             ?? LiveActivityResumePolicy.autoResume.rawValue
@@ -79,20 +73,19 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         let secondaryRaw = UserDefaults.standard.string(forKey: "liveActivitySecondaryMode")
             ?? LiveActivitySecondaryMode.bilingualOrNext.rawValue
         self.secondaryMode = LiveActivitySecondaryMode(rawValue: secondaryRaw) ?? .bilingualOrNext
-
-        let progressRaw = UserDefaults.standard.string(forKey: "liveActivityProgressEngine")
-            ?? LiveActivityProgressEngine.smoothTimer.rawValue
-        self.progressEngine = LiveActivityProgressEngine(rawValue: progressRaw) ?? .smoothTimer
     }
 
-    // MARK: - 啟動或無縫刷新即時動態
-    public func startActivity(track: TrackInfo, currentPlaybackTimeSec: TimeInterval = 0) {
+    // MARK: - 啟動即時動態
+    public func startActivity(
+        track: TrackInfo,
+        initialLine: String? = nil,
+        initialSecondary: String? = nil
+    ) {
         guard #available(iOS 16.2, *) else {
             lastErrorMessage = "此 iOS 版本不支援即時動態"
             return
         }
 
-        // 若在 LiveContainer 內，提示並自動切換
         if RuntimeEnvironmentDetector.shared.isLiveContainer {
             lastErrorMessage = "LiveContainer 虛擬環境無法載入 Widget Extension，請改用 PiP 懸浮膠囊"
             return
@@ -106,31 +99,41 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         let artworkPath = cacheArtwork(from: track.artworkData)
         self.currentCachedArtworkPath = artworkPath
 
-        let startTime = Date().addingTimeInterval(-max(0, currentPlaybackTimeSec))
-        let endTime = startTime.addingTimeInterval(max(1, track.duration))
+        let lineText: String
+        if let initial = initialLine, !initial.isEmpty {
+            lineText = initial
+        } else {
+            lineText = (track.title == TrackInfo.placeholder.title) ? "AuraLyrics 靈動歌詞" : track.title
+        }
+
+        let secondaryText: String?
+        if let initialSec = initialSecondary {
+            secondaryText = initialSec
+        } else {
+            secondaryText = track.artist.isEmpty ? nil : track.artist
+        }
 
         let initialContentState = LyricsActivityAttributes.ContentState(
-            currentLine: track.title == TrackInfo.placeholder.title ? "AuraLyrics 靈動歌詞" : track.title,
-            secondaryLine: track.artist.isEmpty ? nil : track.artist,
+            currentLine: lineText,
+            secondaryLine: secondaryText,
             trackTitle: track.title,
             artistName: track.artist,
             isPlaying: true,
-            progress: track.duration > 0 ? (currentPlaybackTimeSec / track.duration) : 0,
+            progress: 0.0,
             artworkPath: artworkPath,
-            playbackStart: startTime,
-            playbackEnd: endTime,
-            compactStyle: compactStyle.rawValue,
-            progressEngine: progressEngine.rawValue
+            compactStyle: compactStyle.rawValue
         )
 
-        // 若已有運行的 Activity 則直接在原 Activity 上更新，不銷毀重建以避免動態島彈跳閃爍
+        // 若已有運行的 Activity 則原地更新，避免動態島彈跳閃爍
         if let activity = currentActivity {
             lastSentState = initialContentState
-            Task {
-                await activity.update(ActivityContent(state: initialContentState, staleDate: Date().addingTimeInterval(300)))
+            updateTask?.cancel()
+            updateTask = Task {
+                await activity.update(ActivityContent(state: initialContentState, staleDate: Date().addingTimeInterval(8)))
             }
             self.isActivityActive = true
             self.lastErrorMessage = nil
+            BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
             return
         }
 
@@ -142,13 +145,14 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         do {
             let activity = try Activity.request(
                 attributes: attributes,
-                content: .init(state: initialContentState, staleDate: Date().addingTimeInterval(300)),
+                content: .init(state: initialContentState, staleDate: Date().addingTimeInterval(8)),
                 pushType: nil
             )
             self.currentActivity = activity
             self.lastSentState = initialContentState
             self.isActivityActive = true
             self.lastErrorMessage = nil
+            BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
         } catch {
             self.lastErrorMessage = "啟動即時動態失敗: \(error.localizedDescription)"
             self.isActivityActive = false
@@ -162,34 +166,28 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         track: TrackInfo,
         isPlaying: Bool,
         progress: Double,
-        currentPlaybackTimeSec: TimeInterval = 0
+        nextLineIntervalSec: TimeInterval? = nil
     ) {
         guard isEnabled else { return }
 
         guard let activity = currentActivity else {
             if isPlaying {
-                startActivity(track: track, currentPlaybackTimeSec: currentPlaybackTimeSec)
+                startActivity(track: track, initialLine: line, initialSecondary: secondaryLine)
             }
             return
         }
 
         let resolvedSecondary: String?
         switch secondaryMode {
-        case .bilingualOrNext:
-            resolvedSecondary = secondaryLine
-        case .bilingualOnly:
-            resolvedSecondary = secondaryLine
-        case .nextOnly:
+        case .bilingualOrNext, .bilingualOnly, .nextOnly:
             resolvedSecondary = secondaryLine
         case .none:
             resolvedSecondary = nil
         }
 
-        let startTime = Date().addingTimeInterval(-max(0, currentPlaybackTimeSec))
-        let endTime = startTime.addingTimeInterval(max(1, track.duration))
         let artworkPath = currentCachedArtworkPath ?? cacheArtwork(from: track.artworkData)
 
-        // 若主要歌詞、次要行、曲目、播放狀態、樣式等皆未改變，不重複發送 IPC，極致節省系統後台更新預算
+        // 若主要歌詞、次要行、曲目、播放狀態、樣式等皆未改變，不重複發送 IPC，節省後台預算
         if let last = lastSentState,
            last.currentLine == line,
            last.secondaryLine == resolvedSecondary,
@@ -208,18 +206,30 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: isPlaying,
             progress: progress,
             artworkPath: artworkPath,
-            playbackStart: startTime,
-            playbackEnd: endTime,
-            compactStyle: compactStyle.rawValue,
-            progressEngine: progressEngine.rawValue
+            compactStyle: compactStyle.rawValue
         )
         lastSentState = updatedState
+
+        // 精準動態 staleDate：下一句歌詞出現時間 + 2.5 秒，最少 4 秒，最長 12 秒
+        let delta = nextLineIntervalSec ?? 8.0
+        let staleTimeout = min(max(delta + 2.5, 4.0), 12.0)
+        let targetStaleDate = Date().addingTimeInterval(staleTimeout)
 
         updateTask?.cancel()
         updateTask = Task {
             await activity.update(
-                ActivityContent(state: updatedState, staleDate: Date().addingTimeInterval(300))
+                ActivityContent(state: updatedState, staleDate: targetStaleDate)
             )
+        }
+    }
+
+    // MARK: - 長間奏定期心跳 (維持 staleDate 不逾期)
+    public func sendHeartbeat(track: TrackInfo) {
+        guard isActivityActive, let activity = currentActivity, let last = lastSentState else { return }
+        let nextStale = Date().addingTimeInterval(8)
+        updateTask?.cancel()
+        updateTask = Task {
+            await activity.update(ActivityContent(state: last, staleDate: nextStale))
         }
     }
 
@@ -255,7 +265,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    public func handlePlaybackResumed(track: TrackInfo, currentPlaybackTimeSec: TimeInterval) {
+    public func handlePlaybackResumed(track: TrackInfo) {
         pauseTimer?.invalidate()
         pauseTimer = nil
 
@@ -263,29 +273,26 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         if currentActivity == nil {
             if resumePolicy == .autoResume {
-                startActivity(track: track, currentPlaybackTimeSec: currentPlaybackTimeSec)
+                startActivity(track: track)
             }
         } else {
             if var state = lastSentState, let activity = currentActivity {
                 state.isPlaying = true
-                let startTime = Date().addingTimeInterval(-max(0, currentPlaybackTimeSec))
-                state.playbackStart = startTime
-                state.playbackEnd = startTime.addingTimeInterval(max(1, track.duration))
                 lastSentState = state
                 Task {
-                    await activity.update(ActivityContent(state: state, staleDate: nil))
+                    await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(8)))
                 }
             }
         }
     }
 
     // MARK: - 快速切換開關
-    public func toggleLiveActivity(track: TrackInfo, currentPlaybackTimeSec: TimeInterval = 0) {
+    public func toggleLiveActivity(track: TrackInfo) {
         if isEnabled {
             isEnabled = false
         } else {
             isEnabled = true
-            startActivity(track: track, currentPlaybackTimeSec: currentPlaybackTimeSec)
+            startActivity(track: track)
         }
     }
 
@@ -297,32 +304,47 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         updateTask = nil
         lastSentState = nil
         currentCachedArtworkPath = nil
+
         guard let activity = currentActivity else {
-            // 同步清理可能脫鉤的孤兒 activity
             Task {
                 for act in Activity<LyricsActivityAttributes>.activities {
                     await act.end(nil, dismissalPolicy: .immediate)
                 }
             }
+            BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
             return
         }
+
         self.currentActivity = nil
         self.isActivityActive = false
         Task {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
+        BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
     }
 
-    // MARK: - App 關閉/終止時同步清理所有即時動態（阻塞主執行緒短暫時間確保 IPC 抵達系統 ActivityKit）
+    // MARK: - App 終止清理 (非阻塞式排空 XPC，確保 Activity.end 抵達系統 ActivityKit)
     public nonisolated func cleanUpAllActivitiesSync() {
-        let semaphore = DispatchSemaphore(value: 0)
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask(withName: "com.auralyrics.cleanup.term") {
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
+        }
+
         Task.detached {
             for activity in Activity<LyricsActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
-            semaphore.signal()
+            if bgTask != .invalid {
+                UIApplication.shared.endBackgroundTask(bgTask)
+                bgTask = .invalid
+            }
         }
-        _ = semaphore.wait(timeout: .now() + 1.2)
+
+        // 旋轉主執行緒 RunLoop 0.35 秒排空 Mach port 訊息，絕不使用 Semaphore 死鎖
+        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
     }
 
     // MARK: - App 啟動時清理過往殘留之孤兒即時動態
@@ -338,10 +360,9 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     private func triggerStateRefresh() {
         guard var state = lastSentState, let activity = currentActivity else { return }
         state.compactStyle = compactStyle.rawValue
-        state.progressEngine = progressEngine.rawValue
         lastSentState = state
         Task {
-            await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(300)))
+            await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(8)))
         }
     }
 
