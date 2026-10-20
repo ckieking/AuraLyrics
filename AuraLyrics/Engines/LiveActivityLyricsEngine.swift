@@ -127,7 +127,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         if let activity = currentActivity {
             lastSentState = initialContentState
             Task {
-                await activity.update(ActivityContent(state: initialContentState, staleDate: nil))
+                await activity.update(ActivityContent(state: initialContentState, staleDate: Date().addingTimeInterval(30)))
             }
             self.isActivityActive = true
             self.lastErrorMessage = nil
@@ -142,7 +142,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         do {
             let activity = try Activity.request(
                 attributes: attributes,
-                content: .init(state: initialContentState, staleDate: nil),
+                content: .init(state: initialContentState, staleDate: Date().addingTimeInterval(30)),
                 pushType: nil
             )
             self.currentActivity = activity
@@ -220,7 +220,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         updateTask?.cancel()
         updateTask = Task {
             await activity.update(
-                ActivityContent(state: updatedState, staleDate: nil)
+                ActivityContent(state: updatedState, staleDate: Date().addingTimeInterval(30))
             )
         }
     }
@@ -299,11 +299,40 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         updateTask = nil
         lastSentState = nil
         currentCachedArtworkPath = nil
-        guard let activity = currentActivity else { return }
+        guard let activity = currentActivity else {
+            // 同步清理可能脫鉤的孤兒 activity
+            Task {
+                for act in Activity<LyricsActivityAttributes>.activities {
+                    await act.end(nil, dismissalPolicy: .immediate)
+                }
+            }
+            return
+        }
         self.currentActivity = nil
         self.isActivityActive = false
         Task {
             await activity.end(nil, dismissalPolicy: .immediate)
+        }
+    }
+
+    // MARK: - App 關閉/終止時同步清理所有即時動態（阻塞主執行緒短暫時間確保 IPC 抵達系統 ActivityKit）
+    public nonisolated func cleanUpAllActivitiesSync() {
+        let semaphore = DispatchSemaphore(value: 0)
+        Task.detached {
+            for activity in Activity<LyricsActivityAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+            semaphore.signal()
+        }
+        _ = semaphore.wait(timeout: .now() + 1.2)
+    }
+
+    // MARK: - App 啟動時清理過往殘留之孤兒即時動態
+    public func cleanUpOrphanedActivities() {
+        Task {
+            for activity in Activity<LyricsActivityAttributes>.activities {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
         }
     }
 
@@ -314,7 +343,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         state.progressEngine = progressEngine.rawValue
         lastSentState = state
         Task {
-            await activity.update(ActivityContent(state: state, staleDate: nil))
+            await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(30)))
         }
     }
 

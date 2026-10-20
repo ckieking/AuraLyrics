@@ -47,7 +47,7 @@ public final class BackgroundKeepAliveManager: ObservableObject {
                 let silentData = generateSilentWavData(durationSeconds: 1.0)
                 audioPlayer = try AVAudioPlayer(data: silentData)
                 audioPlayer?.numberOfLoops = -1 // 無限循環
-                audioPlayer?.volume = 0.0 // 靜音
+                audioPlayer?.volume = 0.0001 // 極微小音量（人耳完全無感，但維持音訊管道活躍，防止背景休眠）
             }
 
             audioPlayer?.play()
