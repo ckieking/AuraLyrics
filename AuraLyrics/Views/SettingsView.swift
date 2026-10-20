@@ -20,16 +20,10 @@ struct SettingsView: View {
                 Section {
                     // 1:1 實時 PiP 預覽視窗卡
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("懸浮動態島膠囊預覽")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("支援深淺色自適應")
-                                .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.8))
-                        }
+                        Text("懸浮動態島膠囊預覽")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
 
                         // 模擬真實懸浮視窗比例 (寬高比 ~ 3.5:1，高度 80pt)
                         PiPLyricsView(viewModel: pipVM)
@@ -102,15 +96,15 @@ struct SettingsView: View {
                         HStack(spacing: 10) {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                musicMonitor.adjustGlobalOffset(byMs: -500)
+                                musicMonitor.adjustGlobalOffset(byMs: -100)
                             } label: {
-                                Text("-0.5s")
+                                Text("-0.1s")
                                     .font(.system(.subheadline, design: .rounded).weight(.bold))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 38)
                             }
                             .buttonStyle(.bordered)
-                            .accessibilityLabel("所有歌曲歌詞延後 0.5 秒")
+                            .accessibilityLabel("所有歌曲歌詞延後 0.1 秒")
 
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -127,15 +121,15 @@ struct SettingsView: View {
 
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                musicMonitor.adjustGlobalOffset(byMs: 500)
+                                musicMonitor.adjustGlobalOffset(byMs: 100)
                             } label: {
-                                Text("+0.5s")
+                                Text("+0.1s")
                                     .font(.system(.subheadline, design: .rounded).weight(.bold))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 38)
                             }
                             .buttonStyle(.bordered)
-                            .accessibilityLabel("所有歌曲歌詞提前 0.5 秒")
+                            .accessibilityLabel("所有歌曲歌詞提前 0.1 秒")
                         }
                     }
                     .padding(.vertical, 4)
@@ -268,12 +262,6 @@ struct SettingsView: View {
                         Text("應用程式版本")
                         Spacer()
                         Text(appVersionString)
-                            .foregroundColor(.secondary)
-                    }
-                    HStack {
-                        Text("介面設計語言")
-                        Spacer()
-                        Text("Apple HIG + Liquid Glass")
                             .foregroundColor(.secondary)
                     }
                     HStack {
