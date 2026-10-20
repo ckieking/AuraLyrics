@@ -55,6 +55,15 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     private var pauseTimer: Timer?
     private var currentCachedArtworkPath: String?
 
+    /// 取得目前系統是否處於淺色模式
+    private var isSystemLightMode: Bool {
+        if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }) as? UIWindowScene,
+           let window = scene.windows.first {
+            return window.traitCollection.userInterfaceStyle == .light
+        }
+        return UITraitCollection.current.userInterfaceStyle == .light
+    }
+
     private init() {
         self.isEnabled = UserDefaults.standard.bool(forKey: "isLiveActivityEnabled")
 
@@ -121,7 +130,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: true,
             progress: 0.0,
             artworkPath: artworkPath,
-            compactStyle: compactStyle.rawValue
+            compactStyle: compactStyle.rawValue,
+            isLightMode: isSystemLightMode
         )
 
         // 若已有運行的 Activity 則原地更新，避免動態島彈跳閃爍
@@ -187,14 +197,17 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         let artworkPath = currentCachedArtworkPath ?? cacheArtwork(from: track.artworkData)
 
-        // 若主要歌詞、次要行、曲目、播放狀態、樣式等皆未改變，不重複發送 IPC，節省後台預算
+        let currentLight = isSystemLightMode
+
+        // 若主要歌詞、次要行、曲目、播放狀態、樣式與深淺模式皆未改變，不重複發送 IPC，節省背景預算
         if let last = lastSentState,
            last.currentLine == line,
            last.secondaryLine == resolvedSecondary,
            last.trackTitle == track.title,
            last.artistName == track.artist,
            last.isPlaying == isPlaying,
-           last.compactStyle == compactStyle.rawValue {
+           last.compactStyle == compactStyle.rawValue,
+           last.isLightMode == currentLight {
             return
         }
 
@@ -206,7 +219,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: isPlaying,
             progress: progress,
             artworkPath: artworkPath,
-            compactStyle: compactStyle.rawValue
+            compactStyle: compactStyle.rawValue,
+            isLightMode: currentLight
         )
         lastSentState = updatedState
 

@@ -21,6 +21,8 @@ public struct LyricsActivityAttributes: ActivityAttributes {
         public var artworkPath: String?
         /// 緊湊樣式設定
         public var compactStyle: String
+        /// 系統淺色模式標記（確保鎖定畫面卡片精準切換深淺外觀）
+        public var isLightMode: Bool
 
         public init(
             currentLine: String,
@@ -30,7 +32,8 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             isPlaying: Bool = true,
             progress: Double = 0.0,
             artworkPath: String? = nil,
-            compactStyle: String = DynamicIslandCompactStyle.artworkAndText.rawValue
+            compactStyle: String = DynamicIslandCompactStyle.artworkAndText.rawValue,
+            isLightMode: Bool = false
         ) {
             self.currentLine = currentLine
             self.secondaryLine = secondaryLine
@@ -40,6 +43,7 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             self.progress = progress
             self.artworkPath = artworkPath
             self.compactStyle = compactStyle
+            self.isLightMode = isLightMode
         }
     }
 
