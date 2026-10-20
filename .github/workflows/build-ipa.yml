@@ -50,24 +50,77 @@ jobs:
           mkdir -p package/Payload
           cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package/Payload/
 
-          # 雙重防護：使用 PlistBuddy 確保打包檔案內的 Info.plist 版本與 Build 號精準一致
-          MAIN_PLIST="package/Payload/AuraLyrics.app/Info.plist"
-          if [ -f "$MAIN_PLIST" ]; then
-            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$MAIN_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${VERSION}" "$MAIN_PLIST"
-            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" "$MAIN_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD}" "$MAIN_PLIST"
-          fi
+          # 核心修復：使用 Python 精確合併原始 Info.plist 權限與宣告（解決 Xcode 剝除自訂鍵值之問題）
+          export TARGET_VERSION="${VERSION}"
+          export TARGET_BUILD="${BUILD}"
+          python3 - << 'EOF'
+          import os, plistlib
 
-          WIDGET_PLIST="package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
-          if [ -f "$WIDGET_PLIST" ]; then
-            /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "$WIDGET_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${VERSION}" "$WIDGET_PLIST"
-            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${BUILD}" "$WIDGET_PLIST" || /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD}" "$WIDGET_PLIST"
-          fi
+          version = os.environ.get("TARGET_VERSION", "0.1.0")
+          build = os.environ.get("TARGET_BUILD", "1")
 
-          echo "=== [驗證] Payload/AuraLyrics.app/Info.plist 版本資訊 ==="
-          echo -n "CFBundleShortVersionString: "
-          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$MAIN_PLIST"
-          echo -n "CFBundleVersion: "
-          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$MAIN_PLIST"
+          # 1. 主 App Info.plist 補全與版本同步
+          main_plist_path = "package/Payload/AuraLyrics.app/Info.plist"
+          if os.path.exists(main_plist_path) and os.path.exists("AuraLyrics/Info.plist"):
+              with open(main_plist_path, "rb") as f:
+                  target = plistlib.load(f)
+              with open("AuraLyrics/Info.plist", "rb") as f:
+                  source = plistlib.load(f)
+
+              # 合併所有自訂欄位（如 NSAppleMusicUsageDescription, UIBackgroundModes, NSSupportsLiveActivities）
+              for k, v in source.items():
+                  if k not in target:
+                      target[k] = v
+              target["CFBundleShortVersionString"] = version
+              target["CFBundleVersion"] = build
+
+              with open(main_plist_path, "wb") as f:
+                  plistlib.dump(target, f)
+              print(f"✓ 成功合併主 App Info.plist (共 {len(target)} 個鍵值)")
+              assert "NSAppleMusicUsageDescription" in target, "缺少 NSAppleMusicUsageDescription 鍵值！"
+              assert "UIBackgroundModes" in target, "缺少 UIBackgroundModes 鍵值！"
+
+          # 2. Widget Extension Info.plist 補全與版本同步
+          widget_plist_path = "package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
+          if os.path.exists(widget_plist_path) and os.path.exists("AuraLyricsWidget/Info.plist"):
+              with open(widget_plist_path, "rb") as f:
+                  target_w = plistlib.load(f)
+              with open("AuraLyricsWidget/Info.plist", "rb") as f:
+                  source_w = plistlib.load(f)
+
+              for k, v in source_w.items():
+                  if k not in target_w:
+                      target_w[k] = v
+              target_w["CFBundleShortVersionString"] = version
+              target_w["CFBundleVersion"] = build
+
+              with open(widget_plist_path, "wb") as f:
+                  plistlib.dump(target_w, f)
+              print(f"✓ 成功合併 Widget Extension Info.plist (共 {len(target_w)} 個鍵值)")
+              assert "NSExtension" in target_w, "缺少 NSExtension 鍵值！"
+
+          EOF
+
+          echo "=== [驗證] Payload/AuraLyrics.app/Info.plist 隱私與版本資訊 ==="
+          python3 -c '
+          import plistlib
+          with open("package/Payload/AuraLyrics.app/Info.plist", "rb") as f:
+              p = plistlib.load(f)
+              print("  CFBundleIdentifier:", p.get("CFBundleIdentifier"))
+              print("  CFBundleShortVersionString:", p.get("CFBundleShortVersionString"))
+              print("  CFBundleVersion:", p.get("CFBundleVersion"))
+              print("  NSAppleMusicUsageDescription:", p.get("NSAppleMusicUsageDescription"))
+              print("  NSSupportsLiveActivities:", p.get("NSSupportsLiveActivities"))
+          '
+
+          echo "=== [驗證] Widget Extension Info.plist 擴展與版本資訊 ==="
+          python3 -c '
+          import plistlib
+          with open("package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist", "rb") as f:
+              p = plistlib.load(f)
+              print("  CFBundleIdentifier:", p.get("CFBundleIdentifier"))
+              print("  NSExtension:", p.get("NSExtension"))
+          '
 
           cd package
           zip -r "../ipa_output/AuraLyrics-${VERSION}.ipa" Payload
