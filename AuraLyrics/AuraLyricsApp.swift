@@ -34,6 +34,9 @@ struct AuraLyricsApp: App {
         WindowGroup {
             MainTabView()
                 .tint(.pink) // 遵循 Apple HIG 單一強調色原則，呼應 Apple Music 品牌感
+                .onAppear {
+                    BackgroundKeepAliveManager.shared.ensureRunning()
+                }
         }
     }
 }

@@ -46,6 +46,17 @@ public final class BackgroundKeepAliveManager: ObservableObject {
             }
         }
 
+        // 回到前景通知（再次確認並確保音訊運作）
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.ensureRunning()
+            }
+        }
+
         // 進入背景通知（確保音訊通道處於活躍運作狀態）
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
@@ -63,6 +74,12 @@ public final class BackgroundKeepAliveManager: ObservableObject {
     }
 
     public func ensureRunning() {
+        var bgTask: UIBackgroundTaskIdentifier = .invalid
+        bgTask = UIApplication.shared.beginBackgroundTask(withName: "com.auralyrics.bgKeepAlive") {
+            UIApplication.shared.endBackgroundTask(bgTask)
+            bgTask = .invalid
+        }
+
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
@@ -85,6 +102,15 @@ public final class BackgroundKeepAliveManager: ObservableObject {
         } catch {
             print("[BackgroundKeepAliveManager] 啟動背景保活失敗: \(error.localizedDescription)")
             isRunning = false
+        }
+
+        if bgTask != .invalid {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                if bgTask != .invalid {
+                    UIApplication.shared.endBackgroundTask(bgTask)
+                    bgTask = .invalid
+                }
+            }
         }
     }
 

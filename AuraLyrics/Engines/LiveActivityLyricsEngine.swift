@@ -127,7 +127,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         if let activity = currentActivity {
             lastSentState = initialContentState
             Task {
-                await activity.update(ActivityContent(state: initialContentState, staleDate: Date().addingTimeInterval(30)))
+                await activity.update(ActivityContent(state: initialContentState, staleDate: Date().addingTimeInterval(300)))
             }
             self.isActivityActive = true
             self.lastErrorMessage = nil
@@ -142,7 +142,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         do {
             let activity = try Activity.request(
                 attributes: attributes,
-                content: .init(state: initialContentState, staleDate: Date().addingTimeInterval(30)),
+                content: .init(state: initialContentState, staleDate: Date().addingTimeInterval(300)),
                 pushType: nil
             )
             self.currentActivity = activity
@@ -218,7 +218,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         updateTask?.cancel()
         updateTask = Task {
             await activity.update(
-                ActivityContent(state: updatedState, staleDate: Date().addingTimeInterval(30))
+                ActivityContent(state: updatedState, staleDate: Date().addingTimeInterval(300))
             )
         }
     }
@@ -341,7 +341,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         state.progressEngine = progressEngine.rawValue
         lastSentState = state
         Task {
-            await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(30)))
+            await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(300)))
         }
     }
 
