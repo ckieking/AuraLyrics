@@ -47,8 +47,6 @@ public struct LiveActivitySettingsView: View {
                 }
             } header: {
                 Text("動態島外觀")
-            } footer: {
-                Text(liveActivityEngine.compactStyle.description)
             }
 
             // MARK: - 次要行（副行）顯示設定
@@ -66,8 +64,6 @@ public struct LiveActivitySettingsView: View {
                 }
             } header: {
                 Text("副行資訊")
-            } footer: {
-                Text("決定主歌詞下方或動態島展開視窗中的顯示內容。")
             }
 
             // MARK: - 暫停與繼續播放策略
@@ -299,8 +295,6 @@ private struct SecondaryModeSettingsView: View {
                     }
                     .buttonStyle(.plain)
                 }
-            } footer: {
-                Text("決定主歌詞下方或展開視圖中顯示雙語翻譯或是下一句歌詞預覽。")
             }
         }
         .navigationTitle("副行顯示設定")
