@@ -16,6 +16,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v5
 
+      - name: Backup Original Info Plists
+        run: |
+          cp AuraLyrics/Info.plist AuraLyrics_Info_backup.plist
+          cp AuraLyricsWidget/Info.plist AuraLyricsWidget_Info_backup.plist
+
       - name: Verify and Select Xcode 27
         run: |
           sudo xcode-select -s /Applications/Xcode.app
@@ -61,16 +66,31 @@ jobs:
 
           # 1. 主 App Info.plist 補全與版本同步
           main_plist_path = "package/Payload/AuraLyrics.app/Info.plist"
-          if os.path.exists(main_plist_path) and os.path.exists("AuraLyrics/Info.plist"):
+          source_main_path = "AuraLyrics_Info_backup.plist" if os.path.exists("AuraLyrics_Info_backup.plist") else "AuraLyrics/Info.plist"
+          if os.path.exists(main_plist_path) and os.path.exists(source_main_path):
               with open(main_plist_path, "rb") as f:
                   target = plistlib.load(f)
-              with open("AuraLyrics/Info.plist", "rb") as f:
+              with open(source_main_path, "rb") as f:
                   source = plistlib.load(f)
 
-              # 合併所有自訂欄位（如 NSAppleMusicUsageDescription, UIBackgroundModes, NSSupportsLiveActivities）
+              # 合併所有自訂欄位，並強制覆蓋關鍵隱私與能力描述
               for k, v in source.items():
                   if k not in target:
                       target[k] = v
+
+              critical_keys = [
+                  "NSAppleMusicUsageDescription",
+                  "UIBackgroundModes",
+                  "NSSupportsLiveActivities",
+                  "NSSupportsLiveActivitiesFrequentUpdates",
+                  "LSRequiresIPhoneOS",
+                  "UILaunchScreen",
+                  "UISupportedInterfaceOrientations"
+              ]
+              for ck in critical_keys:
+                  if ck in source:
+                      target[ck] = source[ck]
+
               target["CFBundleShortVersionString"] = version
               target["CFBundleVersion"] = build
 
@@ -82,15 +102,20 @@ jobs:
 
           # 2. Widget Extension Info.plist 補全與版本同步
           widget_plist_path = "package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
-          if os.path.exists(widget_plist_path) and os.path.exists("AuraLyricsWidget/Info.plist"):
+          source_widget_path = "AuraLyricsWidget_Info_backup.plist" if os.path.exists("AuraLyricsWidget_Info_backup.plist") else "AuraLyricsWidget/Info.plist"
+          if os.path.exists(widget_plist_path) and os.path.exists(source_widget_path):
               with open(widget_plist_path, "rb") as f:
                   target_w = plistlib.load(f)
-              with open("AuraLyricsWidget/Info.plist", "rb") as f:
+              with open(source_widget_path, "rb") as f:
                   source_w = plistlib.load(f)
 
               for k, v in source_w.items():
                   if k not in target_w:
                       target_w[k] = v
+
+              if "NSExtension" in source_w:
+                  target_w["NSExtension"] = source_w["NSExtension"]
+
               target_w["CFBundleShortVersionString"] = version
               target_w["CFBundleVersion"] = build
 
