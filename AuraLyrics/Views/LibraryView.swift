@@ -43,7 +43,7 @@ struct LibraryView: View {
                         Label("匯入歌詞", systemImage: "plus")
                             .font(.system(size: 16, weight: .semibold))
                     }
-                    .accessibilityLabel("匯入外部 .lrc 檔案")
+                    .accessibilityLabel(String(localized: "匯入外部 .lrc 檔案"))
                 }
             }
             .onAppear {
@@ -68,7 +68,7 @@ struct LibraryView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.pink)
-                        Text("已套用「\(toast)」歌詞")
+                        Text(String(format: String(localized: "已套用「%@」歌詞"), toast))
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
@@ -146,7 +146,7 @@ struct LibraryView: View {
                                             .cornerRadius(4)
                                     }
 
-                                    Text("\(lyrics.lines.count) 行歌詞")
+                                    Text(String(format: String(localized: "%lld 行歌詞"), lyrics.lines.count))
                                         .font(.caption2)
                                         .foregroundColor(.secondary.opacity(0.8))
                                 }
@@ -155,7 +155,7 @@ struct LibraryView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(lyrics.trackTitle)，\(lyrics.artistName)，來源 \(lyrics.source)\(isPlaying ? "，正在套用中" : "")")
+                        .accessibilityLabel(String(format: String(localized: "%@，%@，來源 %@%@"), lyrics.trackTitle, lyrics.artistName, lyrics.source, isPlaying ? String(localized: "，正在套用中") : ""))
 
                         // 獨立預覽按鈕 (>= 44x44pt 拇指熱區)
                         Button {
@@ -168,7 +168,7 @@ struct LibraryView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("預覽「\(lyrics.trackTitle)」時間軸")
+                        .accessibilityLabel(String(format: String(localized: "預覽「%@」時間軸"), lyrics.trackTitle))
                     }
                     .padding(.vertical, 3)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -180,7 +180,7 @@ struct LibraryView: View {
                     }
                 }
             } header: {
-                Text("已快取曲目 (\(filteredLyrics.count))")
+                Text(String(format: String(localized: "已快取曲目 (%lld)"), filteredLyrics.count))
             }
         }
         .listStyle(.insetGrouped)
@@ -239,7 +239,7 @@ struct LibraryView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
 
-            Text("找不到與「\(searchQuery)」相關的本地快取")
+            Text(String(format: String(localized: "找不到與「%@」相關的本地快取"), searchQuery))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
 
@@ -328,7 +328,7 @@ private struct LyricsPreviewSheet: View {
                         HStack(spacing: 8) {
                             Label(lyrics.source, systemImage: "server.rack")
                             Text("·")
-                            Text("\(lyrics.lines.count) 行歌詞")
+                            Text(String(format: String(localized: "%lld 行歌詞"), lyrics.lines.count))
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)

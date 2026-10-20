@@ -10,9 +10,9 @@ enum MainTab: Int, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .nowPlaying: return "正在播放"
-        case .library: return "歌詞庫"
-        case .settings: return "設定"
+        case .nowPlaying: return String(localized: "正在播放")
+        case .library: return String(localized: "歌詞庫")
+        case .settings: return String(localized: "設定")
         }
     }
 
@@ -25,7 +25,7 @@ enum MainTab: Int, CaseIterable, Identifiable {
     }
 }
 
-/// UIViewRepresentable 將 PiPLyricsEngine 的 sourceView 嵌入 View 樹狀結構中，確保系統允許啟動畫中畫
+/// UIViewRepresentable 將 PiPLyricsEngine 的 sourceView 嵌入 View 樹狀結構中，確保系統允許啟動子母畫面 (PiP)
 struct PiPSourceViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         return PiPLyricsEngine.shared.sourceView

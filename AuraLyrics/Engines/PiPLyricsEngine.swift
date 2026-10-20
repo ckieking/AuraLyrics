@@ -9,7 +9,7 @@ import Combine
 public final class PiPLyricsViewModel: ObservableObject {
     public static let shared = PiPLyricsViewModel()
 
-    @Published public var primaryLine: String = "AuraLyrics 靈動歌詞"
+    @Published public var primaryLine: String = String(localized: "AuraLyrics 即時歌詞")
     @Published public var secondaryLine: String? = nil
     @Published public var progress: Double = 0.0
     @Published public var theme: PiPVisualTheme = .dynamicIsland
@@ -76,7 +76,7 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
     @Published public private(set) var isPiPActive: Bool = false
     @Published public private(set) var isPiPPossible: Bool = false
-    /// 懸浮窗功能開關（預設為關閉，關閉時退到後台絕不自動跳出懸浮窗）
+    /// 懸浮窗功能開關（預設為關閉，關閉時移至背景絕不自動跳出懸浮窗）
     @Published public var isPiPEnabled: Bool = false {
         didSet {
             pipController?.canStartPictureInPictureAutomaticallyFromInline = isPiPEnabled
@@ -143,7 +143,7 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
         let controller = AVPictureInPictureController(contentSource: contentSource)
         controller.delegate = self
-        // 預設為關閉：在使用者未主動開啟前，退到後台絕不自動彈出懸浮窗
+        // 預設為關閉：在使用者未主動開啟前，移至背景絕不自動彈出懸浮窗
         controller.canStartPictureInPictureAutomaticallyFromInline = false
 
         self.pipController = controller
@@ -202,7 +202,7 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
             let firstLine = monitor.currentLyrics.lines.first?.text
             updateLyrics(line: monitor.currentTrack.title, secondaryLine: firstLine ?? (monitor.currentTrack.artist.isEmpty ? nil : monitor.currentTrack.artist), progress: monitor.playbackProgress)
         } else {
-            updateLyrics(line: "AuraLyrics 靈動歌詞", secondaryLine: nil, progress: 0.0)
+            updateLyrics(line: String(localized: "AuraLyrics 即時歌詞"), secondaryLine: nil, progress: 0.0)
         }
     }
 }

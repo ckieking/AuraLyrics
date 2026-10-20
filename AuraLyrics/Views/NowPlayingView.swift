@@ -85,7 +85,7 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 右上角獨立按鈕：畫中畫 (PiP 懸浮窗，直徑 40pt，按鈕即為最底層)
+    // MARK: - 右上角獨立按鈕：子母畫面 (PiP，直徑 40pt，按鈕即為最底層)
     private var pipIndependentButton: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
         let buttonDiameter: CGFloat = 40
@@ -104,7 +104,7 @@ struct NowPlayingView: View {
         }
         .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
         .sensoryFeedback(.impact(weight: .medium), trigger: isPiPOn)
-        .accessibilityLabel(isPiPOn ? "關閉畫中畫懸浮窗" : "開啟畫中畫懸浮窗")
+        .accessibilityLabel(isPiPOn ? String(localized: "關閉子母畫面 (PiP)") : String(localized: "開啟子母畫面 (PiP)"))
     }
 
     // MARK: - 右上角獨立小圓按鈕：更多操作選單 (直徑 40pt，按鈕即為最底層)
@@ -157,7 +157,7 @@ struct NowPlayingView: View {
             .contentShape(Circle())
         }
         .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
-        .accessibilityLabel("更多歌詞操作選項")
+        .accessibilityLabel(String(localized: "更多歌詞操作選項"))
     }
 
     // MARK: - 沉浸式氛圍背景 (Apple Music 原生 Mesh 漸層，不受深淺模式影響，高對比度)
@@ -286,14 +286,14 @@ struct NowPlayingView: View {
                                 checkCurrentLineVisibility()
                             }
                             .accessibilityElement(children: .combine)
-                            .accessibilityLabel(line.text + (line.translation.map { "，翻譯：\($0)" } ?? ""))
-                            .accessibilityHint(isCurrent ? "目前唱到的歌詞" : "點擊跳轉至此句")
+                            .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
+                            .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
                         }
 
-                        // MARK: - Apple Music 原生風格：參與人員與創作名單 (Credits, e.g. Written by ...)
+                        // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)
                         if !monitor.currentLyrics.credits.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
-                                Text("參與人員")
+                                Text("製作團隊")
                                     .font(.system(size: 15, weight: .semibold, design: .default))
                                     .foregroundColor(Color.white.opacity(0.65))
                                     .padding(.bottom, 2)

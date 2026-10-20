@@ -1,11 +1,13 @@
 name: AuraLyrics
 options:
   bundleIdPrefix: com.auralyrics
+  developmentLanguage: zh-Hant
   deploymentTarget:
     iOS: "27.0"
 
 settings:
   SWIFT_VERSION: "5.9"
+  DEVELOPMENT_LANGUAGE: "zh-Hant"
   ENABLE_BITCODE: NO
   CODE_SIGNING_REQUIRED: NO
   CODE_SIGN_IDENTITY: ""

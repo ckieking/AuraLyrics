@@ -91,17 +91,17 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         initialSecondary: String? = nil
     ) {
         guard #available(iOS 16.2, *) else {
-            lastErrorMessage = "此 iOS 版本不支援即時動態"
+            lastErrorMessage = String(localized: "此 iOS 版本不支援即時動態")
             return
         }
 
         if RuntimeEnvironmentDetector.shared.isLiveContainer {
-            lastErrorMessage = "LiveContainer 虛擬環境無法載入 Widget Extension，請改用 PiP 懸浮膠囊"
+            lastErrorMessage = String(localized: "LiveContainer 虛擬環境無法載入 Widget Extension，請改用子母畫面 (PiP) 懸浮視窗")
             return
         }
 
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            lastErrorMessage = "系統「即時動態」權限未開啟，請至 iOS 設定中允許"
+            lastErrorMessage = String(localized: "系統「即時動態」權限未開啟，請至 iOS 設定中允許")
             return
         }
 
@@ -112,7 +112,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         if let initial = initialLine, !initial.isEmpty {
             lineText = initial
         } else {
-            lineText = (track.title == TrackInfo.placeholder.title) ? "AuraLyrics 靈動歌詞" : track.title
+            lineText = (track.title == TrackInfo.placeholder.title) ? String(localized: "AuraLyrics 即時歌詞") : track.title
         }
 
         let secondaryText: String?
@@ -164,7 +164,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             self.lastErrorMessage = nil
             BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
         } catch {
-            self.lastErrorMessage = "啟動即時動態失敗: \(error.localizedDescription)"
+            self.lastErrorMessage = String(format: String(localized: "啟動即時動態失敗: %@"), error.localizedDescription)
             self.isActivityActive = false
         }
     }

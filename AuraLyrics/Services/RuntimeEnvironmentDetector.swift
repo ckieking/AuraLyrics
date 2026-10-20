@@ -9,7 +9,7 @@ public final class RuntimeEnvironmentDetector: ObservableObject {
 
     @Published public private(set) var isLiveContainer: Bool = false
     @Published public private(set) var areLiveActivitiesAvailable: Bool = false
-    @Published public private(set) var environmentDescription: String = "檢測中..."
+    @Published public private(set) var environmentDescription: String = String(localized: "檢測中...")
 
     private init() {
         detectEnvironment()
@@ -36,9 +36,9 @@ public final class RuntimeEnvironmentDetector: ObservableObject {
 
         // 3. 彙整環境描述
         if isLiveContainer {
-            self.environmentDescription = "LiveContainer 虛擬容器環境（預設採用免 Extension 的 PiP 畫中畫懸浮膠囊）"
+            self.environmentDescription = String(localized: "LiveContainer 虛擬容器環境（預設採用免 Extension 的子母畫面 PiP 懸浮膠囊）")
         } else {
-            self.environmentDescription = "獨立側載安裝環境（支援原生動態島 / 即時動態與 PiP 雙引擎）"
+            self.environmentDescription = String(localized: "獨立側載安裝環境（支援原生動態島 / 即時動態與子母畫面 PiP 雙引擎）")
         }
     }
 

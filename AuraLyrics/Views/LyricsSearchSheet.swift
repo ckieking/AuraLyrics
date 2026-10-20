@@ -135,7 +135,7 @@ struct LyricsSearchSheet: View {
                                         .cornerRadius(4)
                                 }
 
-                                Text("\(lyrics.lines.count) 行時間軸")
+                                Text(String(format: String(localized: "%lld 行時間軸"), lyrics.lines.count))
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
@@ -163,10 +163,10 @@ struct LyricsSearchSheet: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("套用 \(lyrics.trackTitle)，\(lyrics.artistName)，來源 \(lyrics.source)")
+                    .accessibilityLabel(String(format: String(localized: "套用 %@，%@，來源 %@"), lyrics.trackTitle, lyrics.artistName, lyrics.source))
                 }
             } header: {
-                Text("搜尋結果 (\(searchResults.count))")
+                Text(String(format: String(localized: "搜尋結果 (%lld)"), searchResults.count))
             }
         }
         .listStyle(.insetGrouped)
@@ -262,7 +262,7 @@ struct LyricsSearchSheet: View {
             self.searchResults = results
             self.isSearching = false
             if results.isEmpty {
-                self.errorMessage = "未找到與「\(query)」相符的歌詞，請嘗試簡化關鍵字或去除特殊符號並再試一次。"
+                self.errorMessage = String(format: String(localized: "未找到與「%@」相符的歌詞，請嘗試簡化關鍵字或去除特殊符號並再試一次。"), query)
             }
         }
     }

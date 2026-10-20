@@ -1,4 +1,4 @@
-# AuraLyrics (靈動歌詞)
+# AuraLyrics (即時歌詞)
 
 > 專為 iOS 打造、完全於裝置端執行（無須自建後端伺服器）、完美支援 **側載 (SideStore / AltStore / TrollStore)** 與 **LiveContainer** 虛擬容器環境的即時動態與懸浮歌詞應用程式。
 
@@ -8,7 +8,7 @@
 
 1. **雙引擎顯示架構 (Dual-Engine Display Architecture)**
    - **原生動態島與即時動態 (`ActivityKit` + `WidgetKit`)**：在直接側載安裝時，提供 iPhone 動態島（Dynamic Island 緊湊/展開）、鎖定畫面與 StandBy 待機模式毫秒級同步歌詞。
-   - **PiP 畫中畫懸浮歌詞膠囊 (`AVPictureInPictureController` + 原生 View)**：完全在主程式執行檔內渲染，不依賴獨立 App Extension，無影片控制條且不黑屏。在 **LiveContainer** 與側載環境中均可無縫運作，跨 App、主畫面懸浮顯示，隨手掌握歌詞。
+   - **子母畫面 (PiP) 懸浮歌詞膠囊 (`AVPictureInPictureController` + 原生 View)**：完全在主程式執行檔內渲染，不依賴獨立 App Extension，無影片控制條且不黑屏。在 **LiveContainer** 與側載環境中均可無縫運作，跨 App、主畫面懸浮顯示，隨手掌握歌詞。
 2. **Apple Human Interface Guidelines (HIG) 原生設計標準**
    - 雙層材質紀律（功能導覽層 Liquid Glass 與邊緣捲動模糊；內容層採用原生動態語義色彩）。
    - SF Pro 動態字級 (`Dynamic Type`)、高對比度文字與 WCAG AA 無障礙標準支援。
@@ -26,7 +26,7 @@
 
 AuraLyrics 內建智慧環境檢測器（`RuntimeEnvironmentDetector`），全面統一發布單一安裝套件 **`AuraLyrics-<版本號>.ipa`**（例如 `AuraLyrics-0.1.0.ipa`），在 App 啟動時動態判斷沙盒限制狀態，自動適配最佳顯示引擎：
 
-| 環境 / 安裝方式 | 動態島 / 鎖定畫面 (`ActivityKit`) | 畫中畫懸浮歌詞 (`PiP`) | 智慧環境判定 | 推薦安裝包 |
+| 環境 / 安裝方式 | 動態島 / 鎖定畫面 (`ActivityKit`) | 子母畫面懸浮歌詞 (`PiP`) | 智慧環境判定 | 推薦安裝包 |
 | :--- | :---: | :---: | :---: | :--- |
 | **LiveContainer** | ❌ (Guest App 無法載入 Extension) | ✅ **原生支援** (自動推薦 PiP) | 自動判定為容器環境，安全關閉 Extension 依賴 | `AuraLyrics-0.1.0.ipa` |
 | **SideStore / AltStore** | ✅ 支援 (需簽名 Extension Target) | ✅ 支援 | 判定為獨立側載，解鎖雙引擎並行 | `AuraLyrics-0.1.0.ipa` |
@@ -77,7 +77,7 @@ open AuraLyrics.xcodeproj
 2. 在 iPhone 上開啟 **LiveContainer**，點擊右上角 `+` 號直接匯入該 IPA。
 3. 進入 LiveContainer 設定，確保開啟「Fix Background Audio」或允許音訊背景執行。
 4. 點擊圖示啟動 AuraLyrics，App 會自動透過 `RuntimeEnvironmentDetector` 辨識為 LiveContainer 環境。
-5. 在 Apple Music 開始播放音樂，回到 AuraLyrics 點擊右上角 **畫中畫圖示 (PiP)**（或在設定中開啟「啟用懸浮歌詞」），滑動返回桌面即可懸浮顯示！
+5. 在 Apple Music 開始播放音樂，回到 AuraLyrics 點擊右上角 **子母畫面圖示 (PiP)**（或在設定中開啟「啟用子母畫面 (PiP)」），滑動返回桌面即可懸浮顯示！
 
 ### 直接側載（SideStore / AltStore / TrollStore / Feather）
 1. 使用側載工具安裝 `AuraLyrics-0.1.0.ipa`。
@@ -106,7 +106,7 @@ open AuraLyrics.xcodeproj
 │   │   ├── LRCParser.swift                  # LRC 解析與中日韓雙語翻譯合併
 │   │   └── LyricsProviderService.swift      # LRCLIB + 網易雲 API 直連與本地快取
 │   ├── Engines/
-│   │   ├── PiPLyricsEngine.swift            # AVPictureInPicture 畫中畫懸浮歌詞核心
+│   │   ├── PiPLyricsEngine.swift            # AVPictureInPicture 子母畫面 (PiP) 懸浮歌詞核心
 │   │   └── LiveActivityLyricsEngine.swift   # ActivityKit 即時動態核心
 │   └── Views/
 │       ├── MainTabView.swift                # Apple HIG 三標籤主導覽

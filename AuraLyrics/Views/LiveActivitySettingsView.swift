@@ -92,9 +92,9 @@ public struct LiveActivitySettingsView: View {
                     }
                 }
             } header: {
-                Text("暫停與恢復行為")
+                Text("暫停與繼續行為")
             } footer: {
-                Text("即時訊息被關閉後可能需要重新開啟此 App 來恢復")
+                Text("即時動態被關閉後可能需要重新開啟此 App 來恢復")
             }
 
             // MARK: - 背景同步與權限提示
@@ -102,7 +102,7 @@ public struct LiveActivitySettingsView: View {
                 HStack {
                     Text("背景保活狀態")
                     Spacer()
-                    Text(keepAlive.isRunning ? "運作中" : "待命中")
+                    Text(keepAlive.isRunning ? String(localized: "運作中") : String(localized: "待命中"))
                         .foregroundColor(keepAlive.isRunning ? .green : .secondary)
                 }
 
@@ -122,7 +122,7 @@ public struct LiveActivitySettingsView: View {
                     .foregroundColor(.pink)
                 }
             } header: {
-                Text("系統後台運作")
+                Text("系統背景運作")
             } footer: {
                 Text("iOS 系統禁止背景音訊行程更新即時動態。AuraLyrics 透過粗略定位保活與背景任務維持即時歌詞刷新，不會收集你的隱私及資訊。")
             }
@@ -139,15 +139,15 @@ public struct LiveActivitySettingsView: View {
     private func locationStatusDescription(_ status: CLAuthorizationStatus) -> String {
         switch status {
         case .authorizedWhenInUse:
-            return "僅使用期間允許"
+            return String(localized: "僅使用期間允許")
         case .authorizedAlways:
-            return "永遠允許 (最佳)"
+            return String(localized: "永遠允許 (最佳)")
         case .denied, .restricted:
-            return "從不 (無法背景更新)"
+            return String(localized: "從不 (無法背景更新)")
         case .notDetermined:
-            return "尚未要求授權"
+            return String(localized: "尚未要求授權")
         @unknown default:
-            return "未知狀態"
+            return String(localized: "未知狀態")
         }
     }
 }
@@ -162,10 +162,10 @@ private struct DynamicIslandCompactPreview: View {
             let line = monitor.currentLyrics.lines[idx].text
             if !line.isEmpty { return line }
         }
-        if !monitor.currentTrack.title.isEmpty && monitor.currentTrack.title != "尚未播放音樂" {
+        if !monitor.currentTrack.title.isEmpty && monitor.currentTrack.title != TrackInfo.placeholder.title {
             return monitor.currentTrack.title
         }
-        return "AuraLyrics 即時滾動歌詞"
+        return String(localized: "AuraLyrics 即時滾動歌詞")
     }
 
     var body: some View {

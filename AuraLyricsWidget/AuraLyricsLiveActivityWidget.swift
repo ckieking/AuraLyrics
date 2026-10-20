@@ -43,7 +43,7 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 3) {
                         // 主歌詞行 (向上頂掉上一句之過渡動效)
-                        Text(context.isStale ? "App 已暫停或關閉 · 點擊恢復同步" : context.state.currentLine)
+                        Text(context.isStale ? String(localized: "App 已暫停或關閉 · 點擊恢復同步") : context.state.currentLine)
                             .id(context.state.currentLine)
                             .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(context.isStale ? Color(white: 0.6) : .white)
@@ -77,7 +77,7 @@ public struct AuraLyricsLiveActivityWidget: Widget {
             } compactTrailing: {
                 // 緊湊 Trailing 視圖 (向上推移動畫)
                 CompactTrailingView(
-                    currentLine: context.isStale ? "已暫停" : context.state.currentLine
+                    currentLine: context.isStale ? String(localized: "已暫停") : context.state.currentLine
                 )
             } minimal: {
                 // 極簡 Minimal 視圖
@@ -184,7 +184,7 @@ struct LockScreenLyricsView: View {
 
             // 歌詞與次要行群組 (主歌詞與副行緊湊相連，不留空隙推擠到底部，自動適配深淺色)
             VStack(alignment: .leading, spacing: 4) {
-                Text(context.isStale ? "App 已暫停或關閉 · 點擊開啟 AuraLyrics 恢復同步" : context.state.currentLine)
+                Text(context.isStale ? String(localized: "App 已暫停或關閉 · 點擊開啟 AuraLyrics 恢復同步") : context.state.currentLine)
                     .id(context.state.currentLine)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(context.isStale ? subtleText : primaryText)
