@@ -16,7 +16,8 @@ public struct AuraLyricsLiveActivityWidget: Widget {
         ActivityConfiguration(for: LyricsActivityAttributes.self) { context in
             // 鎖定畫面與 StandBy 橫向模式視圖 (自適應深淺色模式，固定視窗尺寸，符合 HIG 14pt 標準邊距)
             LockScreenLyricsView(context: context)
-                .activityBackgroundTint(nil)
+                .activityBackgroundTint(Color(.systemBackground))
+                .activitySystemActionForegroundColor(Color(.label))
         } dynamicIsland: { context in
             DynamicIsland {
                 // 展開視圖 (Expanded Presentation)
@@ -35,7 +36,7 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(context.state.artistName)
                         .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundColor(.gray)
+                        .foregroundColor(Color(white: 0.7))
                         .lineLimit(1)
                         .padding(.trailing, 8)
                         .padding(.top, 4)
@@ -47,7 +48,7 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                         Text(context.isStale ? "App 已暫停或關閉 · 點擊恢復同步" : context.state.currentLine)
                             .id(context.state.currentLine)
                             .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(context.isStale ? .white.opacity(0.6) : .white)
+                            .foregroundColor(context.isStale ? Color(white: 0.6) : .white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
                             .transition(.push(from: .bottom))
@@ -58,7 +59,7 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                             Text(secondary)
                                 .id(secondary)
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundColor(.white.opacity(0.72))
+                                .foregroundColor(Color.pink)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                                 .transition(.push(from: .bottom))
@@ -84,6 +85,7 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 // 極簡 Minimal 視圖
                 ArtworkOrIconView(artworkPath: context.state.artworkPath, size: 14)
             }
+            .keylineTint(Color.pink.opacity(0.5))
         }
     }
 }
@@ -155,14 +157,8 @@ struct CompactTrailingView: View {
 // MARK: - 鎖定畫面歌詞視圖 (支援深淺色自適應，絕對固定尺寸不隨歌詞跳動)
 struct LockScreenLyricsView: View {
     let context: ActivityViewContext<LyricsActivityAttributes>
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let isLight = (colorScheme == .light)
-        let primaryText = isLight ? Color.black : Color.white
-        let secondaryText = isLight ? Color(white: 0.45) : Color.white.opacity(0.68)
-        let subtleText = isLight ? Color(white: 0.60) : Color.white.opacity(0.45)
-
         VStack(alignment: .leading, spacing: 6) {
             // 頂部歌曲資訊列 (固定高 18pt)
             HStack(spacing: 8) {
@@ -170,23 +166,23 @@ struct LockScreenLyricsView: View {
 
                 Text("\(context.state.trackTitle) · \(context.state.artistName)")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(secondaryText)
+                    .foregroundColor(.secondary)
                     .lineLimit(1)
 
                 Spacer()
 
                 Text("AuraLyrics")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(subtleText)
+                    .foregroundColor(Color.secondary.opacity(0.65))
             }
             .frame(height: 18)
 
-            // 歌詞與次要行群組 (主歌詞與副行緊湊相連，不留空隙推擠到底部)
+            // 歌詞與次要行群組 (主歌詞與副行緊湊相連，不留空隙推擠到底部，自動適配深淺色)
             VStack(alignment: .leading, spacing: 4) {
                 Text(context.isStale ? "App 已暫停或關閉 · 點擊開啟 AuraLyrics 恢復同步" : context.state.currentLine)
                     .id(context.state.currentLine)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
-                    .foregroundColor(context.isStale ? subtleText : primaryText)
+                    .foregroundColor(context.isStale ? .secondary : .primary)
                     .lineLimit(2)
                     .minimumScaleFactor(0.85)
                     .multilineTextAlignment(.leading)
@@ -197,7 +193,7 @@ struct LockScreenLyricsView: View {
                     Text(secondary)
                         .id(secondary)
                         .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .foregroundColor(Color.pink.opacity(0.92))
+                        .foregroundColor(Color.pink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                         .transition(.push(from: .bottom))
