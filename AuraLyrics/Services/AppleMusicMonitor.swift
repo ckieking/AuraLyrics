@@ -25,7 +25,10 @@ public final class AppleMusicMonitor: ObservableObject {
     }
 
     private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
-    private var timer: Timer?
+    private let timerQueue = DispatchQueue(label: "com.auralyrics.monitor.timerQueue", qos: .userInteractive)
+    private var timerSource: DispatchSourceTimer?
+    private var isInBackground: Bool = false
+    private var lastHeartbeatTimestamp: CFTimeInterval = 0.0
 
     // MARK: - 高精度防抖時鐘錨點
     private var anchorPlaybackTimeSec: TimeInterval = 0.0
@@ -66,7 +69,26 @@ public final class AppleMusicMonitor: ObservableObject {
             }
         }
 
-        // App 回到前景時主動重新同步播放器狀態，防止自然切歌時系統通知脫鉤
+        // 進入背景時加固：紀錄背景標記，鎖定高精度時間錨點並立即同步
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                self.isInBackground = true
+                let now = CACurrentMediaTime()
+                if self.isPlaying {
+                    let currentExact = self.anchorPlaybackTimeSec + max(0, now - self.anchorMediaTime)
+                    self.anchorPlaybackTimeSec = currentExact
+                    self.anchorMediaTime = now
+                }
+                self.syncExternalEngines()
+            }
+        }
+
+        // App 回到前景時解除背景標記，並主動重新同步播放器狀態
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
@@ -74,6 +96,7 @@ public final class AppleMusicMonitor: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                self.isInBackground = false
                 self.musicPlayer.beginGeneratingPlaybackNotifications()
                 self.handleTrackChanged(force: true)
                 self.handlePlaybackStateChanged()
@@ -87,30 +110,38 @@ public final class AppleMusicMonitor: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                self.isInBackground = false
                 self.handleTrackChanged()
                 self.handlePlaybackStateChanged()
             }
         }
     }
 
-    // MARK: - 啟動監聽與高精度時間軸定時器
+    // MARK: - 啟動監聽與高精度時間軸定時器 (DispatchSourceTimer 前景背景統一驅動)
     public func startMonitoring() {
         handleTrackChanged(force: true)
         handlePlaybackStateChanged()
 
-        timer?.invalidate()
-        let newTimer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
+        stopTimer()
+
+        let source = DispatchSource.makeTimerSource(flags: .strict, queue: timerQueue)
+        source.schedule(deadline: .now(), repeating: .milliseconds(150), leeway: .milliseconds(20))
+        source.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in
                 self?.tick()
             }
         }
-        RunLoop.main.add(newTimer, forMode: .common)
-        self.timer = newTimer
+        source.resume()
+        self.timerSource = source
+    }
+
+    private func stopTimer() {
+        timerSource?.cancel()
+        timerSource = nil
     }
 
     public func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
+        stopTimer()
         lyricsFetchTask?.cancel()
         lyricsFetchTask = nil
         musicPlayer.endGeneratingPlaybackNotifications()
@@ -119,6 +150,9 @@ public final class AppleMusicMonitor: ObservableObject {
     // MARK: - 曲目變更處理 (支援強制刷新與即時清空舊歌詞)
     private func handleTrackChanged(force: Bool = false) {
         guard let nowPlaying = musicPlayer.nowPlayingItem else {
+            // 背景下若 IPC 讀取為 nil，維持當前歌曲與歌詞，絕不誤清空
+            if isInBackground { return }
+
             lyricsFetchTask?.cancel()
             lyricsFetchTask = nil
             currentTrack = .placeholder
@@ -141,7 +175,6 @@ public final class AppleMusicMonitor: ObservableObject {
         let album = nowPlaying.albumTitle ?? ""
         let duration = nowPlaying.playbackDuration
 
-        // 若非強制重整，且 persistentID 或 storeID 與當前曲目完全相符，且已有歌詞或正在載入，避免無謂重複請求
         if !force && lastPersistentID != 0 && lastPersistentID == persistentID && currentTrack.title == title && currentTrack.artist == artist && (!currentLyrics.lines.isEmpty || isLoadingLyrics) {
             return
         }
@@ -164,7 +197,6 @@ public final class AppleMusicMonitor: ObservableObject {
             artworkData: artworkData
         )
 
-        // 核心修復：立即更新曲目並清空舊歌詞，杜絕上一首歌詞殘留並在 0 秒處被錯誤重新點亮
         currentTrack = newTrack
         currentLyrics = .empty
         currentLineIndex = nil
@@ -177,7 +209,6 @@ public final class AppleMusicMonitor: ObservableObject {
         lastPlaybackTimeSec = playTime
         syncExternalEngines()
 
-        // 取消先前可能未完成的非同步歌詞請求，避免競態覆蓋
         lyricsFetchTask?.cancel()
         lyricsFetchTask = Task { [weak self] in
             guard let self = self else { return }
@@ -199,15 +230,53 @@ public final class AppleMusicMonitor: ObservableObject {
         if isPlaying != newIsPlaying {
             isPlaying = newIsPlaying
             let playTime = musicPlayer.currentPlaybackTime
-            currentPlaybackTimeSec = playTime
-            anchorPlaybackTimeSec = playTime
+            if !playTime.isNaN && !playTime.isInfinite && playTime >= 0 {
+                anchorPlaybackTimeSec = playTime
+                currentPlaybackTimeSec = playTime
+            }
             anchorMediaTime = CACurrentMediaTime()
             syncExternalEngines()
+
+            if newIsPlaying {
+                LiveActivityLyricsEngine.shared.handlePlaybackResumed(track: currentTrack)
+            } else {
+                LiveActivityLyricsEngine.shared.handlePlaybackPaused()
+            }
         }
     }
 
     // MARK: - 時間軸定時器循環
     private func tick() {
+        let now = CACurrentMediaTime()
+        lastTickTimestamp = now
+
+        // --- 背景純淨時鐘推進模式 (避免背景 XPC 輪詢干擾與誤判) ---
+        if isInBackground {
+            if isPlaying {
+                currentPlaybackTimeSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
+
+                // 若背景下播放時間已超出曲目長度，觸發換歌檢查
+                if currentTrack.duration > 0 && currentPlaybackTimeSec >= currentTrack.duration {
+                    if let nowPlaying = musicPlayer.nowPlayingItem {
+                        let pid = nowPlaying.persistentID
+                        let title = nowPlaying.title ?? ""
+                        if (pid != 0 && pid != lastPersistentID) || (title != currentTrack.title) {
+                            handleTrackChanged()
+                            return
+                        }
+                    }
+                }
+
+                if currentTrack.duration > 0 {
+                    playbackProgress = min(max(currentPlaybackTimeSec / currentTrack.duration, 0.0), 1.0)
+                }
+
+                refreshCurrentLineIndex()
+            }
+            return
+        }
+
+        // --- 前景全功能偵測模式 ---
         let playTime = musicPlayer.currentPlaybackTime
         let nowPlaying = musicPlayer.nowPlayingItem
 
@@ -222,9 +291,11 @@ public final class AppleMusicMonitor: ObservableObject {
             let isStoreIDChanged = (!storeID.isEmpty && storeID != lastPlaybackStoreID)
             let isInfoChanged = (!title.isEmpty && (title != currentTrack.title || artist != currentTrack.artist))
 
-            // 自然播完切歌或單曲重播之時間突變偵測 (Time Wrap-around)
-            // 當前時間已歸零至 < 2.5 秒，而前一拍時間 > 5 秒且前首歌進度已超過 70%
-            let isTimeWrapped = (playTime < 2.5 && lastPlaybackTimeSec > 5.0 && (currentTrack.duration > 0 ? (lastPlaybackTimeSec / currentTrack.duration > 0.70) : true))
+            let isPlayTimeValid = !playTime.isNaN && !playTime.isInfinite && playTime >= 0
+            let playTimeJump = isPlayTimeValid ? abs(playTime - lastPlaybackTimeSec) : 0
+            let hasFreshSample = isPlayTimeValid && (playTimeJump > 0.05)
+
+            let isTimeWrapped = hasFreshSample && (playTime < 2.5 && lastPlaybackTimeSec > 5.0 && (currentTrack.duration > 0 ? (lastPlaybackTimeSec / currentTrack.duration > 0.70) : true))
 
             if isPidChanged || isStoreIDChanged || isInfoChanged {
                 handleTrackChanged()
@@ -234,20 +305,18 @@ public final class AppleMusicMonitor: ObservableObject {
                 return
             }
         } else if currentTrack.title != TrackInfo.placeholder.title {
-            // 播放器已被關閉或曲目為空
             handleTrackChanged()
             return
         }
 
-        let now = CACurrentMediaTime()
-        lastTickTimestamp = now
-
-        // 2. 即時同步播放狀態（主動偵測，不完全依賴可能延遲的跨行程通知）
+        // 2. 即時同步播放狀態
         let actualIsPlaying = (musicPlayer.playbackState == .playing)
         var didPlayStateChange = false
         if isPlaying != actualIsPlaying {
             isPlaying = actualIsPlaying
-            anchorPlaybackTimeSec = playTime
+            if !playTime.isNaN && !playTime.isInfinite && playTime >= 0 {
+                anchorPlaybackTimeSec = playTime
+            }
             anchorMediaTime = now
             didPlayStateChange = true
         }
@@ -255,32 +324,33 @@ public final class AppleMusicMonitor: ObservableObject {
         // 3. 高精度時鐘平滑推進與智慧防抖校準
         if isPlaying {
             let predictedTime = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
-            let playTimeJump = abs(playTime - lastPlaybackTimeSec)
+            let isPlayTimeValid = !playTime.isNaN && !playTime.isInfinite && playTime >= 0
+            let playTimeJump = isPlayTimeValid ? abs(playTime - lastPlaybackTimeSec) : 0
+            let hasFreshSample = isPlayTimeValid && (playTimeJump > 0.05)
 
-            // 判定使用者真實跳轉 (User Seek)：系統實測時間本身發生顯著跳躍且與線性推估時間有偏差
-            let isUserSeek = (playTimeJump > 1.2 && abs(playTime - predictedTime) > 1.0)
-
-            // 判定串流緩衝結束首次起跑對齊（剛切歌前幾秒系統 IPC 卡在 0.0，首次回傳有效進度）
-            let isInitialStart = (anchorPlaybackTimeSec == 0 && playTime > 0.05 && playTime < 3.0 && playTimeJump > 0.05)
+            let isUserSeek = hasFreshSample && (playTimeJump > 1.2 && abs(playTime - predictedTime) > 1.0)
+            let isInitialStart = (anchorPlaybackTimeSec == 0 && playTime > 0.05 && playTime < 3.0 && hasFreshSample)
 
             if isUserSeek || isInitialStart || anchorMediaTime == 0 {
                 anchorPlaybackTimeSec = playTime
                 anchorMediaTime = now
-            } else if playTime > 0.5 && abs(playTime - predictedTime) > 2.0 {
-                // 長期嚴重漂移安全保護（持續偏差超過 2.0 秒時平滑對齊）
+            } else if hasFreshSample && playTime > 0.5 && abs(playTime - predictedTime) > 2.0 {
                 anchorPlaybackTimeSec = playTime
                 anchorMediaTime = now
             }
-            // 其餘情況（系統 playTime 卡在 0.0 或階梯取樣延遲）：
-            // 堅定維持本地高精度 CACurrentMediaTime() 線性前進，絕不被未更新的 0.0 往回拉！
+
             currentPlaybackTimeSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
         } else {
-            anchorPlaybackTimeSec = playTime
+            if !playTime.isNaN && !playTime.isInfinite && playTime >= 0 {
+                anchorPlaybackTimeSec = playTime
+                currentPlaybackTimeSec = playTime
+            }
             anchorMediaTime = now
-            currentPlaybackTimeSec = playTime
         }
 
-        lastPlaybackTimeSec = playTime
+        if !playTime.isNaN && !playTime.isInfinite && playTime >= 0 {
+            lastPlaybackTimeSec = playTime
+        }
 
         if currentTrack.duration > 0 {
             playbackProgress = min(max(currentPlaybackTimeSec / currentTrack.duration, 0.0), 1.0)
@@ -292,22 +362,37 @@ public final class AppleMusicMonitor: ObservableObject {
         refreshCurrentLineIndex(forceSync: didPlayStateChange)
     }
 
-    /// 統一依據高精度插值時鐘重新計算當前歌詞行索引，並同步推播至 PiP 與動態島引擎
+    /// 統一依據高精度插值時鐘重新計算當前歌詞行索引，並同步推播至各引擎
     private func refreshCurrentLineIndex(forceSync: Bool = false) {
-        // interpolatedPlaybackTimeMs() 已內含 globalOffsetMs，此處傳入 globalOffsetMs: 0 避免重複累加
         let accurateTimeMs = interpolatedPlaybackTimeMs()
         let newIndex = currentLyrics.currentLineIndex(at: accurateTimeMs, globalOffsetMs: 0)
 
+        // 計算距離下一句歌詞的間隔秒數，提供 LiveActivity 動態調整 staleDate
+        var nextLineIntervalSec: TimeInterval? = nil
+        if let idx = newIndex, idx + 1 < currentLyrics.lines.count {
+            let nextStartMs = currentLyrics.lines[idx + 1].startTimeMs
+            nextLineIntervalSec = max(0.5, Double(nextStartMs - accurateTimeMs) / 1000.0)
+        }
+
         if newIndex != currentLineIndex {
             currentLineIndex = newIndex
-            syncExternalEngines()
+            lastHeartbeatTimestamp = CACurrentMediaTime()
+            syncExternalEngines(nextLineIntervalSec: nextLineIntervalSec)
         } else if forceSync {
-            syncExternalEngines()
+            lastHeartbeatTimestamp = CACurrentMediaTime()
+            syncExternalEngines(nextLineIntervalSec: nextLineIntervalSec)
+        } else {
+            // 長間奏心跳檢測：若歌詞行未改變且已過 4 秒，發送心跳確保 LiveActivity staleDate 持續延長
+            let now = CACurrentMediaTime()
+            if isPlaying && (now - lastHeartbeatTimestamp >= 4.0) {
+                lastHeartbeatTimestamp = now
+                LiveActivityLyricsEngine.shared.sendHeartbeat(track: currentTrack)
+            }
         }
     }
 
-    /// 主動同步當前歌詞或曲目狀態至 PiP 懸浮窗與 Live Activity 動態島（背景與各分頁下皆保持同步）
-    public func syncExternalEngines() {
+    /// 主動同步當前歌詞或曲目狀態至 PiP 懸浮窗與 Live Activity 動態島
+    public func syncExternalEngines(nextLineIntervalSec: TimeInterval? = nil) {
         let showTranslation = UserDefaults.standard.object(forKey: "showBilingualLyrics") as? Bool ?? true
 
         if let index = currentLineIndex, currentLyrics.lines.indices.contains(index) {
@@ -319,7 +404,6 @@ public final class AppleMusicMonitor: ObservableObject {
                 secondaryText = currentLyrics.lines[index + 1].text
             }
 
-            // 下一句歌詞（供 PiP 懸浮窗下方淺灰小字顯示）
             let nextLineText = (index + 1 < currentLyrics.lines.count) ? currentLyrics.lines[index + 1].text : nil
 
             PiPLyricsEngine.shared.updateLyrics(
@@ -332,7 +416,8 @@ public final class AppleMusicMonitor: ObservableObject {
                 secondaryLine: secondaryText,
                 track: currentTrack,
                 isPlaying: isPlaying,
-                progress: playbackProgress
+                progress: playbackProgress,
+                nextLineIntervalSec: nextLineIntervalSec
             )
         } else {
             let isPlaceholder = (currentTrack.title == TrackInfo.placeholder.title)
@@ -352,12 +437,13 @@ public final class AppleMusicMonitor: ObservableObject {
                 secondaryLine: introSecondary,
                 track: currentTrack,
                 isPlaying: isPlaying,
-                progress: playbackProgress
+                progress: playbackProgress,
+                nextLineIntervalSec: nextLineIntervalSec
             )
         }
     }
 
-    /// 取得高精度插值播放時間（毫秒，結合平滑防抖時鐘與微秒級幀間差，已包含 globalOffsetMs）
+    /// 取得高精度插值播放時間（毫秒）
     public func interpolatedPlaybackTimeMs() -> Int {
         let elapsed = isPlaying ? max(0, CACurrentMediaTime() - anchorMediaTime) : 0
         let timeSec = anchorPlaybackTimeSec + elapsed

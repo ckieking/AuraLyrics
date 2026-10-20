@@ -56,6 +56,24 @@ struct SettingsView: View {
                     Text("切換至主畫面或其他 App 時，將自動顯示微縮懸浮動態島歌詞視窗；可隨時拖曳與縮放。")
                 }
 
+                // MARK: - 即時動態與動態島
+                Section {
+                    NavigationLink {
+                        LiveActivitySettingsView()
+                    } label: {
+                        HStack {
+                            Label("即時動態與動態島設定", systemImage: "waveform.badge.magnifyingglass")
+                            Spacer()
+                            Text(LiveActivityLyricsEngine.shared.isEnabled ? "已開啟" : "已關閉")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("即時動態 (Live Activities)")
+                } footer: {
+                    Text("自訂鎖定畫面與動態島顯示樣式、次要行資訊、暫停與自動恢復行為。")
+                }
+
                 // MARK: - 歌詞視覺效果
                 Section {
                     Toggle("未播放歌詞景深模糊", isOn: $enableLyricDefocusBlur)

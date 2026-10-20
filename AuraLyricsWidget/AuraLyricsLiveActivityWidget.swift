@@ -14,18 +14,15 @@ public struct AuraLyricsLiveActivityWidget: Widget {
 
     public var body: some WidgetConfiguration {
         ActivityConfiguration(for: LyricsActivityAttributes.self) { context in
-            // 鎖定畫面與 StandBy 橫向模式視圖 (遵循 HIG 14pt 標準邊距)
+            // 鎖定畫面與 StandBy 橫向模式視圖 (自適應深淺色模式，符合 HIG 14pt 標準邊距)
             LockScreenLyricsView(context: context)
-                .activityBackgroundTint(Color.black.opacity(0.85))
-                .activitySystemActionForegroundColor(Color.white)
+                .activityBackgroundTint(nil)
         } dynamicIsland: { context in
             DynamicIsland {
                 // 展開視圖 (Expanded Presentation)
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
-                        Image(systemName: "music.note")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(.pink)
+                        ArtworkOrIconView(artworkPath: context.state.artworkPath, size: 18)
                         Text(context.state.trackTitle)
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
@@ -45,115 +42,162 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        // 主歌詞高亮行
-                        Text(context.state.currentLine)
+                    VStack(alignment: .leading, spacing: 5) {
+                        // 主歌詞行 (向上頂掉上一句之過渡動效)
+                        Text(context.isStale ? "App 已暫停或關閉 · 點擊恢復同步" : context.state.currentLine)
+                            .id(context.state.currentLine)
                             .font(.system(size: 17, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(context.isStale ? .white.opacity(0.6) : .white)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
+                            .transition(.push(from: .bottom))
+                            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: context.state.currentLine)
 
-                        // 雙語翻譯或下一句
-                        if let secondary = context.state.secondaryLine, !secondary.isEmpty {
+                        // 雙語翻譯或下一句預覽行 (向上推移過渡)
+                        if !context.isStale, let secondary = context.state.secondaryLine, !secondary.isEmpty {
                             Text(secondary)
+                                .id(secondary)
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundColor(.white.opacity(0.7))
+                                .foregroundColor(.white.opacity(0.72))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
+                                .transition(.push(from: .bottom))
+                                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: secondary)
                         }
-
-                        // 進度條
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.white.opacity(0.15))
-                                    .frame(height: 3)
-                                Capsule()
-                                    .fill(Color.pink)
-                                    .frame(width: geo.size.width * max(0.02, min(context.state.progress, 1.0)), height: 3)
-                            }
-                        }
-                        .frame(height: 3)
-                        .padding(.top, 4)
                     }
                     .padding(.horizontal, 12)
                     .padding(.bottom, 8)
                 }
             } compactLeading: {
-                // 緊湊 Leading
-                Image(systemName: "music.note")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.pink)
-                    .padding(.leading, 4)
+                // 緊湊 Leading 視圖 (依設定支援封面縮圖或簡潔音符)
+                CompactLeadingView(
+                    compactStyle: context.state.compactStyle,
+                    artworkPath: context.state.artworkPath
+                )
             } compactTrailing: {
-                // 緊湊 Trailing
-                CompactTrailingView(currentLine: context.state.currentLine)
+                // 緊湊 Trailing 視圖 (向上推移動畫)
+                CompactTrailingView(
+                    currentLine: context.isStale ? "已暫停" : context.state.currentLine
+                )
             } minimal: {
-                // 極簡 Minimal
-                Image(systemName: "music.note")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.pink)
+                // 極簡 Minimal 視圖
+                ArtworkOrIconView(artworkPath: context.state.artworkPath, size: 14)
             }
         }
     }
 }
 
-// 緊湊 Trailing 視圖 (依據 Apple HIG 支援 isDynamicIslandLimitedInWidth 橫向窄寬度適配)
+// MARK: - 縮圖或圖示共用視圖
+struct ArtworkOrIconView: View {
+    let artworkPath: String?
+    let size: CGFloat
+
+    var body: some View {
+        if let path = artworkPath,
+           let uiImage = UIImage(contentsOfFile: path) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+        } else {
+            Image(systemName: "music.note")
+                .font(.system(size: size * 0.85, weight: .bold))
+                .foregroundColor(.pink)
+        }
+    }
+}
+
+// MARK: - 緊湊 Leading 視圖
+struct CompactLeadingView: View {
+    let compactStyle: String
+    let artworkPath: String?
+
+    var body: some View {
+        if compactStyle == DynamicIslandCompactStyle.artworkAndText.rawValue {
+            ArtworkOrIconView(artworkPath: artworkPath, size: 16)
+                .padding(.leading, 4)
+        } else {
+            Image(systemName: "music.note")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(.pink)
+                .padding(.leading, 4)
+        }
+    }
+}
+
+// MARK: - 緊湊 Trailing 視圖
 struct CompactTrailingView: View {
     @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
     let currentLine: String
 
     var body: some View {
         if isLimitedInWidth {
-            // 橫向或有限寬度：收斂為 28pt 內精巧波形圖示，防止文字被硬性截斷
             Image(systemName: "waveform")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.pink)
                 .padding(.trailing, 4)
         } else {
             Text(currentLine)
+                .id(currentLine)
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .padding(.trailing, 4)
+                .transition(.push(from: .bottom))
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: currentLine)
         }
     }
 }
 
-// 鎖定畫面歌詞視圖 (嚴格遵守 HIG 14pt 標準邊距與同心幾何)
+// MARK: - 鎖定畫面歌詞視圖 (支援深淺色模式自適應，無進度條，文字逐句向上頂出)
 struct LockScreenLyricsView: View {
     let context: ActivityViewContext<LyricsActivityAttributes>
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let isLight = (colorScheme == .light)
+        let primaryText = isLight ? Color.black : Color.white
+        let secondaryText = isLight ? Color(white: 0.45) : Color.white.opacity(0.68)
+        let subtleText = isLight ? Color(white: 0.60) : Color.white.opacity(0.45)
+
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                HStack(spacing: 6) {
-                    Image(systemName: "music.note")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(.pink)
-                    Text("\(context.state.trackTitle) · \(context.state.artistName)")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.85))
-                        .lineLimit(1)
-                }
+            // 頂部歌曲資訊列
+            HStack(spacing: 8) {
+                ArtworkOrIconView(artworkPath: context.state.artworkPath, size: 18)
+
+                Text("\(context.state.trackTitle) · \(context.state.artistName)")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundColor(secondaryText)
+                    .lineLimit(1)
+
                 Spacer()
+
                 Text("AuraLyrics")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(subtleText)
             }
 
-            Text(context.state.currentLine)
+            // 主歌詞行 (向上頂掉過渡動效)
+            Text(context.isStale ? "App 已暫停或關閉 · 點擊開啟 AuraLyrics 恢復同步" : context.state.currentLine)
+                .id(context.state.currentLine)
                 .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(context.isStale ? subtleText : primaryText)
                 .lineLimit(2)
                 .minimumScaleFactor(0.8)
+                .transition(.push(from: .bottom))
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: context.state.currentLine)
 
-            if let secondary = context.state.secondaryLine, !secondary.isEmpty {
+            // 次要行（雙語翻譯或下一句預覽，向上推移過渡）
+            if !context.isStale, let secondary = context.state.secondaryLine, !secondary.isEmpty {
                 Text(secondary)
+                    .id(secondary)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.pink.opacity(0.9))
+                    .foregroundColor(Color.pink.opacity(0.92))
                     .lineLimit(1)
+                    .transition(.push(from: .bottom))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: secondary)
             }
         }
         .padding(14) // HIG 標準 14pt 邊距

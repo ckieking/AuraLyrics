@@ -17,6 +17,10 @@ public struct LyricsActivityAttributes: ActivityAttributes {
         public var isPlaying: Bool
         /// 當前曲目播放進度（0.0 ~ 1.0）
         public var progress: Double
+        /// 共享群組內的專輯封面縮圖路徑
+        public var artworkPath: String?
+        /// 緊湊樣式設定
+        public var compactStyle: String
 
         public init(
             currentLine: String,
@@ -24,7 +28,9 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             trackTitle: String,
             artistName: String,
             isPlaying: Bool = true,
-            progress: Double = 0.0
+            progress: Double = 0.0,
+            artworkPath: String? = nil,
+            compactStyle: String = DynamicIslandCompactStyle.artworkAndText.rawValue
         ) {
             self.currentLine = currentLine
             self.secondaryLine = secondaryLine
@@ -32,6 +38,8 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             self.artistName = artistName
             self.isPlaying = isPlaying
             self.progress = progress
+            self.artworkPath = artworkPath
+            self.compactStyle = compactStyle
         }
     }
 
