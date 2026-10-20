@@ -83,7 +83,6 @@ struct NowPlayingView: View {
                 monitor.syncExternalEngines()
             }
         }
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - 右上角獨立按鈕：畫中畫 (PiP 懸浮窗，直徑 40pt，按鈕即為最底層)
@@ -97,7 +96,7 @@ struct NowPlayingView: View {
             ZStack {
                 Image(systemName: isPiPOn ? "pip.exit" : "pip.enter")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(isPiPOn ? .white : .primary)
+                    .foregroundColor(.white)
             }
             .frame(width: buttonDiameter, height: buttonDiameter)
             .liquidGlassCircle(isActive: isPiPOn, activeTint: .pink)
@@ -151,7 +150,7 @@ struct NowPlayingView: View {
             ZStack {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.primary)
+                    .foregroundColor(.white)
             }
             .frame(width: buttonDiameter, height: buttonDiameter)
             .liquidGlassCircle(isActive: false)
@@ -184,16 +183,16 @@ struct NowPlayingView: View {
                     VStack(spacing: 14) {
                         Image(systemName: "music.quarternote.3")
                             .font(.system(size: 42))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Color.white.opacity(0.45))
                             .accessibilityHidden(true)
 
                         Text(monitor.isLoadingLyrics ? "正在檢索歌詞..." : "目前曲目無對應歌詞")
                             .font(.system(.headline, design: .rounded))
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
 
                         Text("可嘗試線上搜尋其他版本，或手動匯入本地 .lrc 檔案")
                             .font(.system(.subheadline, design: .rounded))
-                            .foregroundColor(.secondary)
+                            .foregroundColor(Color.white.opacity(0.68))
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 32)
 
@@ -218,6 +217,7 @@ struct NowPlayingView: View {
                                     .padding(.horizontal, 16)
                             }
                             .buttonStyle(.bordered)
+                            .tint(.white)
                         }
                         .padding(.top, 8)
                     }
