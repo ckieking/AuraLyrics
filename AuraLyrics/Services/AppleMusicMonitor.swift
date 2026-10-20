@@ -203,6 +203,15 @@ public final class AppleMusicMonitor: ObservableObject {
             anchorPlaybackTimeSec = playTime
             anchorMediaTime = CACurrentMediaTime()
             syncExternalEngines()
+
+            if newIsPlaying {
+                LiveActivityLyricsEngine.shared.handlePlaybackResumed(
+                    track: currentTrack,
+                    currentPlaybackTimeSec: playTime
+                )
+            } else {
+                LiveActivityLyricsEngine.shared.handlePlaybackPaused()
+            }
         }
     }
 
@@ -332,7 +341,8 @@ public final class AppleMusicMonitor: ObservableObject {
                 secondaryLine: secondaryText,
                 track: currentTrack,
                 isPlaying: isPlaying,
-                progress: playbackProgress
+                progress: playbackProgress,
+                currentPlaybackTimeSec: currentPlaybackTimeSec
             )
         } else {
             let isPlaceholder = (currentTrack.title == TrackInfo.placeholder.title)
@@ -352,7 +362,8 @@ public final class AppleMusicMonitor: ObservableObject {
                 secondaryLine: introSecondary,
                 track: currentTrack,
                 isPlaying: isPlaying,
-                progress: playbackProgress
+                progress: playbackProgress,
+                currentPlaybackTimeSec: currentPlaybackTimeSec
             )
         }
     }
