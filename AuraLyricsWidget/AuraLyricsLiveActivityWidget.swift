@@ -42,19 +42,18 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        // 主歌詞行 (向上頂掉上一句之過渡動效，固定高度 24pt)
+                    VStack(alignment: .leading, spacing: 3) {
+                        // 主歌詞行 (向上頂掉上一句之過渡動效)
                         Text(context.isStale ? "App 已暫停或關閉 · 點擊恢復同步" : context.state.currentLine)
                             .id(context.state.currentLine)
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(context.isStale ? .white.opacity(0.6) : .white)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(height: 24, alignment: .leading)
+                            .minimumScaleFactor(0.75)
                             .transition(.push(from: .bottom))
                             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: context.state.currentLine)
 
-                        // 雙語翻譯或下一句預覽行 (向上推移過渡，固定高度 16pt，無副行時以空字串佔位保持高度恆定)
+                        // 雙語翻譯或下一句預覽行 (緊隨主歌詞下方)
                         if !context.isStale, let secondary = context.state.secondaryLine, !secondary.isEmpty {
                             Text(secondary)
                                 .id(secondary)
@@ -62,19 +61,13 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                                 .foregroundColor(.white.opacity(0.72))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
-                                .frame(height: 16, alignment: .leading)
                                 .transition(.push(from: .bottom))
                                 .animation(.spring(response: 0.35, dampingFraction: 0.8), value: secondary)
-                        } else {
-                            Text(" ")
-                                .font(.system(size: 13))
-                                .frame(height: 16)
-                                .opacity(0)
                         }
                     }
-                    .frame(height: 44, alignment: .topLeading)
+                    .frame(maxWidth: .infinity, minHeight: 40, maxHeight: 40, alignment: .topLeading)
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 6)
                 }
             } compactLeading: {
                 // 緊湊 Leading 視圖 (依設定支援封面縮圖或簡潔音符)
@@ -188,22 +181,18 @@ struct LockScreenLyricsView: View {
             }
             .frame(height: 18)
 
-            // 主歌詞行 (固定高 44pt，容納 2 行，空間鎖定不隨行數變化跳動)
-            VStack(alignment: .leading, spacing: 0) {
+            // 歌詞與次要行群組 (主歌詞與副行緊湊相連，不留空隙推擠到底部)
+            VStack(alignment: .leading, spacing: 4) {
                 Text(context.isStale ? "App 已暫停或關閉 · 點擊開啟 AuraLyrics 恢復同步" : context.state.currentLine)
                     .id(context.state.currentLine)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(context.isStale ? subtleText : primaryText)
                     .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.85)
                     .multilineTextAlignment(.leading)
                     .transition(.push(from: .bottom))
                     .animation(.spring(response: 0.35, dampingFraction: 0.8), value: context.state.currentLine)
-            }
-            .frame(height: 44, alignment: .topLeading)
 
-            // 次要行（雙語翻譯或下一句預覽，固定高 18pt，無副行時佔位保持卡片恆定高度）
-            VStack(alignment: .leading, spacing: 0) {
                 if !context.isStale, let secondary = context.state.secondaryLine, !secondary.isEmpty {
                     Text(secondary)
                         .id(secondary)
@@ -213,15 +202,14 @@ struct LockScreenLyricsView: View {
                         .minimumScaleFactor(0.8)
                         .transition(.push(from: .bottom))
                         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: secondary)
-                } else {
-                    Text(" ")
-                        .font(.system(size: 13, weight: .medium, design: .rounded))
-                        .opacity(0)
                 }
             }
-            .frame(height: 18, alignment: .leading)
+
+            Spacer(minLength: 0)
         }
-        .padding(14) // HIG 標準 14pt 邊距
-        .frame(maxWidth: .infinity, minHeight: 110, maxHeight: 110, alignment: .topLeading)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity, minHeight: 108, maxHeight: 108, alignment: .topLeading)
     }
 }
