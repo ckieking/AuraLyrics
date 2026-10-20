@@ -25,7 +25,8 @@ public final class AppleMusicMonitor: ObservableObject {
     }
 
     private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
-    private var timer: Timer?
+    private let timerQueue = DispatchQueue(label: "com.auralyrics.monitor.timerQueue", qos: .userInteractive)
+    private var timerSource: DispatchSourceTimer?
 
     // MARK: - 高精度防抖時鐘錨點
     private var anchorPlaybackTimeSec: TimeInterval = 0.0
@@ -91,26 +92,46 @@ public final class AppleMusicMonitor: ObservableObject {
                 self.handlePlaybackStateChanged()
             }
         }
+
+        // 進入背景時強制確保音訊通道活躍與及時同步當前歌詞狀態
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                BackgroundKeepAliveManager.shared.ensureRunning()
+                self.syncExternalEngines()
+            }
+        }
     }
 
-    // MARK: - 啟動監聽與高精度時間軸定時器
+    // MARK: - 啟動監聽與高精度時間軸定時器（支援背景保活與前景 GCD 雙環境運作）
     public func startMonitoring() {
         handleTrackChanged(force: true)
         handlePlaybackStateChanged()
 
-        timer?.invalidate()
-        let newTimer = Timer(timeInterval: 0.15, repeats: true) { [weak self] _ in
+        stopTimer()
+
+        let source = DispatchSource.makeTimerSource(flags: .strict, queue: timerQueue)
+        source.schedule(deadline: .now(), repeating: .milliseconds(150), leeway: .milliseconds(20))
+        source.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in
                 self?.tick()
             }
         }
-        RunLoop.main.add(newTimer, forMode: .common)
-        self.timer = newTimer
+        source.resume()
+        self.timerSource = source
+    }
+
+    private func stopTimer() {
+        timerSource?.cancel()
+        timerSource = nil
     }
 
     public func stopMonitoring() {
-        timer?.invalidate()
-        timer = nil
+        stopTimer()
         lyricsFetchTask?.cancel()
         lyricsFetchTask = nil
         musicPlayer.endGeneratingPlaybackNotifications()

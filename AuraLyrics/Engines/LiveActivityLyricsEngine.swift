@@ -189,16 +189,14 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         let endTime = startTime.addingTimeInterval(max(1, track.duration))
         let artworkPath = currentCachedArtworkPath ?? cacheArtwork(from: track.artworkData)
 
-        // 若主要歌詞、次要行、曲目、播放狀態、樣式等皆未改變且進度微量，不重複發送 IPC
+        // 若主要歌詞、次要行、曲目、播放狀態、樣式等皆未改變，不重複發送 IPC，極致節省系統後台更新預算
         if let last = lastSentState,
            last.currentLine == line,
            last.secondaryLine == resolvedSecondary,
            last.trackTitle == track.title,
            last.artistName == track.artist,
            last.isPlaying == isPlaying,
-           last.compactStyle == compactStyle.rawValue,
-           last.progressEngine == progressEngine.rawValue,
-           abs(last.progress - progress) < 0.05 {
+           last.compactStyle == compactStyle.rawValue {
             return
         }
 
