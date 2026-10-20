@@ -118,7 +118,7 @@ struct CompactLeadingView: View {
         if compactStyle == DynamicIslandCompactStyle.artworkAndText.rawValue {
             ArtworkOrIconView(artworkPath: artworkPath, size: 16)
                 .padding(.leading, 4)
-        } else {
+        } else if compactStyle == DynamicIslandCompactStyle.iconAndText.rawValue {
             Image(systemName: "music.note")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundColor(.pink)

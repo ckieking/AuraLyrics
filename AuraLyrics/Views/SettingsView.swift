@@ -102,15 +102,15 @@ struct SettingsView: View {
                         HStack(spacing: 10) {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                musicMonitor.adjustGlobalOffset(byMs: -500)
+                                musicMonitor.adjustGlobalOffset(byMs: -100)
                             } label: {
-                                Text("-0.5s")
+                                Text("-0.1s")
                                     .font(.system(.subheadline, design: .rounded).weight(.bold))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 38)
                             }
                             .buttonStyle(.bordered)
-                            .accessibilityLabel("所有歌曲歌詞延後 0.5 秒")
+                            .accessibilityLabel("所有歌曲歌詞延後 0.1 秒")
 
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -127,15 +127,15 @@ struct SettingsView: View {
 
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                musicMonitor.adjustGlobalOffset(byMs: 500)
+                                musicMonitor.adjustGlobalOffset(byMs: 100)
                             } label: {
-                                Text("+0.5s")
+                                Text("+0.1s")
                                     .font(.system(.subheadline, design: .rounded).weight(.bold))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 38)
                             }
                             .buttonStyle(.bordered)
-                            .accessibilityLabel("所有歌曲歌詞提前 0.5 秒")
+                            .accessibilityLabel("所有歌曲歌詞提前 0.1 秒")
                         }
                     }
                     .padding(.vertical, 4)
@@ -268,12 +268,6 @@ struct SettingsView: View {
                         Text("應用程式版本")
                         Spacer()
                         Text(appVersionString)
-                            .foregroundColor(.secondary)
-                    }
-                    HStack {
-                        Text("介面設計語言")
-                        Spacer()
-                        Text("Apple HIG + Liquid Glass")
                             .foregroundColor(.secondary)
                     }
                     HStack {
