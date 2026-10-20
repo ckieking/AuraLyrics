@@ -20,8 +20,6 @@ targets:
     sources:
       - path: AuraLyrics
       - path: Shared
-    info:
-      path: AuraLyrics/Info.plist
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.auralyrics.app
       TARGETED_DEVICE_FAMILY: "1"
@@ -39,8 +37,6 @@ targets:
     sources:
       - path: AuraLyricsWidget
       - path: Shared
-    info:
-      path: AuraLyricsWidget/Info.plist
     settings:
       PRODUCT_BUNDLE_IDENTIFIER: com.auralyrics.app.widget
       TARGETED_DEVICE_FAMILY: "1"
