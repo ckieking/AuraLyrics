@@ -14,10 +14,9 @@ public struct AuraLyricsLiveActivityWidget: Widget {
 
     public var body: some WidgetConfiguration {
         ActivityConfiguration(for: LyricsActivityAttributes.self) { context in
-            // 鎖定畫面與 StandBy 橫向模式視圖 (遵循 HIG 14pt 標準邊距)
+            // 鎖定畫面與 StandBy 橫向模式視圖 (自適應深淺色毛玻璃材質與 HIG 14pt 標準邊距)
             LockScreenLyricsView(context: context)
-                .activityBackgroundTint(Color.black.opacity(0.85))
-                .activitySystemActionForegroundColor(Color.white)
+                .activityBackgroundTint(nil)
         } dynamicIsland: { context in
             DynamicIsland {
                 // 展開視圖 (Expanded Presentation)
@@ -57,28 +56,30 @@ public struct AuraLyricsLiveActivityWidget: Widget {
 
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
-                        // 主歌詞高亮行
+                        // 主歌詞高亮行（由下方往上頂出推移）
                         Text(context.state.currentLine)
                             .font(.system(size: 17, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
-                            .lineLimit(1)
+                            .lineLimit(2)
                             .minimumScaleFactor(0.7)
+                            .id("di_line_\(context.state.currentLine)")
+                            .transition(.push(from: .bottom))
 
                         // 雙語翻譯或下一句
                         if let secondary = context.state.secondaryLine, !secondary.isEmpty {
                             Text(secondary)
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .foregroundColor(.white.opacity(0.72))
+                                .foregroundColor(.white.opacity(0.75))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
+                                .id("di_sec_\(secondary)")
+                                .transition(.push(from: .bottom))
                         }
-
-                        // 原生 60fps 平滑進度條
-                        LyricsProgressBar(context: context)
-                            .padding(.top, 4)
                     }
                     .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 10)
+                    .animation(.spring(response: 0.45, dampingFraction: 0.82), value: context.state.currentLine)
+                    .clipped()
                 }
             } compactLeading: {
                 // 緊湊 Leading：依據使用者偏好動態呈現封面縮圖 / 音符 / 波形
@@ -151,39 +152,6 @@ struct ArtworkThumbnailView: View {
     }
 }
 
-// MARK: - 原生 60fps 平滑進度條（零 IPC 傳輸負荷）
-struct LyricsProgressBar: View {
-    let context: ActivityViewContext<LyricsActivityAttributes>
-
-    var body: some View {
-        if context.state.progressEngine == LiveActivityProgressEngine.smoothTimer.rawValue && context.state.isPlaying {
-            ProgressView(
-                timerInterval: context.state.playbackStart...context.state.playbackEnd,
-                countsDown: false
-            )
-            .progressViewStyle(.linear)
-            .tint(.pink)
-            .scaleEffect(x: 1, y: 0.7, anchor: .center)
-            .frame(height: 3)
-        } else {
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.15))
-                        .frame(height: 3)
-                    Capsule()
-                        .fill(Color.pink)
-                        .frame(
-                            width: geo.size.width * max(0.02, min(context.state.progress, 1.0)),
-                            height: 3
-                        )
-                }
-            }
-            .frame(height: 3)
-        }
-    }
-}
-
 // MARK: - 緊湊 Trailing 視圖 (依據 Apple HIG 支援 isDynamicIslandLimitedInWidth 橫向窄寬度適配)
 struct CompactTrailingView: View {
     @Environment(\.isDynamicIslandLimitedInWidth) private var isLimitedInWidth
@@ -203,11 +171,15 @@ struct CompactTrailingView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
                 .padding(.trailing, 4)
+                .id("compact_\(currentLine)")
+                .transition(.push(from: .bottom))
+                .animation(.spring(response: 0.45, dampingFraction: 0.82), value: currentLine)
+                .clipped()
         }
     }
 }
 
-// MARK: - 鎖定畫面歌詞視圖 (嚴格遵守 HIG 14pt 標準邊距與同心幾何)
+// MARK: - 鎖定畫面歌詞視圖 (遵循 HIG 14pt 標準邊距、自適應深淺色模式、歌詞向上頂出動效)
 struct LockScreenLyricsView: View {
     let context: ActivityViewContext<LyricsActivityAttributes>
 
@@ -218,30 +190,37 @@ struct LockScreenLyricsView: View {
                 HStack(spacing: 4) {
                     Text("\(context.state.trackTitle) · \(context.state.artistName)")
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.88))
+                        .foregroundColor(.secondary)
                         .lineLimit(1)
                 }
                 Spacer()
                 Text("AuraLyrics")
                     .font(.system(size: 10, weight: .bold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.45))
+                    .foregroundColor(.secondary.opacity(0.6))
             }
 
-            Text(context.state.currentLine)
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
+            VStack(alignment: .leading, spacing: 4) {
+                // 主歌詞（由下方往上頂出推移）
+                Text(context.state.currentLine)
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+                    .id("lock_line_\(context.state.currentLine)")
+                    .transition(.push(from: .bottom))
 
-            if let secondary = context.state.secondaryLine, !secondary.isEmpty {
-                Text(secondary)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.pink.opacity(0.92))
-                    .lineLimit(1)
+                // 雙語翻譯或下一句預覽
+                if let secondary = context.state.secondaryLine, !secondary.isEmpty {
+                    Text(secondary)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundColor(.pink)
+                        .lineLimit(1)
+                        .id("lock_sec_\(secondary)")
+                        .transition(.push(from: .bottom))
+                }
             }
-
-            LyricsProgressBar(context: context)
-                .padding(.top, 2)
+            .animation(.spring(response: 0.45, dampingFraction: 0.82), value: context.state.currentLine)
+            .clipped()
         }
         .padding(14) // HIG 標準 14pt 邊距
     }

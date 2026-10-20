@@ -133,22 +133,10 @@ struct LiveActivitySettingsView: View {
                         Text(mode.title).tag(mode)
                     }
                 }
-
-                Picker("進度條推進引擎", selection: Binding(
-                    get: { liveEngine.progressEngine },
-                    set: { newValue in
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        liveEngine.progressEngine = newValue
-                    }
-                )) {
-                    ForEach(LiveActivityProgressEngine.allCases) { engine in
-                        Text(engine.title).tag(engine)
-                    }
-                }
             } header: {
-                Text("歌詞排版與進度條")
+                Text("歌詞排版與副行")
             } footer: {
-                Text("系統原生 60fps 計時器由 iOS 本機 GPU 繪製推進，具備最高流暢度且零 IPC 傳輸負擔。")
+                Text("即時動態與動態島歌詞切換時自動以原生彈簧曲線向上頂出推移，並智慧適配深淺色模式。")
             }
         }
         .navigationTitle("即時訊息與動態島")
