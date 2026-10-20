@@ -20,16 +20,10 @@ struct SettingsView: View {
                 Section {
                     // 1:1 實時 PiP 預覽視窗卡
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("懸浮動態島膠囊預覽")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("支援深淺色自適應")
-                                .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.8))
-                        }
+                        Text("懸浮動態島膠囊預覽")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.secondary)
 
                         // 模擬真實懸浮視窗比例 (寬高比 ~ 3.5:1，高度 80pt)
                         PiPLyricsView(viewModel: pipVM)
