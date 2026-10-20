@@ -37,10 +37,7 @@ struct NowPlayingView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .topTrailing) {
-                // MARK: - 內容底層：沉浸式動態專輯流光背景 (Ambient Backdrop)
-                ambientBackdrop
-
-                // MARK: - 內容中層：可滾動穿透之歌詞清單
+                // MARK: - 內容層：可滾動穿透之歌詞清單（置於純淨空間，絕不被底層背景干擾佈局尺寸）
                 lyricsScrollView
 
                 // MARK: - 內容頂層：右上角兩顆完全獨立放大的 Liquid Glass 圓形按鈕
@@ -51,6 +48,10 @@ struct NowPlayingView: View {
                 }
                 .padding(.trailing, 20)
                 .padding(.top, 8)
+            }
+            .background {
+                // MARK: - 內容底層修飾：沉浸式動態專輯流光背景 (Ambient Backdrop)
+                ambientBackdrop
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSearchSheet) {
@@ -309,8 +310,8 @@ struct NowPlayingView: View {
                             .padding(.bottom, 48)
                         }
                     }
-                    .padding(.top, 16)
-                    .padding(.bottom, 24)
+                    .padding(.top, 60)
+                    .padding(.bottom, 72)
                 }
             }
             .onScrollPhaseChange { oldPhase, newPhase in

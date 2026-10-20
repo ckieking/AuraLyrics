@@ -17,50 +17,57 @@ public struct AmbientGradientBackground: View {
     }
 
     public var body: some View {
-        ZStack {
-            // MARK: - 最底層：極深色基底，保證任何時候絕對不透白
-            palette.backgroundDark
-                .ignoresSafeArea()
+        GeometryReader { proxy in
+            let size = proxy.size
 
-            if !reduceTransparency {
-                // MARK: - 第二層：微弱封面漫射紋理（增加原創封面的視覺關聯度）
-                if let image = artworkImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            ZStack {
+                // MARK: - 最底層：極深色基底，保證任何時候絕對不透白
+                palette.backgroundDark
+                    .frame(width: size.width, height: size.height)
+
+                if !reduceTransparency {
+                    // MARK: - 第二層：微弱封面漫射紋理（增加原創封面的視覺關聯度，嚴格約束在容器尺寸內避免撐大外層佈局）
+                    if let image = artworkImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: size.width, height: size.height)
+                            .clipped()
+                            .blur(radius: 64)
+                            .opacity(0.32)
+                    }
+
+                    // MARK: - 第三層：Apple Music 原生 3x3 MeshGradient 多焦點流光網格
+                    meshGradientView
+                        .frame(width: size.width, height: size.height)
                         .clipped()
-                        .blur(radius: 64)
-                        .opacity(0.32)
-                        .ignoresSafeArea()
+
+                    // MARK: - 第四層：頂底暗角與微噪遮罩（確保狀態列與底部完全符合 WCAG AAA 白字對比度）
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.black.opacity(0.45), location: 0.0),
+                            .init(color: Color.black.opacity(0.08), location: 0.28),
+                            .init(color: Color.black.opacity(0.12), location: 0.72),
+                            .init(color: Color.black.opacity(0.55), location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(width: size.width, height: size.height)
+                } else {
+                    // 減少透明度無障礙模式：使用高對比度雙色線性漸層
+                    LinearGradient(
+                        colors: [palette.primary, palette.backgroundDark],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(width: size.width, height: size.height)
                 }
-
-                // MARK: - 第三層：Apple Music 原生 3x3 MeshGradient 多焦點流光網格
-                meshGradientView
-                    .ignoresSafeArea()
-
-                // MARK: - 第四層：頂底暗角與微噪遮罩（確保狀態列與底部完全符合 WCAG AAA 白字對比度）
-                LinearGradient(
-                    stops: [
-                        .init(color: Color.black.opacity(0.45), location: 0.0),
-                        .init(color: Color.black.opacity(0.08), location: 0.28),
-                        .init(color: Color.black.opacity(0.12), location: 0.72),
-                        .init(color: Color.black.opacity(0.55), location: 1.0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            } else {
-                // 減少透明度無障礙模式：使用高對比度雙色線性漸層
-                LinearGradient(
-                    colors: [palette.primary, palette.backgroundDark],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
             }
+            .frame(width: size.width, height: size.height)
+            .clipped()
         }
+        .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.8), value: palette)
         .onAppear {
             if !reduceMotion {
