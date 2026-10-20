@@ -33,31 +33,31 @@ public enum DynamicIslandCompactStyle: String, CaseIterable, Identifiable, Codab
 
 /// 音樂暫停時即時動態與動態島之保留策略
 public enum LiveActivityPausePolicy: String, CaseIterable, Identifiable, Codable {
-    case dismissImmediately = "dismissImmediately"
     case keepActiveWithTimeout = "keepActiveWithTimeout"
     case keepActiveAlways = "keepActiveAlways"
+    case dismissImmediately = "dismissImmediately"
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
-        case .dismissImmediately:
-            return "音樂暫停時立即收起 (預設)"
         case .keepActiveWithTimeout:
-            return "保留 5 分鐘後自動關閉"
+            return "保留 5 分鐘後自動關閉 (預設)"
         case .keepActiveAlways:
             return "持續保留直至手動關閉"
+        case .dismissImmediately:
+            return "音樂暫停時立即收起"
         }
     }
 
     public var description: String {
         switch self {
-        case .dismissImmediately:
-            return "音樂暫停時立即結束即時動態，恢復播放時自動重新開啟。"
         case .keepActiveWithTimeout:
             return "暫停時維持最後歌詞顯示，逾時 5 分鐘後自動收起清理。"
         case .keepActiveAlways:
             return "暫停時維持最後歌詞，隨時等待繼續播放。"
+        case .dismissImmediately:
+            return "音樂暫停時立即結束即時動態。"
         }
     }
 }

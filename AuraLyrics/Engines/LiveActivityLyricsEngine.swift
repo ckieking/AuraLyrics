@@ -63,8 +63,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         self.compactStyle = DynamicIslandCompactStyle(rawValue: compactRaw) ?? .artworkAndText
 
         let pauseRaw = UserDefaults.standard.string(forKey: "liveActivityPausePolicy")
-            ?? LiveActivityPausePolicy.dismissImmediately.rawValue
-        self.pausePolicy = LiveActivityPausePolicy(rawValue: pauseRaw) ?? .dismissImmediately
+            ?? LiveActivityPausePolicy.keepActiveWithTimeout.rawValue
+        self.pausePolicy = LiveActivityPausePolicy(rawValue: pauseRaw) ?? .keepActiveWithTimeout
 
         let resumeRaw = UserDefaults.standard.string(forKey: "liveActivityResumePolicy")
             ?? LiveActivityResumePolicy.autoResume.rawValue

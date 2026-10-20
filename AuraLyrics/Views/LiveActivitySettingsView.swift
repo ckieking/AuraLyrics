@@ -78,7 +78,7 @@ public struct LiveActivitySettingsView: View {
             } header: {
                 Text("暫停與恢復行為")
             } footer: {
-                Text(liveActivityEngine.pausePolicy.description)
+                Text("即時訊息被關閉後可能需要重新開啟此App來恢復")
             }
 
             // MARK: - 背景同步與權限提示
