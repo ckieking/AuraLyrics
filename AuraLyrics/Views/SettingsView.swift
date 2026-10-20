@@ -20,7 +20,7 @@ struct SettingsView: View {
                 Section {
                     // 1:1 實時 PiP 預覽視窗卡
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("懸浮動態島膠囊預覽")
+                        Text("懸浮視窗預覽")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(.secondary)
@@ -33,7 +33,7 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 6)
 
-                    Toggle("啟用懸浮歌詞", isOn: Binding(
+                    Toggle("啟用懸浮視窗", isOn: Binding(
                         get: { pipEngine.isPiPEnabled },
                         set: { enable in
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -45,9 +45,9 @@ struct SettingsView: View {
                         }
                     ))
                 } header: {
-                    Text("畫中畫 (PiP) 懸浮視窗")
+                    Text("畫中畫懸浮視窗")
                 } footer: {
-                    Text("切換至主畫面或其他 App 時，將自動顯示微縮懸浮動態島歌詞視窗；可隨時拖曳與縮放。")
+                    Text("切換至主畫面或其他 App 時，將自動顯示懸浮歌詞視窗；可隨時拖曳與縮放。")
                 }
 
                 // MARK: - 即時動態與動態島
@@ -63,25 +63,25 @@ struct SettingsView: View {
                         }
                     }
                 } header: {
-                    Text("即時動態 (Live Activities)")
+                    Text("即時動態")
                 } footer: {
                     Text("自訂鎖定畫面與動態島顯示樣式、次要行資訊、暫停與自動恢復行為。")
                 }
 
                 // MARK: - 歌詞視覺效果
                 Section {
-                    Toggle("未播放歌詞景深模糊", isOn: $enableLyricDefocusBlur)
+                    Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur)
                 } header: {
                     Text("歌詞視覺效果")
                 } footer: {
-                    Text("開啟後未播放的歌詞將呈現 Apple Music 原生景深模糊質感（單層級失焦），聚焦當前播放行；關閉可完全消除模糊運算以達到極致省電。")
+                    Text("開啟後處於焦點外的歌詞將呈現模糊效果，聚焦當前播放行；關閉可降低發熱及耗電。")
                 }
 
                 // MARK: - 歌詞同步時間微調（全域共用）
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("目前全域延遲微調")
+                            Text("歌詞延遲微調")
                                 .font(.subheadline)
                             Spacer()
                             Text(String(format: "%+.1f 秒", Double(musicMonitor.globalOffsetMs) / 1000.0))
@@ -110,7 +110,7 @@ struct SettingsView: View {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 musicMonitor.resetGlobalOffset()
                             } label: {
-                                Text("重設歸零")
+                                Text("重設")
                                     .font(.system(.subheadline, design: .rounded).weight(.medium))
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 38)
@@ -134,9 +134,9 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 4)
                 } header: {
-                    Text("歌詞同步時間微調（全域共用）")
+                    Text("歌詞顯示延遲微調")
                 } footer: {
-                    Text("所有歌曲共用此微調時間，正值代表歌詞提前唱出、負值代表延後；無須為每首歌分別微調。")
+                    Text("所有歌曲共用此微調時間，正值代表歌詞提前唱出、負值代表延後。")
                 }
 
                 // MARK: - 系統與環境診斷（圖示形狀 + 狀態文字 + 色彩，符合無障礙規範）
@@ -153,7 +153,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: envDetector.isLiveContainer ? "info.circle.fill" : "checkmark.seal.fill")
                                 .foregroundColor(envDetector.isLiveContainer ? .orange : .green)
-                            Text(envDetector.isLiveContainer ? "LiveContainer 沙盒" : "原生側載環境")
+                            Text(envDetector.isLiveContainer ? "LiveContainer 沙盒" : "原生側載")
                                 .fontWeight(.medium)
                                 .foregroundColor(envDetector.isLiveContainer ? .orange : .green)
                         }
@@ -172,7 +172,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: envDetector.areLiveActivitiesAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                                 .foregroundColor(envDetector.areLiveActivitiesAvailable ? .green : .orange)
-                            Text(envDetector.areLiveActivitiesAvailable ? "正常支援" : "受限或不支援")
+                            Text(envDetector.areLiveActivitiesAvailable ? "支援" : "受限或不支援")
                                 .fontWeight(.medium)
                                 .foregroundColor(envDetector.areLiveActivitiesAvailable ? .green : .orange)
                         }
@@ -182,7 +182,7 @@ struct SettingsView: View {
                     // 畫中畫懸浮窗 (PiP)
                     HStack {
                         Label {
-                            Text("畫中畫 (PiP) 支援")
+                            Text("畫中畫 (PiP)")
                         } icon: {
                             Image(systemName: "pip")
                                 .foregroundColor(.pink)
@@ -191,7 +191,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: pipEngine.isPiPPossible ? "checkmark.circle.fill" : "xmark.circle.fill")
                                 .foregroundColor(pipEngine.isPiPPossible ? .green : .red)
-                            Text(pipEngine.isPiPPossible ? "正常支援" : "無法使用")
+                            Text(pipEngine.isPiPPossible ? "支援" : "受限或不支援")
                                 .fontWeight(.medium)
                                 .foregroundColor(pipEngine.isPiPPossible ? .green : .red)
                         }
@@ -210,7 +210,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: keepAlive.isRunning ? "checkmark.circle.fill" : "pause.circle.fill")
                                 .foregroundColor(keepAlive.isRunning ? .green : .secondary)
-                            Text(keepAlive.isRunning ? "運作中 (.mixWithOthers)" : "已暫停")
+                            Text(keepAlive.isRunning ? "運作中" : "已暫停")
                                 .fontWeight(.medium)
                                 .foregroundColor(keepAlive.isRunning ? .green : .secondary)
                         }
@@ -219,12 +219,12 @@ struct SettingsView: View {
                 } header: {
                     Text("運行環境與相容性診斷")
                 } footer: {
-                    Text("若處於 LiveContainer 環境中，iOS 系統可能限制 WidgetKit / ActivityKit 擴展程序的註冊；此時畫中畫 (PiP) 將作為核心主力懸浮引擎。")
+                    Text("若處於 LiveContainer 環境中，iOS 系統可能限制 WidgetKit / ActivityKit 擴展程序的註冊。")
                 }
 
                 // MARK: - 背景保活管理
                 Section {
-                    Toggle("背景無縫持續運作", isOn: Binding(
+                    Toggle("啟用背景保活", isOn: Binding(
                         get: { keepAlive.isRunning },
                         set: { enable in
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -236,9 +236,7 @@ struct SettingsView: View {
                         }
                     ))
                 } header: {
-                    Text("背景保活機制")
-                } footer: {
-                    Text("使用極低 CPU 負擔之無聲混音串流，確保在鎖定畫面、桌面或通訊軟體中，歌詞與進度仍可持續精準同步，絕不降低或中斷 Apple Music 音樂播放。")
+                    Text("背景保活")
                 }
 
                 // MARK: - 快取管理
@@ -248,7 +246,7 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Image(systemName: "trash")
-                            Text("清除所有已下載歌詞快取")
+                            Text("清除所有歌詞快取")
                         }
                         .frame(minHeight: 36)
                     }
@@ -265,9 +263,9 @@ struct SettingsView: View {
                             .foregroundColor(.secondary)
                     }
                     HStack {
-                        Text("歌詞檢索架構")
+                        Text("歌詞來源")
                         Spacer()
-                        Text("LRCLIB / 網易雲公開 API")
+                        Text("網易雲 (NetEase) / LRCLIB")
                             .foregroundColor(.secondary)
                     }
                 } header: {
@@ -277,18 +275,18 @@ struct SettingsView: View {
             .navigationTitle("設定")
             .alert("確定清除所有歌詞快取？", isPresented: $showResetCacheAlert) {
                 Button("取消", role: .cancel) {}
-                Button("確定清除", role: .destructive) {
+                Button("確定", role: .destructive) {
                     clearAllCache()
                 }
             } message: {
-                Text("此操作將刪除本機儲存的所有歌詞 JSON 快取，後續播放時將重新自線上檢索。")
+                Text("此操作將刪除本機儲存的所有歌詞快取，再次播放將自動重新下載。")
             }
             .overlay(alignment: .bottom) {
                 if cacheClearedToast {
                     HStack(spacing: 8) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text("已成功清除本機歌詞快取")
+                        Text("成功清除本機歌詞快取")
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }

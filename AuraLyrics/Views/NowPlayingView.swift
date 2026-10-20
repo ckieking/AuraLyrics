@@ -81,7 +81,7 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 右上角獨立小圓按鈕：畫中畫 (PiP 懸浮窗，直徑 40pt，按鈕即為最底層)
+    // MARK: - 右上角獨立按鈕：畫中畫 (PiP 懸浮窗，直徑 40pt，按鈕即為最底層)
     private var pipIndependentButton: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
         let buttonDiameter: CGFloat = 40
@@ -108,7 +108,7 @@ struct NowPlayingView: View {
         let buttonDiameter: CGFloat = 40
 
         return Menu {
-            // 需求 4：雙語改到選單裡，開啟後後面帶有單純勾勾 (checkmark)
+            //雙語歌詞選項
             Button {
                 showTranslation.toggle()
             } label: {
@@ -211,7 +211,7 @@ struct NowPlayingView: View {
                             .foregroundColor(.secondary)
                             .accessibilityHidden(true)
 
-                        Text(monitor.isLoadingLyrics ? "正在為你檢索同步歌詞..." : "目前曲目無同步時間軸歌詞")
+                        Text(monitor.isLoadingLyrics ? "正在檢索歌詞..." : "目前曲目無對應歌詞")
                             .font(.system(.headline, design: .rounded))
                             .foregroundColor(.primary)
 
@@ -354,7 +354,7 @@ struct NowPlayingView: View {
                     }
                 }
             }
-            // 需求 5：Apple Music 智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
+            //智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 checkCurrentLineVisibility()
                 guard let index = newIndex else { return }
@@ -369,14 +369,14 @@ struct NowPlayingView: View {
                     }
                 }
             }
-            // 需求 6：每首歌播完切換下一首時顯示新歌詞並同時滾動回最上方（無視歌詞是否在畫面內外）
+            //每首歌播完切換下一首時顯示新歌詞並同時滾動回最上方（無視歌詞是否在畫面內外）
             .onChange(of: monitor.currentTrack) { _, _ in
                 scrollToTop(proxy: proxy)
             }
             .onChange(of: monitor.currentLyrics.id) { _, _ in
                 scrollToTop(proxy: proxy)
             }
-            // 需求 7：當使用者重新將本頁面作為焦點頁面時（App 回到前景、分頁切回），強制定位到目前歌詞進度並恢復跟隨
+            //當使用者重新將本頁面作為焦點頁面時（App 回到前景、分頁切回），強制定位到目前歌詞進度並恢復跟隨
             .onAppear {
                 updateCachedArtwork()
                 Task { @MainActor in

@@ -166,7 +166,7 @@ struct LyricsSearchSheet: View {
                     .accessibilityLabel("套用 \(lyrics.trackTitle)，\(lyrics.artistName)，來源 \(lyrics.source)")
                 }
             } header: {
-                Text("線上結果 (\(searchResults.count))")
+                Text("搜尋結果 (\(searchResults.count))")
             }
         }
         .listStyle(.insetGrouped)
@@ -179,7 +179,7 @@ struct LyricsSearchSheet: View {
                 .scaleEffect(1.2)
                 .tint(.pink)
 
-            Text("正在跨庫檢索時間軸歌詞...")
+            Text("正在搜尋歌詞...")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
         }
@@ -202,7 +202,7 @@ struct LyricsSearchSheet: View {
                 .font(.headline)
                 .foregroundColor(.primary)
 
-            Text("輸入歌名、歌手或關鍵字\n即時檢索 LRCLIB 與網易雲時間軸歌詞")
+            Text("輸入歌名、歌手或關鍵字\n搜尋 LRCLIB 與網易雲歌詞")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -219,7 +219,7 @@ struct LyricsSearchSheet: View {
                 .font(.system(size: 36))
                 .foregroundColor(.secondary)
 
-            Text("未找到相符歌詞")
+            Text("找不到符合的歌詞")
                 .font(.headline)
                 .foregroundColor(.primary)
 
@@ -262,7 +262,7 @@ struct LyricsSearchSheet: View {
             self.searchResults = results
             self.isSearching = false
             if results.isEmpty {
-                self.errorMessage = "未找到與「\(query)」相符的時間軸歌詞，請嘗試簡化關鍵字或去除特殊符號。"
+                self.errorMessage = "未找到與「\(query)」相符的歌詞，請嘗試簡化關鍵字或去除特殊符號並再試一次。"
             }
         }
     }

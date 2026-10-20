@@ -168,7 +168,7 @@ struct LibraryView: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("預覽「\(lyrics.trackTitle)」歌詞時間軸")
+                        .accessibilityLabel("預覽「\(lyrics.trackTitle)」時間軸")
                     }
                     .padding(.vertical, 3)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -337,7 +337,7 @@ private struct LyricsPreviewSheet: View {
                     .padding(.vertical, 4)
                 }
 
-                Section(header: Text("時間軸歌詞全文")) {
+                Section(header: Text("歌詞時間軸")) {
                     ForEach(lyrics.lines) { line in
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(alignment: .firstTextBaseline) {
