@@ -31,13 +31,13 @@ struct NowPlayingView: View {
     /// 快取解碼後之專輯封面圖，避免在 body 內高頻重複解碼 PNG
     @State private var cachedArtworkImage: UIImage? = nil
 
+    /// 當前專輯封面解析出之色彩調色盤（Apple Music 沉浸式流光背景）
+    @State private var currentPalette: ArtworkPalette = .fallback
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .topTrailing) {
-                // MARK: - 內容底層：沉浸式動態專輯流光背景 (Ambient Backdrop)
-                ambientBackdrop
-
-                // MARK: - 內容中層：可滾動穿透之歌詞清單
+                // MARK: - 內容層：可滾動穿透之歌詞清單（置於純淨空間，絕不被底層背景干擾佈局尺寸）
                 lyricsScrollView
 
                 // MARK: - 內容頂層：右上角兩顆完全獨立放大的 Liquid Glass 圓形按鈕
@@ -48,6 +48,10 @@ struct NowPlayingView: View {
                 }
                 .padding(.trailing, 20)
                 .padding(.top, 8)
+            }
+            .background {
+                // MARK: - 內容底層修飾：沉浸式動態專輯流光背景 (Ambient Backdrop)
+                ambientBackdrop
             }
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showSearchSheet) {
@@ -79,6 +83,7 @@ struct NowPlayingView: View {
                 monitor.syncExternalEngines()
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     // MARK: - 右上角獨立按鈕：畫中畫 (PiP 懸浮窗，直徑 40pt，按鈕即為最底層)
@@ -156,35 +161,14 @@ struct NowPlayingView: View {
         .accessibilityLabel("更多歌詞操作選項")
     }
 
-    // MARK: - 沉浸式氛圍背景 (Ambient Backdrop，快取解碼避免每幀 PNG 重複解碼)
+    // MARK: - 沉浸式氛圍背景 (Apple Music 原生 Mesh 漸層，不受深淺模式影響，高對比度)
     @ViewBuilder
     private var ambientBackdrop: some View {
-        if !reduceTransparency, let uiImage = cachedArtworkImage {
-            GeometryReader { geo in
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geo.size.width, height: geo.size.height)
-                    .clipped()
-                    .blur(radius: 54)
-                    .overlay(
-                        LinearGradient(
-                            colors: [
-                                Color(.systemBackground).opacity(0.82),
-                                Color(.systemBackground).opacity(0.68),
-                                Color(.systemBackground).opacity(0.94)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-            }
-            .ignoresSafeArea()
-            .accessibilityHidden(true)
-        } else {
-            Color(.systemBackground)
-                .ignoresSafeArea()
-        }
+        AmbientGradientBackground(
+            palette: currentPalette,
+            artworkImage: cachedArtworkImage
+        )
+        .accessibilityHidden(true)
     }
 
     // MARK: - 中央滾動歌詞清單 (Scroll-Through Lyrics with Apple Music Smart Follow)
@@ -271,7 +255,7 @@ struct NowPlayingView: View {
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
                                             .font(.system(size: 16, weight: .medium, design: .default))
-                                            .foregroundColor(isCurrent ? .pink : Color(.secondaryLabel))
+                                            .foregroundColor(isCurrent ? .pink : Color.white.opacity(0.65))
                                             .blur(radius: isCurrent ? 0 : translationBlurRadius(for: index))
                                             .animation(.easeInOut(duration: 0.35), value: translationBlurRadius(for: index))
                                     }
@@ -326,8 +310,8 @@ struct NowPlayingView: View {
                             .padding(.bottom, 48)
                         }
                     }
-                    .padding(.top, 16)
-                    .padding(.bottom, 24)
+                    .padding(.top, 60)
+                    .padding(.bottom, 72)
                 }
             }
             .onScrollPhaseChange { oldPhase, newPhase in
@@ -434,9 +418,20 @@ struct NowPlayingView: View {
 
     private func updateCachedArtwork() {
         if let data = monitor.currentTrack.artworkData {
-            cachedArtworkImage = UIImage(data: data)
+            let image = UIImage(data: data)
+            cachedArtworkImage = image
+            let key = "\(monitor.currentTrack.title)-\(monitor.currentTrack.artist)"
+            Task { @MainActor in
+                let palette = await ArtworkColorExtractor.shared.extractPalette(from: image, cacheKey: key)
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    currentPalette = palette
+                }
+            }
         } else {
             cachedArtworkImage = nil
+            withAnimation(.easeInOut(duration: 0.8)) {
+                currentPalette = .fallback
+            }
         }
     }
 

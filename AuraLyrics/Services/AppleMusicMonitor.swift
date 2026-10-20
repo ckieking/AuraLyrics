@@ -325,11 +325,12 @@ public final class AppleMusicMonitor: ObservableObject {
             // 串流緩衝結束首次起跑對齊（剛切歌前幾秒系統 IPC 卡在 0.0，首次回傳有效進度）
             let isInitialStart = (anchorPlaybackTimeSec == 0 && playTime > 0.05 && playTime < 5.0 && hasFreshAdvance)
 
-            // 使用者手動跳轉進度 (Seek)
-            let isUserSeek = hasFreshAdvance && (abs(playTimeDelta) > 1.2 && abs(playTime - predictedTime) > 1.0)
+            // 使用者手動跳轉進度 (Seek：實測時間發生顯著跳躍且與線性推估時間偏差 > 1.0s)
+            let playTimeJump = abs(playTime - lastPlaybackTimeSec)
+            let isUserSeek = isPlayTimeValid && (playTimeJump > 1.2 && abs(playTime - predictedTime) > 1.0)
 
-            // 長期漂移校準：僅在時間確實向前前進 (hasFreshAdvance) 且與推估時間偏差 > 1.5 秒時平滑對齊
-            let hasSignificantDrift = hasFreshAdvance && playTime > 0.5 && (abs(playTime - predictedTime) > 1.5)
+            // 長期漂移校準：實測有效時間且偏差 > 1.5 秒時立即平滑對齊
+            let hasSignificantDrift = isPlayTimeValid && playTime > 0.5 && (abs(playTime - predictedTime) > 1.5)
 
             if isUserSeek || isInitialStart || hasSignificantDrift || anchorMediaTime == 0 {
                 anchorPlaybackTimeSec = playTime
