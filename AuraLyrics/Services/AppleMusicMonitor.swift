@@ -370,7 +370,7 @@ public final class AppleMusicMonitor: ObservableObject {
         // 計算距離下一句歌詞的間隔秒數，提供 LiveActivity 動態調整 staleDate
         var nextLineIntervalSec: TimeInterval? = nil
         if let idx = newIndex, idx + 1 < currentLyrics.lines.count {
-            let nextStartMs = currentLyrics.lines[idx + 1].startTimeMs
+            let nextStartMs = currentLyrics.lines[idx + 1].timeMs
             nextLineIntervalSec = max(0.5, Double(nextStartMs - accurateTimeMs) / 1000.0)
         }
 
