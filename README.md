@@ -9,10 +9,11 @@
 </p>
 
 > A dynamic lyrics application designed for iOS, supporting Apple Music tracking, Picture-in-Picture (PiP) floating window, and Dynamic Island Live Activities.
+>>The vast majority of content in this repository was created by AI agents.
 
 ---
 
-## Key Features
+## Features
 
 ### 1. In-App Lyrics Interface
 - **Apple Music Style Visuals**: Focuses on the currently playing line with background lines softly defocused, complemented by an immersive dynamic mesh gradient backdrop.
