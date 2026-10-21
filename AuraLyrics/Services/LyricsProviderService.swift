@@ -10,6 +10,8 @@ public final class LyricsProviderService: ObservableObject {
 
     private let currentCacheSchemaVersion = 2
     private let priorityOrderKey = "lyricsSearchPriorityOrder"
+    private let prioritySchemaVersionKey = "lyricsSearchPrioritySchemaVersion"
+    private let currentPrioritySchemaVersion = 2
 
     @Published public private(set) var priorityItems: [LyricsSearchPriorityItem] = []
 
@@ -20,6 +22,14 @@ public final class LyricsProviderService: ObservableObject {
     }
 
     private func loadPriorityItems() {
+        let version = UserDefaults.standard.integer(forKey: prioritySchemaVersionKey)
+        if version < currentPrioritySchemaVersion {
+            self.priorityItems = LyricsSearchPriorityItem.defaultList
+            UserDefaults.standard.set(currentPrioritySchemaVersion, forKey: prioritySchemaVersionKey)
+            savePriorityItems(LyricsSearchPriorityItem.defaultList)
+            return
+        }
+
         if let data = UserDefaults.standard.data(forKey: priorityOrderKey),
            let saved = try? JSONDecoder().decode([LyricsSearchPriorityItem].self, from: data),
            !saved.isEmpty {
@@ -33,6 +43,7 @@ public final class LyricsProviderService: ObservableObject {
             self.priorityItems = list
         } else {
             self.priorityItems = LyricsSearchPriorityItem.defaultList
+            UserDefaults.standard.set(currentPrioritySchemaVersion, forKey: prioritySchemaVersionKey)
         }
     }
 

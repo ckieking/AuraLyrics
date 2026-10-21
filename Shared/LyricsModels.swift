@@ -207,7 +207,7 @@ public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable 
     public var displayName: String {
         switch self {
         case .musixmatch: return "Musixmatch"
-        case .netease: return String(localized: "網易雲音樂")
+        case .netease: return String(localized: "網易雲音樂 (NetEase)")
         case .lrclib: return "LRCLIB"
         }
     }
@@ -258,11 +258,11 @@ public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashab
     }
 
     public static let defaultList: [LyricsSearchPriorityItem] = [
-        LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
         LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
+        LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
         LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
-        LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
         LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
+        LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
         LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true)
     ]
 }

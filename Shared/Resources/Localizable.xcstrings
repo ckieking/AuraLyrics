@@ -2652,7 +2652,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Word-by-word Sync (YRC/KRC)"
+            "value": "Word-by-word Sync (NetEase YRC/KRC)"
           }
         }
       }
@@ -2781,6 +2781,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "Default priority: Musixmatch Syllables → NetEase Syllables → LRCLIB Syllables → Musixmatch Line → NetEase Line → LRCLIB Line."
+          }
+        }
+      }
+    },
+    "網易雲音樂 (NetEase)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "網易雲音樂 (NetEase)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NetEase Music"
+          }
+        }
+      }
+    },
+    "網易雲音樂": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "網易雲音樂 (NetEase)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NetEase Music"
           }
         }
       }
