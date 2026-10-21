@@ -342,11 +342,15 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
     // MARK: - App 終止清理 (非阻塞式排空 XPC，確保 Activity.end 抵達系統 ActivityKit)
     public nonisolated func cleanUpAllActivitiesSync() {
-        var bgTask: UIBackgroundTaskIdentifier = .invalid
-        bgTask = UIApplication.shared.beginBackgroundTask(withName: "com.auralyrics.cleanup.term") {
-            if bgTask != .invalid {
-                UIApplication.shared.endBackgroundTask(bgTask)
-                bgTask = .invalid
+        final class TaskHolder: @unchecked Sendable {
+            var id: UIBackgroundTaskIdentifier = .invalid
+        }
+        let holder = TaskHolder()
+        holder.id = UIApplication.shared.beginBackgroundTask(withName: "com.auralyrics.cleanup.term") {
+            let taskID = holder.id
+            if taskID != .invalid {
+                holder.id = .invalid
+                UIApplication.shared.endBackgroundTask(taskID)
             }
         }
 
@@ -354,9 +358,10 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             for activity in Activity<LyricsActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
-            if bgTask != .invalid {
-                UIApplication.shared.endBackgroundTask(bgTask)
-                bgTask = .invalid
+            let taskID = holder.id
+            if taskID != .invalid {
+                holder.id = .invalid
+                UIApplication.shared.endBackgroundTask(taskID)
             }
         }
 

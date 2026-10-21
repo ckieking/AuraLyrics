@@ -83,11 +83,26 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
     // MARK: - 註冊 BGTaskScheduler
     public func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.auralyrics.bg.lyrics", using: .main) { task in
+            task.expirationHandler = {
+                task.setTaskCompleted(success: false)
+            }
             Task { @MainActor in
-                // 收到背景任務排程回呼時刷新保活
+                // 收到背景任務排程回呼時刷新保活並排定下一次排程
                 BackgroundKeepAliveManager.shared.ensureRollingBackgroundTask()
+                BackgroundKeepAliveManager.shared.scheduleNextBackgroundTask()
                 task.setTaskCompleted(success: true)
             }
+        }
+    }
+
+    /// 使用標準公開 API 排程下一次背景更新任務
+    public func scheduleNextBackgroundTask() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.auralyrics.bg.lyrics")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("[BackgroundKeepAliveManager] 背景任務排程提交: \(error.localizedDescription)")
         }
     }
 
@@ -160,10 +175,8 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
             }
         }
 
-        // 觸發模擬背景任務啟動以取得 sessionkitd BackgroundTask Context
-        if BGTaskScheduler.shared.responds(to: Selector(("_simulateLaunchForTaskWithIdentifier:"))) {
-            BGTaskScheduler.shared.perform(Selector(("_simulateLaunchForTaskWithIdentifier:")), with: "com.auralyrics.bg.lyrics")
-        }
+        // 透過公開 BGTaskScheduler 請求下次背景執行週期
+        scheduleNextBackgroundTask()
     }
 
     private func endRollingBackgroundTask() {

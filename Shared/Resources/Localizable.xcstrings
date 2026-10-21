@@ -2816,6 +2816,38 @@
           }
         }
       }
+    },
+    "開源授權": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開源授權"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Source License"
+          }
+        }
+      }
+    },
+    "版權聲明：本應用程式為開源第三方歌詞輔助工具。所有歌詞、翻譯、音訊元資料與專輯封面之版權與商標均屬原詞曲創作者、歌手、製作人及其相應唱片公司或版權方所有。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版權聲明：本應用程式為開源第三方歌詞輔助工具。所有歌詞、翻譯、音訊元資料與專輯封面之版權與商標均屬原詞曲創作者、歌手、製作人及其相應唱片公司或版權方所有。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copyright Notice: This application is an open-source third-party lyrics utility. All lyrics, translations, audio metadata, and album artwork copyrights and trademarks belong to their respective authors, artists, producers, and record labels or rights holders."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
