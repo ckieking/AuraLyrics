@@ -34,9 +34,9 @@
         <string>com.auralyrics.bg.lyrics</string>
     </array>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>AuraLyrics 需要背景定位權限以維持鎖定畫面與動態島即時歌詞的連續同步更新。</string>
+    <string>AuraLyrics 需要背景定位權限以維持鎖定畫面與動態島即時歌詞的連續同步更新（僅使用極低耗電之粗略狀態保活，不收集或上傳任何位置資料）。</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>AuraLyrics 需要背景定位權限以維持鎖定畫面與動態島即時歌詞的連續同步更新</string>
+    <string>AuraLyrics 需要背景定位權限以維持鎖定畫面與動態島即時歌詞的連續同步更新（僅使用極低耗電之粗略狀態保活，不收集或上傳任何位置資料）。</string>
     <key>NSAppleMusicUsageDescription</key>
     <string>AuraLyrics 需要存取媒體庫資料以讀取當前播放中的音樂名稱與播放進度，進而為你同步顯示歌詞。</string>
     <key>NSSupportsLiveActivities</key>

@@ -284,8 +284,16 @@ struct SettingsView: View {
                         Text("Musixmatch / 網易雲 (NetEase) / LRCLIB")
                             .foregroundColor(.secondary)
                     }
+                    HStack {
+                        Text("開源授權")
+                        Spacer()
+                        Text("MIT License")
+                            .foregroundColor(.secondary)
+                    }
                 } header: {
                     Text("關於 AuraLyrics")
+                } footer: {
+                    Text("版權聲明：本應用程式為開源第三方歌詞輔助工具。所有歌詞、翻譯、音訊元資料與專輯封面之版權與商標均屬原詞曲創作者、歌手、製作人及其相應唱片公司或版權方所有。")
                 }
             }
             .navigationTitle("設定")
