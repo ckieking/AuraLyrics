@@ -1,0 +1,51 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="darkBg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#141419"/>
+      <stop offset="45%" stop-color="#070709"/>
+      <stop offset="100%" stop-color="#020203"/>
+    </linearGradient>
+
+    <!-- Aurora Rainbow Ring Gradient -->
+    <linearGradient id="ringGradDark" x1="200" y1="200" x2="824" y2="824" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="35%" stop-color="#7000FF"/>
+      <stop offset="70%" stop-color="#FF007A"/>
+      <stop offset="100%" stop-color="#FF9900"/>
+    </linearGradient>
+
+    <!-- Wide Ambient Aurora Dispersion -->
+    <radialGradient id="darkAuraGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7000FF" stop-opacity="0"/>
+      <stop offset="55%" stop-color="#7000FF" stop-opacity="0.35"/>
+      <stop offset="75%" stop-color="#FF007A" stop-opacity="0.45"/>
+      <stop offset="85%" stop-color="#00F0FF" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Filters -->
+    <filter id="glowBlurDark" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="40" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="outerDiffusion" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="64"/>
+    </filter>
+  </defs>
+
+  <!-- Background Canvas -->
+  <rect width="1024" height="1024" fill="url(#darkBg)"/>
+
+  <!-- Ambient Diffusion Glow -->
+  <circle cx="512" cy="512" r="320" fill="url(#darkAuraGlow)" filter="url(#outerDiffusion)"/>
+
+  <!-- Aurora Ring with Smooth Neon Glow -->
+  <circle cx="512" cy="512" r="280" stroke="url(#ringGradDark)" stroke-width="44" fill="none" filter="url(#glowBlurDark)"/>
+
+  <!-- High-Energy Pure White Core Line -->
+  <circle cx="512" cy="512" r="280" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round" fill="none" opacity="0.85"/>
+</svg>
