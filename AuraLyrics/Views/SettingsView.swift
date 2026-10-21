@@ -338,8 +338,8 @@ struct SettingsView: View {
 
     /// 動態讀取 App 系統版本與內部建置號
     private var appVersionString: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.9.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-        return "\(version) (Build \(build))"
+        return "\(version) Beta (Build \(build))"
     }
 }

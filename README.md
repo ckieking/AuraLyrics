@@ -45,9 +45,9 @@ AuraLyrics includes runtime environment detection (`RuntimeEnvironmentDetector`)
 
 | Environment / Sideloading Tool | Dynamic Island / Lock Screen (`ActivityKit`) | Picture-in-Picture (`PiP`) | Description | Recommended Package |
 | :--- | :---: | :---: | :--- | :--- |
-| **LiveContainer** | ❌ (Guest apps do not support Extensions) | ✅ Supported | Automatically bypasses Extension calls and uses main app PiP engine | `AuraLyrics-0.1.0.ipa` |
-| **SideStore / AltStore** | ✅ Supported (requires signing Extension Target) | ✅ Supported | Independent sideloaded environment supporting both Dynamic Island and PiP | `AuraLyrics-0.1.0.ipa` |
-| **Personal Apple ID Sideload** | ⚠️ (Depends on signing tool's Extension support) | ✅ Supported | Standard PiP and background keep-alive available | `AuraLyrics-0.1.0.ipa` |
+| **LiveContainer** | ❌ (Guest apps do not support Extensions) | ✅ Supported | Automatically bypasses Extension calls and uses main app PiP engine | `AuraLyrics-0.9.0-beta.ipa` |
+| **SideStore / AltStore** | ✅ Supported (requires signing Extension Target) | ✅ Supported | Independent sideloaded environment supporting both Dynamic Island and PiP | `AuraLyrics-0.9.0-beta.ipa` |
+| **Personal Apple ID Sideload** | ⚠️ (Depends on signing tool's Extension support) | ✅ Supported | Standard PiP and background keep-alive available | `AuraLyrics-0.9.0-beta.ipa` |
 
 ---
 
@@ -85,13 +85,13 @@ open AuraLyrics.xcodeproj
 ## Installation & Usage Guide
 
 ### Using with LiveContainer
-1. Download `AuraLyrics-0.1.0.ipa`.
+1. Download `AuraLyrics-0.9.0-beta.ipa`.
 2. Open **LiveContainer** on your iPhone and import the IPA.
 3. In LiveContainer settings, ensure "Fix Background Audio" or background audio execution is enabled.
 4. Launch AuraLyrics; the app automatically detects the environment and enables PiP floating mode.
 
 ### Using with Sideloading Tools (SideStore / AltStore / TrollStore / Feather, etc.)
-1. Install `AuraLyrics-0.1.0.ipa` using your preferred sideloading tool.
+1. Install `AuraLyrics-0.9.0-beta.ipa` using your preferred sideloading tool.
 2. Launch the app and grant the required "Media & Apple Music" permissions.
 3. While playing music, view lyrics via **Dynamic Island / Lock Screen Live Activity** or the **PiP Floating Window**.
 

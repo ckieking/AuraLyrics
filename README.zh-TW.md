@@ -45,9 +45,9 @@ AuraLyrics 具備環境偵測機制（`RuntimeEnvironmentDetector`），統一�
 
 | 環境 / 安裝方式 | 動態島 / 鎖定畫面 (`ActivityKit`) | 子母畫面懸浮歌詞 (`PiP`) | 機制說明 | 建議安裝包 |
 | :--- | :---: | :---: | :--- | :--- |
-| **LiveContainer** | ❌ (Guest App 未支援 Extension) | ✅ 支援 | 自動停用 Extension 呼叫並採用主程式 PiP 引擎 | `AuraLyrics-0.1.0.ipa` |
-| **SideStore / AltStore** | ✅ 支援 (需一併簽名 Extension Target) | ✅ 支援 | 獨立側載環境，可同時啟用動態島與 PiP | `AuraLyrics-0.1.0.ipa` |
-| **個人 Apple ID 側載** | ⚠️ (視簽名工具之 Extension 支援度而定) | ✅ 支援 | 可正常使用 PiP 與背景保活 | `AuraLyrics-0.1.0.ipa` |
+| **LiveContainer** | ❌ (Guest App 未支援 Extension) | ✅ 支援 | 自動停用 Extension 呼叫並採用主程式 PiP 引擎 | `AuraLyrics-0.9.0-beta.ipa` |
+| **SideStore / AltStore** | ✅ 支援 (需一併簽名 Extension Target) | ✅ 支援 | 獨立側載環境，可同時啟用動態島與 PiP | `AuraLyrics-0.9.0-beta.ipa` |
+| **個人 Apple ID 側載** | ⚠️ (視簽名工具之 Extension 支援度而定) | ✅ 支援 | 可正常使用 PiP 與背景保活 | `AuraLyrics-0.9.0-beta.ipa` |
 
 ---
 
@@ -85,13 +85,13 @@ open AuraLyrics.xcodeproj
 ## 安裝與使用指南
 
 ### 在 LiveContainer 中使用
-1. 下載並取得 `AuraLyrics-0.1.0.ipa`。
+1. 下載並取得 `AuraLyrics-0.9.0-beta.ipa`。
 2. 在 iPhone 上開啟 **LiveContainer**，匯入該 IPA。
 3. 進入 LiveContainer 設定，確保開啟「Fix Background Audio」或允許音訊背景執行。
 4. 啟動 AuraLyrics，App 會自動偵測環境並啟用 PiP 懸浮顯示。
 
 ### 側載工具（SideStore / AltStore / TrollStore / Feather 等）
-1. 使用側載工具安裝 `AuraLyrics-0.1.0.ipa`。
+1. 使用側載工具安裝 `AuraLyrics-0.9.0-beta.ipa`。
 2. 啟動 App 並允許相關權限。
 3. 播放音樂時，可使用頂部 **動態島 / 鎖定畫面即時動態** 或 **PiP 懸浮視窗** 檢視歌詞。
 

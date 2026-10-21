@@ -40,7 +40,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/AuraLyrics.xcarchive \
-            MARKETING_VERSION="0.1.0" \
+            MARKETING_VERSION="0.9.0" \
             CURRENT_PROJECT_VERSION="${{ github.run_number }}" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -49,19 +49,20 @@ jobs:
       - name: Package Unified IPA
         run: |
           mkdir -p ipa_output
-          VERSION="0.1.0"
+          VERSION="0.9.0-beta"
+          APP_VERSION="0.9.0"
           BUILD="${{ github.run_number }}"
           echo "Packaging AuraLyrics version: ${VERSION} (Build ${BUILD})"
           mkdir -p package/Payload
           cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package/Payload/
 
           # 核心修復：使用 Python 精確合併原始 Info.plist 權限與宣告（解決 Xcode 剝除自訂鍵值之問題）
-          export TARGET_VERSION="${VERSION}"
+          export TARGET_VERSION="${APP_VERSION}"
           export TARGET_BUILD="${BUILD}"
           python3 - << 'EOF'
           import os, plistlib
 
-          version = os.environ.get("TARGET_VERSION", "0.1.0")
+          version = os.environ.get("TARGET_VERSION", "0.9.0")
           build = os.environ.get("TARGET_BUILD", "1")
 
           # 1. 主 App Info.plist 補全與版本同步
