@@ -15,7 +15,7 @@
    - 任務導向就近控制（時間軸微調、雙語翻譯開關即時切換）。
 3. **無須後端伺服器 (100% Client-Side)**
    - 原生連線 **Apple Music** 系統播放器 (`MPMusicPlayerController.systemMusicPlayer`)，免任何 API 金鑰。
-   - 整合 **LRCLIB** 與 **網易雲音樂公開 API** 雙歌詞源，支援華語、日語、韓語及歐美曲目，提供雙語對照歌詞。
+   - 整合 **Musixmatch** (Richsync 逐字時間軸)、**網易雲音樂公開 API** (YRC/KRC 逐字時間軸) 與 **LRCLIB** 三大歌詞源，支援自訂搜尋順位與逐字/逐行降級。
    - 本地離線快取儲存，支援直接匯入外部 `.lrc` 檔案。
 4. **無聲混音背景保活 (`AVAudioSession`)**
    - 動態 PCM 無聲迴圈搭配 `.playback` 與 `.mixWithOthers`，在背景持續追蹤歌詞，**絕不中斷或壓低 Apple Music 音量**。

@@ -9,10 +9,49 @@ public final class LyricsProviderService: ObservableObject {
     private let urlSession = URLSession.shared
 
     private let currentCacheSchemaVersion = 2
+    private let priorityOrderKey = "lyricsSearchPriorityOrder"
+
+    @Published public private(set) var priorityItems: [LyricsSearchPriorityItem] = []
 
     private init() {
         checkAndMigrateCache()
         createCacheDirectoryIfNeeded()
+        loadPriorityItems()
+    }
+
+    private func loadPriorityItems() {
+        if let data = UserDefaults.standard.data(forKey: priorityOrderKey),
+           let saved = try? JSONDecoder().decode([LyricsSearchPriorityItem].self, from: data),
+           !saved.isEmpty {
+            var list = saved
+            let existingIds = Set(saved.map { $0.id })
+            for def in LyricsSearchPriorityItem.defaultList {
+                if !existingIds.contains(def.id) {
+                    list.append(def)
+                }
+            }
+            self.priorityItems = list
+        } else {
+            self.priorityItems = LyricsSearchPriorityItem.defaultList
+        }
+    }
+
+    public func savePriorityItems(_ items: [LyricsSearchPriorityItem]) {
+        self.priorityItems = items
+        if let data = try? JSONEncoder().encode(items) {
+            UserDefaults.standard.set(data, forKey: priorityOrderKey)
+        }
+    }
+
+    public func resetPriorityItems() {
+        savePriorityItems(LyricsSearchPriorityItem.defaultList)
+    }
+
+    public var highestPriorityDescription: String {
+        if let first = priorityItems.first(where: { $0.isEnabled }) {
+            return "\(first.title)（\(first.isWordSync ? String(localized: "逐字") : String(localized: "逐行"))）"
+        }
+        return String(localized: "已停用所有來源")
     }
 
     private func checkAndMigrateCache() {
@@ -115,7 +154,7 @@ public final class LyricsProviderService: ObservableObject {
         createCacheDirectoryIfNeeded()
     }
 
-    // MARK: - 線上自動搜尋歌詞（優先查詢具備逐字音節來源 -> 自動升級舊快取）
+    // MARK: - 線上自動搜尋歌詞（依使用者自訂平台與逐字/逐行順位搜尋）
     public func fetchLyrics(track: TrackInfo) async -> SyncedLyrics? {
         let cleanTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -123,40 +162,62 @@ public final class LyricsProviderService: ObservableObject {
         guard !cleanTitle.isEmpty else { return nil }
 
         let cached = loadCachedLyrics(title: cleanTitle, artist: cleanArtist)
-        var fallbackResult: SyncedLyrics? = cached
 
-        // 1. 若本地快取已包含逐字音節時間軸，或為使用者本地手動匯入，直接採用
-        if let cached = cached, (cached.hasSyllables || cached.source == "Local") {
+        // 1. 若為使用者本地手動匯入，絕對優先採用
+        if let cached = cached, cached.source == "Local" {
             return cached
         }
 
-        // 2. 優先向網易雲音樂請求原生逐字時間軸 (YRC/KRC) 與雙語翻譯
-        if let netEaseResult = await fetchFromNetEase(title: cleanTitle, artist: cleanArtist, durationSec: track.duration) {
-            if netEaseResult.hasSyllables {
-                saveLyricsToCache(netEaseResult)
-                return netEaseResult
+        let activePriorities = priorityItems.filter { $0.isEnabled }
+
+        // 2. 若本地快取已符合使用者最高優先級別且具備逐字，可直接沿用節省連線與電量
+        if let cached = cached, cached.hasSyllables,
+           let topPriority = activePriorities.first, topPriority.isWordSync,
+           topPriority.source.rawValue.caseInsensitiveCompare(cached.source) == .orderedSame {
+            return cached
+        }
+
+        // 3. 記憶體暫存各來源請求結果，確保在一次歌曲搜尋中各來源最多僅呼叫一次
+        var sourceCache: [LyricsSource: SyncedLyrics?] = [:]
+
+        func getOrFetch(source: LyricsSource) async -> SyncedLyrics? {
+            if let existing = sourceCache[source] {
+                return existing
             }
-            // 若網易雲僅有普通行級歌詞，但本地尚無任何快取，暫存該備援結果並更新 fallbackResult
-            if fallbackResult == nil {
-                saveLyricsToCache(netEaseResult)
-                fallbackResult = netEaseResult
+            let res: SyncedLyrics?
+            switch source {
+            case .musixmatch:
+                res = await fetchFromMusixmatch(title: cleanTitle, artist: cleanArtist, durationSec: track.duration)
+            case .netease:
+                res = await fetchFromNetEase(title: cleanTitle, artist: cleanArtist, durationSec: track.duration)
+            case .lrclib:
+                res = await fetchFromLRCLIB(title: cleanTitle, artist: cleanArtist, durationSec: track.duration)
+            }
+            sourceCache[source] = res
+            return res
+        }
+
+        // 4. 依使用者自訂順位依序比對
+        for item in activePriorities {
+            guard let result = await getOrFetch(source: item.source) else {
+                continue
+            }
+
+            if item.isWordSync {
+                // 逐字項目：必須包含音節時間軸
+                if result.hasSyllables {
+                    saveLyricsToCache(result)
+                    return result
+                }
+            } else {
+                // 普通逐行項目：無論有無逐字皆可滿足降級標準
+                saveLyricsToCache(result)
+                return result
             }
         }
 
-        // 3. 查詢 LRCLIB 嘗試比對 Enhanced LRC 逐字標籤
-        if let lrclibResult = await fetchFromLRCLIB(title: cleanTitle, artist: cleanArtist, durationSec: track.duration) {
-            if lrclibResult.hasSyllables {
-                saveLyricsToCache(lrclibResult)
-                return lrclibResult
-            }
-            if fallbackResult == nil {
-                saveLyricsToCache(lrclibResult)
-                fallbackResult = lrclibResult
-            }
-        }
-
-        // 4. 若無逐字來源，回退至既有快取或普通行級歌詞
-        return fallbackResult
+        // 5. 若所有啟用順位皆未滿足，回退至既有快取
+        return cached
     }
 
     // MARK: - 手動搜尋跨庫歌詞（Structured Concurrency 並行請求，不污染快取直到使用者點選）
@@ -164,19 +225,196 @@ public final class LyricsProviderService: ObservableObject {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
 
+        async let mxmTask = fetchFromMusixmatch(title: trimmed, artist: "", durationSec: durationSec)
         async let netEaseTask = fetchFromNetEase(title: trimmed, artist: "", durationSec: durationSec)
         async let lrclibTask = fetchFromLRCLIB(title: trimmed, artist: "", durationSec: durationSec)
 
-        let (netEaseResult, lrclibResult) = await (netEaseTask, lrclibTask)
+        let (mxmResult, netEaseResult, lrclibResult) = await (mxmTask, netEaseTask, lrclibTask)
         var results: [SyncedLyrics] = []
-        if let netEase = netEaseResult {
+        if let mxm = mxmResult {
+            results.append(mxm)
+        }
+        if let netEase = netEaseResult, !results.contains(where: { $0.id == netEase.id }) {
             results.append(netEase)
         }
-        if let lrclib = lrclibResult,
-           !results.contains(where: { $0.id == lrclib.id }) {
+        if let lrclib = lrclibResult, !results.contains(where: { $0.id == lrclib.id }) {
             results.append(lrclib)
         }
         return results
+    }
+
+    // MARK: - Musixmatch API 請求（免金鑰取得官方客戶端匿名憑證與 Richsync 逐字時間軸）
+    private func getMusixmatchToken() async -> String? {
+        if let stored = UserDefaults.standard.string(forKey: "musixmatchUserToken"),
+           !stored.isEmpty, stored != "00000000000000000000000000000000000000000000000000000000" {
+            return stored
+        }
+        return await refreshMusixmatchToken()
+    }
+
+    private func refreshMusixmatchToken() async -> String? {
+        guard let url = URL(string: "https://apic-appmobile.musixmatch.com/ws/1.1/token.get?app_id=mac-ios-v2.0") else { return nil }
+        var request = URLRequest(url: url)
+        request.setValue("apic-appmobile.musixmatch.com", forHTTPHeaderField: "Host")
+        request.setValue("10.1.1", forHTTPHeaderField: "x-mxm-app-version")
+        request.setValue("Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0", forHTTPHeaderField: "X-User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 8
+
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                return nil
+            }
+            struct TokenResponse: Codable {
+                struct Message: Codable {
+                    struct Body: Codable {
+                        let user_token: String?
+                    }
+                    let header: Header
+                    let body: Body?
+                    struct Header: Codable {
+                        let status_code: Int
+                    }
+                }
+                let message: Message
+            }
+            let decoded = try JSONDecoder().decode(TokenResponse.self, from: data)
+            if let token = decoded.message.body?.user_token,
+               !token.isEmpty, token != "00000000000000000000000000000000000000000000000000000000" {
+                UserDefaults.standard.set(token, forKey: "musixmatchUserToken")
+                return token
+            }
+        } catch {
+            print("[LyricsProvider] Musixmatch Token 換發失敗: \(error.localizedDescription)")
+        }
+        return nil
+    }
+
+    public func fetchFromMusixmatch(title: String, artist: String, durationSec: TimeInterval = 0) async -> SyncedLyrics? {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else { return nil }
+
+        guard let token = await getMusixmatchToken() else { return nil }
+
+        return await performMusixmatchRequest(title: cleanTitle, artist: cleanArtist, durationSec: durationSec, token: token, allowRetryOn401: true)
+    }
+
+    private func performMusixmatchRequest(title: String, artist: String, durationSec: TimeInterval, token: String, allowRetryOn401: Bool) async -> SyncedLyrics? {
+        guard var components = URLComponents(string: "https://apic-appmobile.musixmatch.com/ws/1.1/macro.subtitles.get") else { return nil }
+
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "format", value: "json"),
+            URLQueryItem(name: "namespace", value: "lyrics_richsynched"),
+            URLQueryItem(name: "subtitle_format", value: "mxm"),
+            URLQueryItem(name: "app_id", value: "mac-ios-v2.0"),
+            URLQueryItem(name: "q_track", value: title),
+            URLQueryItem(name: "optional_calls", value: "track.richsync"),
+            URLQueryItem(name: "richsync_compact_type", value: "words"),
+            URLQueryItem(name: "usertoken", value: token)
+        ]
+
+        if !artist.isEmpty {
+            queryItems.append(URLQueryItem(name: "q_artist", value: artist))
+        }
+
+        if durationSec > 0 {
+            let durInt = String(Int(durationSec))
+            queryItems.append(URLQueryItem(name: "q_duration", value: durInt))
+            queryItems.append(URLQueryItem(name: "f_subtitle_length", value: durInt))
+            queryItems.append(URLQueryItem(name: "f_subtitle_length_max_deviation", value: "5"))
+        }
+
+        components.queryItems = queryItems
+        guard let url = components.url else { return nil }
+
+        var request = URLRequest(url: url)
+        request.setValue("apic-appmobile.musixmatch.com", forHTTPHeaderField: "Host")
+        request.setValue("10.1.1", forHTTPHeaderField: "x-mxm-app-version")
+        request.setValue("Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0", forHTTPHeaderField: "X-User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 8
+
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else { return nil }
+
+            if httpResponse.statusCode == 401 && allowRetryOn401 {
+                UserDefaults.standard.removeObject(forKey: "musixmatchUserToken")
+                if let newToken = await refreshMusixmatchToken() {
+                    return await performMusixmatchRequest(title: title, artist: artist, durationSec: durationSec, token: newToken, allowRetryOn401: false)
+                }
+                return nil
+            }
+
+            guard httpResponse.statusCode == 200 else { return nil }
+
+            // 解析 Musixmatch Macro 回應
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            guard let message = json?["message"] as? [String: Any],
+                  let header = message["header"] as? [String: Any],
+                  let statusCode = header["status_code"] as? Int, statusCode == 200,
+                  let body = message["body"] as? [String: Any],
+                  let macroCalls = body["macro_calls"] as? [String: Any] else {
+                return nil
+            }
+
+            // 1. 優先嘗試 Richsync 逐字音節時間軸
+            if let richsyncCall = macroCalls["track.richsync.get"] as? [String: Any],
+               let rsMsg = richsyncCall["message"] as? [String: Any],
+               let rsHeader = rsMsg["header"] as? [String: Any],
+               (rsHeader["status_code"] as? Int) == 200,
+               let rsBody = rsMsg["body"] as? [String: Any],
+               let richsyncObj = rsBody["richsync"] as? [String: Any],
+               let richsyncRaw = richsyncObj["richsync_body"] as? String {
+                let lines = LRCParser.shared.parseMusixmatchRichsync(richsyncBody: richsyncRaw)
+                if !lines.isEmpty {
+                    var credits: [String] = []
+                    if let copyright = richsyncObj["lyrics_copyright"] as? String, !copyright.isEmpty {
+                        credits.append(copyright.trimmingCharacters(in: .whitespacesAndNewlines))
+                    }
+                    return SyncedLyrics(
+                        trackTitle: title,
+                        artistName: artist,
+                        lines: lines,
+                        credits: credits,
+                        offsetMs: 0,
+                        source: "Musixmatch"
+                    )
+                }
+            }
+
+            // 2. 若無逐字，降級提取 Subtitles 逐行時間軸
+            if let subCall = macroCalls["track.subtitles.get"] as? [String: Any],
+               let subMsg = subCall["message"] as? [String: Any],
+               let subHeader = subMsg["header"] as? [String: Any],
+               (subHeader["status_code"] as? Int) == 200,
+               let subBody = subMsg["body"] as? [String: Any],
+               let subList = subBody["subtitle_list"] as? [[String: Any]],
+               let firstSub = subList.first?["subtitle"] as? [String: Any],
+               let subRaw = firstSub["subtitle_body"] as? String {
+                let lines = LRCParser.shared.parseMusixmatchSubtitles(subtitleBody: subRaw)
+                if !lines.isEmpty {
+                    var credits: [String] = []
+                    if let copyright = firstSub["lyrics_copyright"] as? String, !copyright.isEmpty {
+                        credits.append(copyright.trimmingCharacters(in: .whitespacesAndNewlines))
+                    }
+                    return SyncedLyrics(
+                        trackTitle: title,
+                        artistName: artist,
+                        lines: lines,
+                        credits: credits,
+                        offsetMs: 0,
+                        source: "Musixmatch"
+                    )
+                }
+            }
+        } catch {
+            print("[LyricsProvider] Musixmatch 請求失敗: \(error.localizedDescription)")
+        }
+
+        return nil
     }
 
     // MARK: - LRCLIB API 請求

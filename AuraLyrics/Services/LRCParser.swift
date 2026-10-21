@@ -470,5 +470,113 @@ public final class LRCParser: Sendable {
         let raw = parse(lrcContent: lrcContent)
         return extractCredits(from: raw)
     }
+
+    // MARK: - Musixmatch Richsync (逐字音節時間軸) 解析
+    public func parseMusixmatchRichsync(richsyncBody: String) -> [LyricLine] {
+        guard let data = richsyncBody.data(using: .utf8) else { return [] }
+
+        struct MxmRichsyncToken: Codable {
+            let c: String
+            let o: Double
+        }
+
+        struct MxmRichsyncLine: Codable {
+            let ts: Double
+            let te: Double
+            let l: [MxmRichsyncToken]?
+            let x: String?
+        }
+
+        guard let rawLines = try? JSONDecoder().decode([MxmRichsyncLine].self, from: data) else {
+            return []
+        }
+
+        var result: [LyricLine] = []
+
+        for line in rawLines {
+            let tsMs = Int(line.ts * 1000)
+            let teMs = Int(line.te * 1000)
+            let tokens = line.l ?? []
+
+            var syllables: [LyricSyllable] = []
+
+            for (i, tok) in tokens.enumerated() {
+                let text = tok.c
+                let startMs = tsMs + Int(tok.o * 1000)
+
+                // 若此 token 是純空格且前面已有音節，合併至前一個音節以維持字詞平滑發光
+                if text == " " && !syllables.isEmpty {
+                    syllables[syllables.count - 1].text += " "
+                    continue
+                }
+
+                // 計算音節持續時長（至下一個非空格 token 的起唱點或行尾）
+                var nextStartMs = teMs
+                for j in (i + 1)..<tokens.count {
+                    if tokens[j].c != " " {
+                        nextStartMs = tsMs + Int(tokens[j].o * 1000)
+                        break
+                    }
+                }
+                let durationMs = max(20, nextStartMs - startMs)
+
+                syllables.append(LyricSyllable(
+                    text: text,
+                    timeMs: startMs,
+                    durationMs: durationMs
+                ))
+            }
+
+            let fullLineText = line.x ?? syllables.map { $0.text }.joined()
+            let trimmedText = fullLineText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedText.isEmpty else { continue }
+
+            result.append(LyricLine(
+                timeMs: tsMs,
+                text: fullLineText,
+                syllables: syllables.isEmpty ? nil : syllables
+            ))
+        }
+
+        return result.sorted { $0.timeMs < $1.timeMs }
+    }
+
+    // MARK: - Musixmatch Subtitles (普通逐行時間軸) 解析
+    public func parseMusixmatchSubtitles(subtitleBody: String) -> [LyricLine] {
+        let trimmed = subtitleBody.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        // 若為 JSON 陣列格式 (mxm 時間格式)
+        if trimmed.hasPrefix("[") {
+            guard let data = trimmed.data(using: .utf8) else { return [] }
+
+            struct MxmSubTime: Codable {
+                let total: Double
+            }
+            struct MxmSubItem: Codable {
+                let text: String
+                let time: MxmSubTime
+            }
+
+            if let items = try? JSONDecoder().decode([MxmSubItem].self, from: data) {
+                var lines: [LyricLine] = []
+                for item in items {
+                    let text = item.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !text.isEmpty else { continue }
+                    lines.append(LyricLine(
+                        timeMs: Int(item.time.total * 1000),
+                        text: text,
+                        syllables: nil
+                    ))
+                }
+                if !lines.isEmpty {
+                    return lines.sorted { $0.timeMs < $1.timeMs }
+                }
+            }
+        }
+
+        // 若為標準 LRC 字串格式
+        return parse(lrcContent: subtitleBody)
+    }
 }
 

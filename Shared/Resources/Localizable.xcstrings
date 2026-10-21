@@ -2544,6 +2544,246 @@
           }
         }
       }
+    },
+    "自動搜尋歌詞順位": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動搜尋歌詞順位"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Search Priority"
+          }
+        }
+      }
+    },
+    "搜尋順位清單": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋順位清單"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Priority List"
+          }
+        }
+      }
+    },
+    "重設為預設順位": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設為預設順位"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset to Default Priority"
+          }
+        }
+      }
+    },
+    "確定重設搜尋順位？": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定重設搜尋順位？"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset Search Priority?"
+          }
+        }
+      }
+    },
+    "此操作將恢復各歌詞庫與逐字/逐行時間軸的原始推薦順序。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此操作將恢復各歌詞庫與逐字/逐行時間軸的原始推薦順序。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will restore the default search priority for all lyric providers and sync modes."
+          }
+        }
+      }
+    },
+    "逐字時間軸 (Richsync)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐字時間軸 (Richsync)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Word-by-word Sync (Richsync)"
+          }
+        }
+      }
+    },
+    "逐字時間軸 (YRC/KRC)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐字時間軸 (YRC/KRC)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Word-by-word Sync (YRC/KRC)"
+          }
+        }
+      }
+    },
+    "逐字時間軸 (Enhanced LRC)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐字時間軸 (Enhanced LRC)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Word-by-word Sync (Enhanced LRC)"
+          }
+        }
+      }
+    },
+    "普通逐行時間軸 (LRC)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "普通逐行時間軸 (LRC)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line-by-line Sync (LRC)"
+          }
+        }
+      }
+    },
+    "逐字": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐字"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syllable"
+          }
+        }
+      }
+    },
+    "逐行": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐行"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Line"
+          }
+        }
+      }
+    },
+    "已停用所有來源": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已停用所有來源"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All Sources Disabled"
+          }
+        }
+      }
+    },
+    "可自訂 Musixmatch、網易雲音樂與 LRCLIB 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可自訂 Musixmatch、網易雲音樂與 LRCLIB 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Customize the search priority among Musixmatch, NetEase, and LRCLIB, distinguishing between word-level and line-level sync."
+          }
+        }
+      }
+    },
+    "播放曲目時，系統將由上至下依序查詢已啟用的歌詞來源。點選右側開關可停用特定來源；長按右側把手上下拖曳可變更搜尋優先序。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放曲目時，系統將由上至下依序查詢已啟用的歌詞來源。點選右側開關可停用特定來源；長按右側把手上下拖曳可變更搜尋優先序。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a track plays, the system queries enabled lyric sources in order from top to bottom. Toggle the switch to disable a source; drag the handle to reorder priority."
+          }
+        }
+      }
+    },
+    "預設順位：Musixmatch 逐字 → 網易雲 逐字 → LRCLIB 逐字 → Musixmatch 逐行 → 網易雲 逐行 → LRCLIB 逐行。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設順位：Musixmatch 逐字 → 網易雲 逐字 → LRCLIB 逐字 → Musixmatch 逐行 → 網易雲 逐行 → LRCLIB 逐行。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default priority: Musixmatch Syllables → NetEase Syllables → LRCLIB Syllables → Musixmatch Line → NetEase Line → LRCLIB Line."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
