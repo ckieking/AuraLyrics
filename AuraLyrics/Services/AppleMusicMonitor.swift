@@ -170,8 +170,8 @@ public final class AppleMusicMonitor: ObservableObject {
 
         let persistentID = nowPlaying.persistentID
         let playbackStoreID = nowPlaying.playbackStoreID ?? ""
-        let title = nowPlaying.title ?? "未知曲目"
-        let artist = nowPlaying.artist ?? "未知歌手"
+        let title = nowPlaying.title ?? String(localized: "未知曲目")
+        let artist = nowPlaying.artist ?? String(localized: "未知歌手")
         let album = nowPlaying.albumTitle ?? ""
         let duration = nowPlaying.playbackDuration
 
@@ -422,7 +422,7 @@ public final class AppleMusicMonitor: ObservableObject {
         } else {
             let isPlaceholder = (currentTrack.title == TrackInfo.placeholder.title)
             let introPrimary = isPlaceholder
-                ? "AuraLyrics 靈動歌詞"
+                ? String(localized: "AuraLyrics 即時歌詞")
                 : currentTrack.title
             let firstLineText = currentLyrics.lines.first?.text
             let introSecondary = isPlaceholder ? nil : (firstLineText ?? (currentTrack.artist.isEmpty ? nil : currentTrack.artist))

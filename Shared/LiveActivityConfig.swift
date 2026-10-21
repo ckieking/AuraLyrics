@@ -11,22 +11,22 @@ public enum DynamicIslandCompactStyle: String, CaseIterable, Identifiable, Codab
     public var title: String {
         switch self {
         case .artworkAndText:
-            return "專輯封面 + 當前歌詞 (預設)"
+            return String(localized: "專輯封面 + 當前歌詞 (預設)")
         case .iconAndText:
-            return "音符圖示 + 當前歌詞"
+            return String(localized: "音符圖示 + 當前歌詞")
         case .textOnly:
-            return "僅當前歌詞"
+            return String(localized: "僅當前歌詞")
         }
     }
 
     public var description: String {
         switch self {
         case .artworkAndText:
-            return "左側展示微縮專輯封面，右側隨歌曲平滑滾動當前播放歌詞。"
+            return String(localized: "左側展示微縮專輯封面，右側隨歌曲平滑滾動當前播放歌詞。")
         case .iconAndText:
-            return "左側展示簡約音樂圖示，右側顯示當前歌詞。"
+            return String(localized: "左側展示簡約音樂圖示，右側顯示當前歌詞。")
         case .textOnly:
-            return "動態島兩側均最大化空間呈現歌詞文字。"
+            return String(localized: "動態島兩側均最大化空間呈現歌詞文字。")
         }
     }
 }
@@ -42,22 +42,22 @@ public enum LiveActivityPausePolicy: String, CaseIterable, Identifiable, Codable
     public var title: String {
         switch self {
         case .keepActiveWithTimeout:
-            return "保留 5 分鐘後自動關閉 (預設)"
+            return String(localized: "保留 5 分鐘後自動關閉 (預設)")
         case .keepActiveAlways:
-            return "持續保留直至手動關閉"
+            return String(localized: "持續保留直至手動關閉")
         case .dismissImmediately:
-            return "音樂暫停時立即收起"
+            return String(localized: "音樂暫停時立即收起")
         }
     }
 
     public var description: String {
         switch self {
         case .keepActiveWithTimeout:
-            return "暫停時維持最後歌詞顯示，逾時 5 分鐘後自動收起清理。"
+            return String(localized: "暫停時維持最後歌詞顯示，逾時 5 分鐘後自動收起清理。")
         case .keepActiveAlways:
-            return "暫停時維持最後歌詞，隨時等待繼續播放。"
+            return String(localized: "暫停時維持最後歌詞，隨時等待繼續播放。")
         case .dismissImmediately:
-            return "音樂暫停時立即結束即時動態。"
+            return String(localized: "音樂暫停時立即結束即時動態。")
         }
     }
 }
@@ -72,9 +72,9 @@ public enum LiveActivityResumePolicy: String, CaseIterable, Identifiable, Codabl
     public var title: String {
         switch self {
         case .autoResume:
-            return "繼續播放時自動重新啟動 (預設)"
+            return String(localized: "繼續播放時自動重新啟動 (預設)")
         case .manualOnly:
-            return "僅由使用者手動開啟"
+            return String(localized: "僅由使用者手動開啟")
         }
     }
 }
@@ -91,13 +91,13 @@ public enum LiveActivitySecondaryMode: String, CaseIterable, Identifiable, Codab
     public var title: String {
         switch self {
         case .bilingualOrNext:
-            return "雙語翻譯優先，無翻譯則顯示下一句 (預設)"
+            return String(localized: "雙語翻譯優先，無翻譯則顯示下一句 (預設)")
         case .bilingualOnly:
-            return "僅顯示雙語翻譯"
+            return String(localized: "僅顯示雙語翻譯")
         case .nextOnly:
-            return "僅顯示下一句歌詞預覽"
+            return String(localized: "僅顯示下一句歌詞預覽")
         case .none:
-            return "不顯示副行"
+            return String(localized: "不顯示副行")
         }
     }
 }

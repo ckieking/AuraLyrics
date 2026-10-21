@@ -16,11 +16,11 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - 懸浮歌詞 (PiP) 實時預覽與開關
+                // MARK: - 子母畫面 (PiP) 實時預覽與開關
                 Section {
                     // 1:1 實時 PiP 預覽視窗卡
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("懸浮視窗預覽")
+                        Text("子母畫面預覽")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(.secondary)
@@ -33,7 +33,7 @@ struct SettingsView: View {
                     }
                     .padding(.vertical, 6)
 
-                    Toggle("啟用懸浮視窗", isOn: Binding(
+                    Toggle("啟用子母畫面 (PiP)", isOn: Binding(
                         get: { pipEngine.isPiPEnabled },
                         set: { enable in
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -45,7 +45,7 @@ struct SettingsView: View {
                         }
                     ))
                 } header: {
-                    Text("畫中畫懸浮視窗")
+                    Text("子母畫面 (PiP)")
                 }
 
                 // MARK: - 即時動態與動態島
@@ -100,7 +100,7 @@ struct SettingsView: View {
                                     .frame(height: 38)
                             }
                             .buttonStyle(.bordered)
-                            .accessibilityLabel("所有歌曲歌詞延後 0.1 秒")
+                            .accessibilityLabel(String(localized: "所有歌曲歌詞延後 0.1 秒"))
 
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -113,7 +113,7 @@ struct SettingsView: View {
                             }
                             .buttonStyle(.bordered)
                             .tint(.secondary)
-                            .accessibilityLabel("重設全域歌詞延遲為零秒")
+                            .accessibilityLabel(String(localized: "重設全域歌詞延遲為零秒"))
 
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -125,7 +125,7 @@ struct SettingsView: View {
                                     .frame(height: 38)
                             }
                             .buttonStyle(.bordered)
-                            .accessibilityLabel("所有歌曲歌詞提前 0.1 秒")
+                            .accessibilityLabel(String(localized: "所有歌曲歌詞提前 0.1 秒"))
                         }
                     }
                     .padding(.vertical, 4)
@@ -149,7 +149,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: envDetector.isLiveContainer ? "info.circle.fill" : "checkmark.seal.fill")
                                 .foregroundColor(envDetector.isLiveContainer ? .orange : .green)
-                            Text(envDetector.isLiveContainer ? "LiveContainer 沙盒" : "原生側載")
+                            Text(envDetector.isLiveContainer ? String(localized: "LiveContainer 沙盒") : String(localized: "原生側載"))
                                 .fontWeight(.medium)
                                 .foregroundColor(envDetector.isLiveContainer ? .orange : .green)
                         }
@@ -168,17 +168,17 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: envDetector.areLiveActivitiesAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                                 .foregroundColor(envDetector.areLiveActivitiesAvailable ? .green : .orange)
-                            Text(envDetector.areLiveActivitiesAvailable ? "支援" : "受限或不支援")
+                            Text(envDetector.areLiveActivitiesAvailable ? String(localized: "支援") : String(localized: "受限或不支援"))
                                 .fontWeight(.medium)
                                 .foregroundColor(envDetector.areLiveActivitiesAvailable ? .green : .orange)
                         }
                         .font(.subheadline)
                     }
 
-                    // 畫中畫懸浮窗 (PiP)
+                    // 子母畫面 (PiP)
                     HStack {
                         Label {
-                            Text("畫中畫 (PiP)")
+                            Text("子母畫面 (PiP)")
                         } icon: {
                             Image(systemName: "pip")
                                 .foregroundColor(.pink)
@@ -187,7 +187,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: pipEngine.isPiPPossible ? "checkmark.circle.fill" : "xmark.circle.fill")
                                 .foregroundColor(pipEngine.isPiPPossible ? .green : .red)
-                            Text(pipEngine.isPiPPossible ? "支援" : "受限或不支援")
+                            Text(pipEngine.isPiPPossible ? String(localized: "支援") : String(localized: "受限或不支援"))
                                 .fontWeight(.medium)
                                 .foregroundColor(pipEngine.isPiPPossible ? .green : .red)
                         }
@@ -206,7 +206,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: keepAlive.isRunning ? "checkmark.circle.fill" : "pause.circle.fill")
                                 .foregroundColor(keepAlive.isRunning ? .green : .secondary)
-                            Text(keepAlive.isRunning ? "運作中" : "已暫停")
+                            Text(keepAlive.isRunning ? String(localized: "運作中") : String(localized: "已暫停"))
                                 .fontWeight(.medium)
                                 .foregroundColor(keepAlive.isRunning ? .green : .secondary)
                         }

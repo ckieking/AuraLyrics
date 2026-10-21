@@ -23,8 +23,8 @@ public struct TrackInfo: Codable, Equatable, Sendable {
     }
 
     public static let placeholder = TrackInfo(
-        title: "尚未播放音樂",
-        artist: "請在 Apple Music 播放歌曲",
+        title: String(localized: "尚未播放音樂"),
+        artist: String(localized: "請在 Apple Music 播放歌曲"),
         album: "AuraLyrics",
         duration: 0
     )
@@ -188,10 +188,10 @@ public enum DisplayEngineMode: String, CaseIterable, Identifiable, Codable, Send
 
     public var localizedTitle: String {
         switch self {
-        case .automatic: return "自動選擇（依環境推薦）"
-        case .pipCapsule: return "PiP 畫中畫懸浮膠囊"
-        case .liveActivity: return "原生動態島 / 即時動態"
-        case .both: return "雙模式並行"
+        case .automatic: return String(localized: "自動選擇（依環境推薦）")
+        case .pipCapsule: return String(localized: "子母畫面 (PiP) 懸浮膠囊")
+        case .liveActivity: return String(localized: "原生動態島 / 即時動態")
+        case .both: return String(localized: "雙模式並行")
         }
     }
 }
@@ -206,9 +206,9 @@ public enum PiPVisualTheme: String, CaseIterable, Identifiable, Codable, Sendabl
 
     public var localizedTitle: String {
         switch self {
-        case .dynamicIsland: return "動態島膠囊風（深黑圓角 + 頂部吸附感）"
-        case .standardCard: return "標準雙行卡片（原文＋雙語翻譯）"
-        case .minimalLine: return "極簡單行（高對比精緻小窗）"
+        case .dynamicIsland: return String(localized: "動態島膠囊風（深黑圓角 + 頂部吸附感）")
+        case .standardCard: return String(localized: "標準雙行卡片（原文＋雙語翻譯）")
+        case .minimalLine: return String(localized: "極簡單行（高對比精緻小窗）")
         }
     }
 }

@@ -1,0 +1,2550 @@
+{
+  "sourceLanguage": "zh-Hant",
+  "strings": {
+    "正在播放": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在播放"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Now Playing"
+          }
+        }
+      }
+    },
+    "歌詞庫": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞庫"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Library"
+          }
+        }
+      }
+    },
+    "設定": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        }
+      }
+    },
+    "關閉子母畫面 (PiP)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關閉子母畫面 (PiP)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close Picture in Picture"
+          }
+        }
+      }
+    },
+    "開啟子母畫面 (PiP)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟子母畫面 (PiP)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Picture in Picture"
+          }
+        }
+      }
+    },
+    "雙語歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙語歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilingual Lyrics"
+          }
+        }
+      }
+    },
+    "即時動態與動態島": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即時動態與動態島"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities & Dynamic Island"
+          }
+        }
+      }
+    },
+    "線上搜尋歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "線上搜尋歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Online Lyrics"
+          }
+        }
+      }
+    },
+    "匯入本地 .lrc": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入本地 .lrc"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Local .lrc"
+          }
+        }
+      }
+    },
+    "更多歌詞操作選項": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多歌詞操作選項"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Lyrics Options"
+          }
+        }
+      }
+    },
+    "正在檢索歌詞...": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在檢索歌詞..."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching for lyrics..."
+          }
+        }
+      }
+    },
+    "目前曲目無對應歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前曲目無對應歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No lyrics for current track"
+          }
+        }
+      }
+    },
+    "可嘗試線上搜尋其他版本，或手動匯入本地 .lrc 檔案": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可嘗試線上搜尋其他版本，或手動匯入本地 .lrc 檔案"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try searching online for other versions or import a local .lrc file"
+          }
+        }
+      }
+    },
+    "搜尋歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Lyrics"
+          }
+        }
+      }
+    },
+    "匯入 .lrc": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入 .lrc"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import .lrc"
+          }
+        }
+      }
+    },
+    "，翻譯：%@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "，翻譯：%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", Translation: %@"
+          }
+        }
+      }
+    },
+    "目前唱到的歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目前唱到的歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current playing lyric"
+          }
+        }
+      }
+    },
+    "點擊跳轉至此句": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "點擊跳轉至此句"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap to seek to this line"
+          }
+        }
+      }
+    },
+    "製作團隊": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "製作團隊"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credits"
+          }
+        }
+      }
+    },
+    "搜尋已快取歌曲或歌手": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋已快取歌曲或歌手"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search cached tracks or artists"
+          }
+        }
+      }
+    },
+    "匯入歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import Lyrics"
+          }
+        }
+      }
+    },
+    "匯入外部 .lrc 檔案": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "匯入外部 .lrc 檔案"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Import external .lrc file"
+          }
+        }
+      }
+    },
+    "已套用「%@」歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已套用「%@」歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applied lyrics for \"%@\""
+          }
+        }
+      }
+    },
+    "已快取曲目 (%lld)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已快取曲目 (%lld)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cached Tracks (%lld)"
+          }
+        }
+      }
+    },
+    "播放中": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放中"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playing"
+          }
+        }
+      }
+    },
+    "未知歌手": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知歌手"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown Artist"
+          }
+        }
+      }
+    },
+    "未知曲目": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知曲目"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown Track"
+          }
+        }
+      }
+    },
+    "雙語": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙語"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilingual"
+          }
+        }
+      }
+    },
+    "%lld 行歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld lines"
+          }
+        }
+      }
+    },
+    "%@，%@，來源 %@%@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@，%@，來源 %@%@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@, %@, Source: %@%@"
+          }
+        }
+      }
+    },
+    "，正在套用中": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "，正在套用中"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ", currently applied"
+          }
+        }
+      }
+    },
+    "預覽「%@」時間軸": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預覽「%@」時間軸"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview timeline for \"%@\""
+          }
+        }
+      }
+    },
+    "刪除": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刪除"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        }
+      }
+    },
+    "尚無本地快取歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚無本地快取歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Cached Lyrics"
+          }
+        }
+      }
+    },
+    "在 Apple Music 聆聽音樂或於首頁搜尋後\n時間軸歌詞將自動離線儲存於此": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Apple Music 聆聽音樂或於首頁搜尋後\n時間軸歌詞將自動離線儲存於此"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics will be saved here automatically when playing in Apple Music or searching online"
+          }
+        }
+      }
+    },
+    "找不到相符的歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到相符的歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Matching Lyrics Found"
+          }
+        }
+      }
+    },
+    "找不到與「%@」相關的本地快取": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到與「%@」相關的本地快取"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No cached lyrics found for \"%@\""
+          }
+        }
+      }
+    },
+    "清除搜尋條件": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除搜尋條件"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Search"
+          }
+        }
+      }
+    },
+    "歌詞預覽": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞預覽"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Preview"
+          }
+        }
+      }
+    },
+    "歌詞時間軸": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞時間軸"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Timeline"
+          }
+        }
+      }
+    },
+    "完成": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        }
+      }
+    },
+    "套用此歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用此歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply This Lyric"
+          }
+        }
+      }
+    },
+    "子母畫面預覽": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "子母畫面預覽"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PiP Preview"
+          }
+        }
+      }
+    },
+    "啟用子母畫面 (PiP)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "啟用子母畫面 (PiP)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Picture in Picture"
+          }
+        }
+      }
+    },
+    "子母畫面 (PiP)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "子母畫面 (PiP)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picture in Picture (PiP)"
+          }
+        }
+      }
+    },
+    "即時動態與動態島設定": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即時動態與動態島設定"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities & Dynamic Island Settings"
+          }
+        }
+      }
+    },
+    "即時動態": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即時動態"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities"
+          }
+        }
+      }
+    },
+    "已開啟": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已開啟"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enabled"
+          }
+        }
+      }
+    },
+    "已關閉": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已關閉"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disabled"
+          }
+        }
+      }
+    },
+    "非焦點歌詞模糊效果": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非焦點歌詞模糊效果"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non-Focused Lyrics Blur"
+          }
+        }
+      }
+    },
+    "歌詞視覺效果": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞視覺效果"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Visual Effects"
+          }
+        }
+      }
+    },
+    "開啟後處於焦點外的歌詞將呈現模糊效果，聚焦當前播放行；關閉可降低發熱及耗電。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟後處於焦點外的歌詞將呈現模糊效果，聚焦當前播放行；關閉可降低發熱及耗電。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applies a blur effect to non-focused lyrics to highlight current line. Disabling reduces power consumption."
+          }
+        }
+      }
+    },
+    "歌詞延遲微調": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞延遲微調"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Delay Offset"
+          }
+        }
+      }
+    },
+    "%+.1f 秒": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%+.1f 秒"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%+.1f s"
+          }
+        }
+      }
+    },
+    "-0.1s": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "-0.1s"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "-0.1s"
+          }
+        }
+      }
+    },
+    "+0.1s": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+0.1s"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "+0.1s"
+          }
+        }
+      }
+    },
+    "重設": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset"
+          }
+        }
+      }
+    },
+    "所有歌曲歌詞延後 0.1 秒": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有歌曲歌詞延後 0.1 秒"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delay lyrics by 0.1s for all songs"
+          }
+        }
+      }
+    },
+    "重設全域歌詞延遲為零秒": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設全域歌詞延遲為零秒"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset global lyrics delay to zero seconds"
+          }
+        }
+      }
+    },
+    "所有歌曲歌詞提前 0.1 秒": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有歌曲歌詞提前 0.1 秒"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advance lyrics by 0.1s for all songs"
+          }
+        }
+      }
+    },
+    "歌詞顯示延遲微調": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞顯示延遲微調"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Sync Delay Offset"
+          }
+        }
+      }
+    },
+    "所有歌曲共用此微調時間，正值代表歌詞提前唱出、負值代表延後。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有歌曲共用此微調時間，正值代表歌詞提前唱出、負值代表延後。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All songs share this offset. Positive values advance lyrics; negative values delay them."
+          }
+        }
+      }
+    },
+    "執行環境": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "執行環境"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime Environment"
+          }
+        }
+      }
+    },
+    "LiveContainer 沙盒": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiveContainer 沙盒"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiveContainer Sandbox"
+          }
+        }
+      }
+    },
+    "原生側載": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生側載"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native Sideload"
+          }
+        }
+      }
+    },
+    "即時動態 (ActivityKit)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即時動態 (ActivityKit)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities (ActivityKit)"
+          }
+        }
+      }
+    },
+    "支援": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支援"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supported"
+          }
+        }
+      }
+    },
+    "受限或不支援": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "受限或不支援"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restricted or Unsupported"
+          }
+        }
+      }
+    },
+    "背景保活狀態": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景保活狀態"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background Keep-Alive Status"
+          }
+        }
+      }
+    },
+    "運作中": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運作中"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Running"
+          }
+        }
+      }
+    },
+    "已暫停": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已暫停"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paused"
+          }
+        }
+      }
+    },
+    "運行環境與相容性診斷": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "運行環境與相容性診斷"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Runtime Environment Diagnostics"
+          }
+        }
+      }
+    },
+    "若處於 LiveContainer 環境中，iOS 系統可能限制 WidgetKit / ActivityKit 擴展程序的註冊。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "若處於 LiveContainer 環境中，iOS 系統可能限制 WidgetKit / ActivityKit 擴展程序的註冊。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In LiveContainer, iOS may restrict WidgetKit / ActivityKit registration."
+          }
+        }
+      }
+    },
+    "啟用背景保活": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "啟用背景保活"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Background Keep-Alive"
+          }
+        }
+      }
+    },
+    "背景保活": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景保活"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background Keep-Alive"
+          }
+        }
+      }
+    },
+    "清除所有歌詞快取": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除所有歌詞快取"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear All Lyrics Cache"
+          }
+        }
+      }
+    },
+    "儲存空間與快取": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "儲存空間與快取"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Storage & Cache"
+          }
+        }
+      }
+    },
+    "應用程式版本": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "應用程式版本"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Version"
+          }
+        }
+      }
+    },
+    "歌詞來源": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌詞來源"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Sources"
+          }
+        }
+      }
+    },
+    "網易雲 (NetEase) / LRCLIB": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "網易雲 (NetEase) / LRCLIB"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "NetEase / LRCLIB"
+          }
+        }
+      }
+    },
+    "關於 AuraLyrics": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "關於 AuraLyrics"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About AuraLyrics"
+          }
+        }
+      }
+    },
+    "確定清除所有歌詞快取？": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定清除所有歌詞快取？"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear all cached lyrics?"
+          }
+        }
+      }
+    },
+    "此操作將刪除本機儲存的所有歌詞快取，再次播放將自動重新下載。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此操作將刪除本機儲存的所有歌詞快取，再次播放將自動重新下載。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This will delete all locally cached lyrics. They will be re-downloaded when played."
+          }
+        }
+      }
+    },
+    "取消": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        }
+      }
+    },
+    "確定": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確定"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm"
+          }
+        }
+      }
+    },
+    "成功清除本機歌詞快取": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "成功清除本機歌詞快取"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Successfully cleared local lyrics cache"
+          }
+        }
+      }
+    },
+    "功能啟用": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "功能啟用"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feature Activation"
+          }
+        }
+      }
+    },
+    "啟用即時動態與動態島歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "啟用即時動態與動態島歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Live Activities & Dynamic Island Lyrics"
+          }
+        }
+      }
+    },
+    "開啟後，當 Apple Music 播放音樂時，動態島與即時動態將同步呈現即時滾動歌詞。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "開啟後，當 Apple Music 播放音樂時，動態島與即時動態將同步呈現即時滾動歌詞。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When enabled, Dynamic Island and Live Activities display scrolling lyrics when Apple Music plays."
+          }
+        }
+      }
+    },
+    "動態島外觀": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動態島外觀"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dynamic Island Appearance"
+          }
+        }
+      }
+    },
+    "動態島顯示樣式": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動態島顯示樣式"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dynamic Island Compact Style"
+          }
+        }
+      }
+    },
+    "副行資訊": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副行資訊"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Secondary Line Information"
+          }
+        }
+      }
+    },
+    "副行顯示模式": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副行顯示模式"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Secondary Line Display Mode"
+          }
+        }
+      }
+    },
+    "暫停與繼續行為": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暫停與繼續行為"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause & Resume Behavior"
+          }
+        }
+      }
+    },
+    "音樂暫停時處理方式": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音樂暫停時處理方式"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When Music Pauses"
+          }
+        }
+      }
+    },
+    "音樂繼續播放時處理方式": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音樂繼續播放時處理方式"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When Music Resumes"
+          }
+        }
+      }
+    },
+    "即時動態被關閉後可能需要重新開啟此 App 來恢復": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "即時動態被關閉後可能需要重新開啟此 App 來恢復"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If Live Activities are closed, you may need to reopen AuraLyrics to resume"
+          }
+        }
+      }
+    },
+    "待命中": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待命中"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standby"
+          }
+        }
+      }
+    },
+    "背景定位保活授權": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "背景定位保活授權"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background Location Authorization"
+          }
+        }
+      }
+    },
+    "權限設定": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "權限設定"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Settings"
+          }
+        }
+      }
+    },
+    "系統背景運作": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系統背景運作"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Background Operation"
+          }
+        }
+      }
+    },
+    "iOS 系統禁止背景音訊行程更新即時動態。AuraLyrics 透過粗略定位保活與背景任務維持即時歌詞刷新，不會收集你的隱私及資訊。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS 系統禁止背景音訊行程更新即時動態。AuraLyrics 透過粗略定位保活與背景任務維持即時歌詞刷新，不會收集你的隱私及資訊。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iOS prevents background audio processes from updating Live Activities. AuraLyrics maintains real-time lyrics via low-power location keep-alive without collecting personal data."
+          }
+        }
+      }
+    },
+    "僅使用期間允許": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅使用期間允許"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "While Using App"
+          }
+        }
+      }
+    },
+    "永遠允許 (最佳)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "永遠允許 (最佳)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Always (Best)"
+          }
+        }
+      }
+    },
+    "從不 (無法背景更新)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "從不 (無法背景更新)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Never (No Background Updates)"
+          }
+        }
+      }
+    },
+    "尚未要求授權": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未要求授權"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Determined"
+          }
+        }
+      }
+    },
+    "未知狀態": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知狀態"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown Status"
+          }
+        }
+      }
+    },
+    "預覽畫面": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預覽畫面"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview"
+          }
+        }
+      }
+    },
+    "副行顯示設定": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副行顯示設定"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Secondary Line Settings"
+          }
+        }
+      }
+    },
+    "AuraLyrics 即時滾動歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AuraLyrics 即時滾動歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AuraLyrics Real-Time Lyrics"
+          }
+        }
+      }
+    },
+    "搜尋歌曲、歌手或關鍵字": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋歌曲、歌手或關鍵字"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search song, artist, or keywords"
+          }
+        }
+      }
+    },
+    "搜尋": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search"
+          }
+        }
+      }
+    },
+    "搜尋結果 (%lld)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋結果 (%lld)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Results (%lld)"
+          }
+        }
+      }
+    },
+    "套用 %@，%@，來源 %@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套用 %@，%@，來源 %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply %@, %@, Source: %@"
+          }
+        }
+      }
+    },
+    "逐字音節": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐字音節"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syllables"
+          }
+        }
+      }
+    },
+    "%lld 行時間軸": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 行時間軸"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld lines"
+          }
+        }
+      }
+    },
+    "正在搜尋歌詞...": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在搜尋歌詞..."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching for lyrics..."
+          }
+        }
+      }
+    },
+    "線上歌詞檢索": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "線上歌詞檢索"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Online Lyrics Search"
+          }
+        }
+      }
+    },
+    "輸入歌名、歌手或關鍵字\n搜尋 LRCLIB 與網易雲歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "輸入歌名、歌手或關鍵字\n搜尋 LRCLIB 與網易雲歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter song title, artist, or keywords\nto search LRCLIB and NetEase lyrics"
+          }
+        }
+      }
+    },
+    "找不到符合的歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到符合的歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Matching Lyrics Found"
+          }
+        }
+      }
+    },
+    "重新搜尋": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新搜尋"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Again"
+          }
+        }
+      }
+    },
+    "未找到與「%@」相符的歌詞，請嘗試簡化關鍵字或去除特殊符號並再試一次。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到與「%@」相符的歌詞，請嘗試簡化關鍵字或去除特殊符號並再試一次。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No lyrics found matching \"%@\". Try simplifying keywords or removing special characters."
+          }
+        }
+      }
+    },
+    "專輯封面 + 當前歌詞 (預設)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "專輯封面 + 當前歌詞 (預設)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Album Artwork + Current Line (Default)"
+          }
+        }
+      }
+    },
+    "左側展示微縮專輯封面，右側隨歌曲平滑滾動當前播放歌詞。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左側展示微縮專輯封面，右側隨歌曲平滑滾動當前播放歌詞。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Displays thumbnail artwork on the left and scrolling lyrics on the right."
+          }
+        }
+      }
+    },
+    "音符圖示 + 當前歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音符圖示 + 當前歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music Icon + Current Line"
+          }
+        }
+      }
+    },
+    "左側展示簡約音樂圖示，右側顯示當前歌詞。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左側展示簡約音樂圖示，右側顯示當前歌詞。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Displays a minimal music icon on the left and current lyrics on the right."
+          }
+        }
+      }
+    },
+    "僅當前歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅當前歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lyrics Only"
+          }
+        }
+      }
+    },
+    "動態島兩側均最大化空間呈現歌詞文字。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動態島兩側均最大化空間呈現歌詞文字。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maximizes space on both sides of Dynamic Island for lyric text."
+          }
+        }
+      }
+    },
+    "保留 5 分鐘後自動關閉 (預設)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留 5 分鐘後自動關閉 (預設)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Active for 5 Minutes (Default)"
+          }
+        }
+      }
+    },
+    "暫停時維持最後歌詞顯示，逾時 5 分鐘後自動收起清理。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暫停時維持最後歌詞顯示，逾時 5 分鐘後自動收起清理。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retains last lyric line on pause and dismisses after 5 minutes."
+          }
+        }
+      }
+    },
+    "持續保留直至手動關閉": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "持續保留直至手動關閉"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep Active Until Dismissed"
+          }
+        }
+      }
+    },
+    "暫停時維持最後歌詞，隨時等待繼續播放。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暫停時維持最後歌詞，隨時等待繼續播放。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retains last lyric line on pause, awaiting playback resume."
+          }
+        }
+      }
+    },
+    "音樂暫停時立即收起": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音樂暫停時立即收起"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dismiss Immediately on Pause"
+          }
+        }
+      }
+    },
+    "音樂暫停時立即結束即時動態。": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音樂暫停時立即結束即時動態。"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ends Live Activity immediately when music is paused."
+          }
+        }
+      }
+    },
+    "繼續播放時自動重新啟動 (預設)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繼續播放時自動重新啟動 (預設)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto Resume on Playback (Default)"
+          }
+        }
+      }
+    },
+    "僅由使用者手動開啟": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅由使用者手動開啟"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual Resume Only"
+          }
+        }
+      }
+    },
+    "雙語翻譯優先，無翻譯則顯示下一句 (預設)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙語翻譯優先，無翻譯則顯示下一句 (預設)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilingual Translation First, or Next Line (Default)"
+          }
+        }
+      }
+    },
+    "僅顯示雙語翻譯": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅顯示雙語翻譯"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bilingual Translation Only"
+          }
+        }
+      }
+    },
+    "僅顯示下一句歌詞預覽": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅顯示下一句歌詞預覽"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Line Preview Only"
+          }
+        }
+      }
+    },
+    "不顯示副行": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不顯示副行"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Secondary Line"
+          }
+        }
+      }
+    },
+    "尚未播放音樂": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未播放音樂"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Playing"
+          }
+        }
+      }
+    },
+    "請在 Apple Music 播放歌曲": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "請在 Apple Music 播放歌曲"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please play a song in Apple Music"
+          }
+        }
+      }
+    },
+    "自動選擇（依環境推薦）": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自動選擇（依環境推薦）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto Select (Recommended)"
+          }
+        }
+      }
+    },
+    "子母畫面 (PiP) 懸浮膠囊": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "子母畫面 (PiP) 懸浮膠囊"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Picture in Picture (PiP) Capsule"
+          }
+        }
+      }
+    },
+    "原生動態島 / 即時動態": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原生動態島 / 即時動態"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native Dynamic Island / Live Activities"
+          }
+        }
+      }
+    },
+    "雙模式並行": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "雙模式並行"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dual Mode"
+          }
+        }
+      }
+    },
+    "動態島膠囊風（深黑圓角 + 頂部吸附感）": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "動態島膠囊風（深黑圓角 + 頂部吸附感）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dynamic Island Capsule (Dark Rounded + Docked)"
+          }
+        }
+      }
+    },
+    "標準雙行卡片（原文＋雙語翻譯）": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標準雙行卡片（原文＋雙語翻譯）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard Two-Line Card (Original + Translation)"
+          }
+        }
+      }
+    },
+    "極簡單行（高對比精緻小窗）": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "極簡單行（高對比精緻小窗）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimal Single Line (High Contrast Window)"
+          }
+        }
+      }
+    },
+    "AuraLyrics 即時歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AuraLyrics 即時歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AuraLyrics Real-Time Lyrics"
+          }
+        }
+      }
+    },
+    "此 iOS 版本不支援即時動態": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 iOS 版本不支援即時動態"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This iOS version does not support Live Activities"
+          }
+        }
+      }
+    },
+    "LiveContainer 虛擬環境無法載入 Widget Extension，請改用子母畫面 (PiP) 懸浮視窗": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiveContainer 虛擬環境無法載入 Widget Extension，請改用子母畫面 (PiP) 懸浮視窗"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiveContainer cannot load Widget Extensions. Please use Picture in Picture (PiP) floating window"
+          }
+        }
+      }
+    },
+    "系統「即時動態」權限未開啟，請至 iOS 設定中允許": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系統「即時動態」權限未開啟，請至 iOS 設定中允許"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Live Activities permission is disabled. Please enable it in iOS Settings"
+          }
+        }
+      }
+    },
+    "啟動即時動態失敗: %@": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "啟動即時動態失敗: %@"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed to start Live Activity: %@"
+          }
+        }
+      }
+    },
+    "檢測中...": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "檢測中..."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detecting..."
+          }
+        }
+      }
+    },
+    "LiveContainer 虛擬容器環境（預設採用免 Extension 的子母畫面 PiP 懸浮膠囊）": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiveContainer 虛擬容器環境（預設採用免 Extension 的子母畫面 PiP 懸浮膠囊）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "LiveContainer virtual container environment (defaults to Extension-free Picture in Picture PiP capsule)"
+          }
+        }
+      }
+    },
+    "獨立側載安裝環境（支援原生動態島 / 即時動態與子母畫面 PiP 雙引擎）": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "獨立側載安裝環境（支援原生動態島 / 即時動態與子母畫面 PiP 雙引擎）"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standalone sideload environment (supports native Dynamic Island / Live Activities and Picture in Picture PiP dual engines)"
+          }
+        }
+      }
+    },
+    "App 已暫停或關閉 · 點擊恢復同步": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App 已暫停或關閉 · 點擊恢復同步"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App paused or closed · Tap to resume sync"
+          }
+        }
+      }
+    },
+    "App 已暫停或關閉 · 點擊開啟 AuraLyrics 恢復同步": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App 已暫停或關閉 · 點擊開啟 AuraLyrics 恢復同步"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App paused or closed · Tap to open AuraLyrics and resume sync"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
