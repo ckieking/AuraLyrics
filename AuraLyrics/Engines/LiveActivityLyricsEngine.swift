@@ -258,7 +258,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             if var state = lastSentState, let activity = currentActivity {
                 state.isPlaying = false
                 lastSentState = state
-                Task {
+                updateTask?.cancel()
+                updateTask = Task {
                     await activity.update(ActivityContent(state: state, staleDate: nil))
                 }
             }
@@ -272,7 +273,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             if var state = lastSentState, let activity = currentActivity {
                 state.isPlaying = false
                 lastSentState = state
-                Task {
+                updateTask?.cancel()
+                updateTask = Task {
                     await activity.update(ActivityContent(state: state, staleDate: nil))
                 }
             }
@@ -293,7 +295,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             if var state = lastSentState, let activity = currentActivity {
                 state.isPlaying = true
                 lastSentState = state
-                Task {
+                updateTask?.cancel()
+                updateTask = Task {
                     await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(8)))
                 }
             }

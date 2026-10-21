@@ -244,8 +244,14 @@ public final class AppleMusicMonitor: ObservableObject {
             isPlaying = newIsPlaying
             let playTime = musicPlayer.currentPlaybackTime
             if !playTime.isNaN && !playTime.isInfinite && playTime >= 0 {
-                anchorPlaybackTimeSec = playTime
-                currentPlaybackTimeSec = playTime
+                if !newIsPlaying && abs(playTime - currentPlaybackTimeSec) < 0.4 {
+                    // 音樂剛暫停時：若 IPC 時間與本地插值時鐘偏差極小（< 0.4s），保留已平滑前進的 currentPlaybackTimeSec，
+                    // 堅決防止換行瞬間因 IPC 延遲把剛頂出的新歌詞扯回上一句！
+                    anchorPlaybackTimeSec = currentPlaybackTimeSec
+                } else {
+                    anchorPlaybackTimeSec = playTime
+                    currentPlaybackTimeSec = playTime
+                }
             }
             anchorMediaTime = CACurrentMediaTime()
             syncExternalEngines()
@@ -306,16 +312,14 @@ public final class AppleMusicMonitor: ObservableObject {
         if !isInBackground {
             let actualIsPlaying = (musicPlayer.playbackState == .playing)
             if isPlaying != actualIsPlaying {
-                isPlaying = actualIsPlaying
-                if isPlayTimeValid {
-                    anchorPlaybackTimeSec = playTime
-                }
-                anchorMediaTime = now
+                handlePlaybackStateChanged()
+                return
             }
         } else if hasFreshAdvance && !isPlaying {
             isPlaying = true
             anchorPlaybackTimeSec = playTime
             anchorMediaTime = now
+            LiveActivityLyricsEngine.shared.handlePlaybackResumed(track: currentTrack)
         }
 
         // 3. 高精度時鐘推進與智慧校準
@@ -341,11 +345,25 @@ public final class AppleMusicMonitor: ObservableObject {
                 currentPlaybackTimeSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
             }
         } else {
-            if isPlayTimeValid {
+            // 音樂處於暫停狀態：
+            // 嚴格凍結當前播放進度！絕不使用 MPMusicPlayerController 暫停時的微幅 IPC 噪聲覆寫時間。
+            // 僅在使用者於系統控制中心或鎖定畫面實體拖移進度條（Seek，時間差 > 0.5 秒）時才更新。
+            let isUserSeek = isPlayTimeValid && abs(playTime - currentPlaybackTimeSec) > 0.5
+            if isUserSeek {
                 anchorPlaybackTimeSec = playTime
                 currentPlaybackTimeSec = playTime
+                anchorMediaTime = now
+                lastPlaybackTimeSec = playTime
+                if currentTrack.duration > 0 {
+                    playbackProgress = min(max(currentPlaybackTimeSec / currentTrack.duration, 0.0), 1.0)
+                    if abs(PiPLyricsViewModel.shared.progress - playbackProgress) > 0.002 {
+                        PiPLyricsViewModel.shared.progress = playbackProgress
+                    }
+                }
+                refreshCurrentLineIndex(forceSync: true)
             }
-            anchorMediaTime = now
+            // 暫停且無 Seek 時，直接退出 tick，絕不重新觸發 refreshCurrentLineIndex 防止歌詞在邊界來回跳動！
+            return
         }
 
         if isPlayTimeValid && playTime > 0 {
@@ -372,6 +390,11 @@ public final class AppleMusicMonitor: ObservableObject {
         if let idx = newIndex, idx + 1 < currentLyrics.lines.count {
             let nextStartMs = currentLyrics.lines[idx + 1].timeMs
             nextLineIntervalSec = max(0.5, Double(nextStartMs - accurateTimeMs) / 1000.0)
+        }
+
+        // 若音樂已暫停且非手動強制同步 (forceSync == false)，嚴格鎖定歌詞行索引，絕不允許因邊界時間浮動而換行
+        if !isPlaying && !forceSync {
+            return
         }
 
         if newIndex != currentLineIndex {
