@@ -8,13 +8,15 @@ struct LyricsSourcePriorityView: View {
     @State private var showResetAlert = false
     @State private var draggingItemID: String? = nil
     @State private var dragStartIndex: Int? = nil
-    @State private var currentDragIndex: Int? = nil
+    @State private var currentTargetIndex: Int? = nil
     @State private var dragOffsetY: CGFloat = 0
+
+    private let itemHeight: CGFloat = 60
 
     var body: some View {
         List {
             Section {
-                ForEach(items) { item in
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     let isDragging = (draggingItemID == item.id)
 
                     HStack(spacing: 12) {
@@ -69,7 +71,7 @@ struct LyricsSourcePriorityView: View {
                         .labelsHidden()
                         .toggleStyle(SwitchToggleStyle(tint: .pink))
 
-                        // 專屬純 Y 軸拖曳把手（嚴格限制 X 軸移動，杜絕左右晃動與跳至首尾問題）
+                        // 專屬純 Y 軸拖曳把手（嚴格限制 X 軸移動，並採用虛擬插槽預覽，杜絕重排抖動與二次回彈動畫）
                         Image(systemName: "line.3.horizontal")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundColor(isDragging ? .pink : .secondary.opacity(0.6))
@@ -78,56 +80,66 @@ struct LyricsSourcePriorityView: View {
                             .gesture(
                                 DragGesture(coordinateSpace: .global)
                                     .onChanged { gesture in
-                                        guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
-
                                         if draggingItemID == nil {
                                             draggingItemID = item.id
-                                            dragStartIndex = currentIndex
-                                            currentDragIndex = currentIndex
+                                            dragStartIndex = index
+                                            currentTargetIndex = index
                                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                         }
 
                                         guard draggingItemID == item.id,
-                                              let startIndex = dragStartIndex,
-                                              let activeIndex = currentDragIndex else { return }
+                                              let startIndex = dragStartIndex else { return }
 
-                                        // 嚴格僅讀取垂直高度 Y，完全忽略水平 X
                                         let totalTranslationY = gesture.translation.height
+                                        dragOffsetY = totalTranslationY
 
-                                        let itemHeight: CGFloat = 60
                                         let stepsFromStart = Int(round(totalTranslationY / itemHeight))
-                                        let targetIndex = min(max(0, startIndex + stepsFromStart), items.count - 1)
+                                        let target = min(max(0, startIndex + stepsFromStart), items.count - 1)
 
-                                        if targetIndex != activeIndex {
-                                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                                let moved = items.remove(at: activeIndex)
-                                                items.insert(moved, at: targetIndex)
-                                                currentDragIndex = targetIndex
-                                            }
+                                        if target != currentTargetIndex {
+                                            currentTargetIndex = target
                                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                         }
-
-                                        // 計算相對於目前所在槽位的浮動偏移量（確保手指移動平滑且不累積逃逸）
-                                        dragOffsetY = totalTranslationY - CGFloat(targetIndex - startIndex) * itemHeight
                                     }
                                     .onEnded { _ in
-                                        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                            draggingItemID = nil
-                                            dragStartIndex = nil
-                                            currentDragIndex = nil
-                                            dragOffsetY = 0
+                                        if let startIndex = dragStartIndex,
+                                           let target = currentTargetIndex,
+                                           startIndex != target {
+                                            var newItems = items
+                                            let moved = newItems.remove(at: startIndex)
+                                            newItems.insert(moved, at: target)
+
+                                            // 使用無動畫交易立即提交陣列新排列，因視覺位置已完全吻合，杜絕二次回彈動畫
+                                            var transaction = Transaction()
+                                            transaction.disablesAnimations = true
+                                            withTransaction(transaction) {
+                                                items = newItems
+                                                draggingItemID = nil
+                                                dragStartIndex = nil
+                                                currentTargetIndex = nil
+                                                dragOffsetY = 0
+                                            }
+                                            lyricsProvider.savePriorityItems(newItems)
+                                        } else {
+                                            // 原位釋放：以彈簧動畫平滑復位
+                                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                                draggingItemID = nil
+                                                dragStartIndex = nil
+                                                currentTargetIndex = nil
+                                                dragOffsetY = 0
+                                            }
                                         }
                                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        lyricsProvider.savePriorityItems(items)
                                     }
                             )
                     }
                     .padding(.vertical, 4)
-                    // 核心物理約束：X 軸位移永久鎖定為 0，僅允許 Y 軸上下平滑滑動
-                    .offset(x: 0, y: isDragging ? dragOffsetY : 0)
+                    // 核心物理約束：X 軸位移永久鎖定為 0，純 Y 軸平滑過渡
+                    .offset(x: 0, y: itemOffsetY(index: index))
                     .zIndex(isDragging ? 100 : 1)
                     .scaleEffect(isDragging ? 1.02 : 1.0)
                     .shadow(color: isDragging ? Color.black.opacity(0.15) : Color.clear, radius: 10, y: 5)
+                    .animation(isDragging ? nil : .spring(response: 0.25, dampingFraction: 0.8), value: currentTargetIndex)
                 }
             } header: {
                 Text("搜尋順位清單")
@@ -162,5 +174,29 @@ struct LyricsSourcePriorityView: View {
         } message: {
             Text("此操作將恢復各歌詞庫與逐字/逐行時間軸的原始推薦順序。")
         }
+    }
+
+    private func itemOffsetY(index: Int) -> CGFloat {
+        guard let startIndex = dragStartIndex,
+              let targetIndex = currentTargetIndex,
+              let draggingID = draggingItemID else {
+            return 0
+        }
+
+        if items[index].id == draggingID {
+            return dragOffsetY
+        }
+
+        if targetIndex > startIndex {
+            if index > startIndex && index <= targetIndex {
+                return -itemHeight
+            }
+        } else if targetIndex < startIndex {
+            if index >= targetIndex && index < startIndex {
+                return itemHeight
+            }
+        }
+
+        return 0
     }
 }
