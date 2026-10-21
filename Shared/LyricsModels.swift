@@ -196,6 +196,77 @@ public enum DisplayEngineMode: String, CaseIterable, Identifiable, Codable, Send
     }
 }
 
+/// 歌詞來源平台
+public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable {
+    case musixmatch = "Musixmatch"
+    case netease = "NetEase"
+    case lrclib = "LRCLIB"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .musixmatch: return "Musixmatch"
+        case .netease: return String(localized: "網易雲音樂 (NetEase)")
+        case .lrclib: return "LRCLIB"
+        }
+    }
+}
+
+/// 自動歌詞搜尋順位項目（區分平台來源與逐字/逐行時間軸）
+public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashable, Sendable {
+    public var id: String
+    public var source: LyricsSource
+    public var isWordSync: Bool
+    public var isEnabled: Bool
+
+    public init(id: String, source: LyricsSource, isWordSync: Bool, isEnabled: Bool = true) {
+        self.id = id
+        self.source = source
+        self.isWordSync = isWordSync
+        self.isEnabled = isEnabled
+    }
+
+    public var title: String {
+        source.displayName
+    }
+
+    public var subtitle: String {
+        if isWordSync {
+            switch source {
+            case .musixmatch:
+                return String(localized: "逐字時間軸 (Richsync)")
+            case .netease:
+                return String(localized: "逐字時間軸 (YRC/KRC)")
+            case .lrclib:
+                return String(localized: "逐字時間軸 (Enhanced LRC)")
+            }
+        } else {
+            return String(localized: "普通逐行時間軸 (LRC)")
+        }
+    }
+
+    public var icon: String {
+        switch source {
+        case .musixmatch:
+            return "waveform.badge.mic"
+        case .netease:
+            return "cloud.fill"
+        case .lrclib:
+            return "music.note.list"
+        }
+    }
+
+    public static let defaultList: [LyricsSearchPriorityItem] = [
+        LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
+        LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
+        LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+        LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
+        LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
+        LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true)
+    ]
+}
+
 /// PiP 懸浮窗樣式風格
 public enum PiPVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     case dynamicIsland = "dynamicIsland"

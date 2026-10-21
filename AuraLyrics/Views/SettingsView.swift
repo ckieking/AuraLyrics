@@ -8,6 +8,7 @@ struct SettingsView: View {
     @ObservedObject var keepAlive = BackgroundKeepAliveManager.shared
     @ObservedObject var pipVM = PiPLyricsViewModel.shared
     @ObservedObject var musicMonitor = AppleMusicMonitor.shared
+    @ObservedObject var lyricsProvider = LyricsProviderService.shared
 
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
@@ -62,6 +63,25 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("即時動態")
+                }
+
+                // MARK: - 歌詞來源與搜尋順位
+                Section {
+                    NavigationLink {
+                        LyricsSourcePriorityView()
+                    } label: {
+                        HStack {
+                            Label("自動搜尋歌詞順位", systemImage: "arrow.up.arrow.down.square")
+                            Spacer()
+                            Text(lyricsProvider.highestPriorityDescription)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                } header: {
+                    Text("歌詞來源")
+                } footer: {
+                    Text("可自訂 Musixmatch、網易雲音樂與 LRCLIB 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。")
                 }
 
                 // MARK: - 歌詞視覺效果
@@ -261,7 +281,7 @@ struct SettingsView: View {
                     HStack {
                         Text("歌詞來源")
                         Spacer()
-                        Text("網易雲 (NetEase) / LRCLIB")
+                        Text("Musixmatch / 網易雲 (NetEase) / LRCLIB")
                             .foregroundColor(.secondary)
                     }
                 } header: {
