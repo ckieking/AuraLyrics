@@ -16,3 +16,15 @@ Payload/
 
 # Agent & Local tools
 .agents/
+
+# Environment & Secrets
+.env
+*.env
+.env.*
+*.secret
+*.key
+*.pem
+*.p12
+*.mobileprovision
+fastlane/
+
