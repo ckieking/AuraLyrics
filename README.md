@@ -1,7 +1,7 @@
 # AuraLyrics
 
 <p align="center">
-  <img src="AuraLyrics/Assets.xcassets/AppIcon.appiconset/AppIcon-Default.png" alt="AuraLyrics App Icon" width="128" height="128" style="border-radius: 28px;" />
+  <img src="AuraLyrics/Resources/AppIcon-Preview.png" alt="AuraLyrics App Icon" width="128" height="128" />
 </p>
 
 > 專為 iOS 設計的動態歌詞應用程式，支援 Apple Music 播放追蹤、子母畫面 (PiP) 懸浮視窗與動態島即時動態（Live Activity）。
