@@ -9,7 +9,7 @@
 </p>
 
 > A dynamic lyrics application designed for iOS, supporting Apple Music tracking, Picture-in-Picture (PiP) floating window, and Dynamic Island Live Activities.
->>The vast majority of content in this repository was created by AI agents.
+>> The vast majority of content in this repository was created by AI agents.
 
 ---
 
