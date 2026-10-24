@@ -5,11 +5,15 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <b>繁體中文</b>
+  <a href="https://auralyrics.dpdns.org"><b>🌐 官方網站</b></a> &nbsp;|&nbsp;
+  <a href="README.md">English</a> &nbsp;|&nbsp;
+  <b>繁體中文</b>
 </p>
 
 > 專為 iOS 設計的動態歌詞應用程式，支援 Apple Music 播放追蹤、子母畫面 (PiP) 懸浮視窗與動態島即時動態（Live Activity）。
 >> 這個倉庫中的大部分內容由AI代理建立
+>
+> 🌐 **官方網站：** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)
 
 ---
 
