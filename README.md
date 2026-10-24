@@ -5,11 +5,15 @@
 </p>
 
 <p align="center">
-  <b>English</b> | <a href="README.zh-TW.md">繁體中文</a>
+  <a href="https://auralyrics.dpdns.org"><b>🌐 Website</b></a> &nbsp;|&nbsp;
+  <b>English</b> &nbsp;|&nbsp;
+  <a href="README.zh-TW.md">繁體中文</a>
 </p>
 
 > A dynamic lyrics application designed for iOS, supporting Apple Music tracking, Picture-in-Picture (PiP) floating window, and Dynamic Island Live Activities.
 >> The vast majority of content in this repository was created by AI agents.
+>
+> 🌐 **Website:** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)
 
 ---
 
