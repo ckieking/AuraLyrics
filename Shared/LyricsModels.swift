@@ -7,26 +7,54 @@ public struct TrackInfo: Codable, Equatable, Sendable {
     public var album: String
     public var duration: TimeInterval
     public var artworkData: Data?
+    public var genre: String
 
     public init(
         title: String,
         artist: String,
         album: String,
         duration: TimeInterval,
-        artworkData: Data? = nil
+        artworkData: Data? = nil,
+        genre: String = ""
     ) {
         self.title = title
         self.artist = artist
         self.album = album
         self.duration = duration
         self.artworkData = artworkData
+        self.genre = genre
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case title, artist, album, duration, artworkData, genre
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.title = try container.decode(String.self, forKey: .title)
+        self.artist = try container.decode(String.self, forKey: .artist)
+        self.album = try container.decode(String.self, forKey: .album)
+        self.duration = try container.decode(TimeInterval.self, forKey: .duration)
+        self.artworkData = try container.decodeIfPresent(Data.self, forKey: .artworkData)
+        self.genre = try container.decodeIfPresent(String.self, forKey: .genre) ?? ""
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(title, forKey: .title)
+        try container.encode(artist, forKey: .artist)
+        try container.encode(album, forKey: .album)
+        try container.encode(duration, forKey: .duration)
+        try container.encodeIfPresent(artworkData, forKey: .artworkData)
+        try container.encode(genre, forKey: .genre)
     }
 
     public static let placeholder = TrackInfo(
         title: String(localized: "尚未播放音樂"),
         artist: String(localized: "請在 Apple Music 播放歌曲"),
         album: "AuraLyrics",
-        duration: 0
+        duration: 0,
+        genre: ""
     )
 }
 
@@ -79,7 +107,7 @@ public struct LyricLine: Identifiable, Codable, Equatable, Sendable {
 
 /// 完整同步歌詞集合與相關元資料
 public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
-    public var id: String { "\(trackTitle)-\(artistName)-\(source)" }
+    public var id: String { "\(trackTitle)-\(artistName)-\(source)-\(lines.count)-\(lines.first?.timeMs ?? 0)-\(lines.last?.timeMs ?? 0)-\(hasSyllables ? "ws" : "ls")" }
     public var trackTitle: String
     public var artistName: String
     public var lines: [LyricLine]
@@ -215,6 +243,23 @@ public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable 
     }
 }
 
+/// 歌詞語系獨立順位設定分類
+public enum LyricsLanguageProfile: String, CaseIterable, Identifiable, Codable, Sendable {
+    case japanese = "japanese"
+    case asian = "asian"
+    case western = "western"
+
+    public var id: String { rawValue }
+
+    public var localizedTitle: String {
+        switch self {
+        case .japanese: return String(localized: "日語")
+        case .asian: return String(localized: "華語 / 亞洲")
+        case .western: return String(localized: "歐美 / 預設")
+        }
+    }
+}
+
 /// 自動歌詞搜尋順位項目（區分平台來源與逐字/逐行時間軸）
 public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashable, Sendable {
     public var id: String
@@ -263,16 +308,45 @@ public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashab
         }
     }
 
-    public static let defaultList: [LyricsSearchPriorityItem] = [
-        LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
-        LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
-        LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
-        LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
-        LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
-        LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
-        LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
-        LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true)
-    ]
+    public static func defaultList(for profile: LyricsLanguageProfile) -> [LyricsSearchPriorityItem] {
+        switch profile {
+        case .japanese:
+            return [
+                LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true)
+            ]
+        case .asian:
+            return [
+                LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true)
+            ]
+        case .western:
+            return [
+                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true)
+            ]
+        }
+    }
+
+    public static let defaultList: [LyricsSearchPriorityItem] = defaultList(for: .asian)
 }
 
 /// PiP 懸浮窗樣式風格
