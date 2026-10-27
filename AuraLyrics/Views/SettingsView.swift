@@ -70,13 +70,7 @@ struct SettingsView: View {
                     NavigationLink {
                         LyricsSourcePriorityView()
                     } label: {
-                        HStack {
-                            Label("自動搜尋歌詞順位", systemImage: "arrow.up.arrow.down.square")
-                            Spacer()
-                            Text(lyricsProvider.highestPriorityDescription)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
+                        Label("自動搜尋歌詞順位", systemImage: "arrow.up.arrow.down.square")
                     }
                 } header: {
                     Text("歌詞來源")
