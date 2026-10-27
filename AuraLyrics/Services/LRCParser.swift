@@ -578,5 +578,292 @@ public final class LRCParser: Sendable {
         // 若為標準 LRC 字串格式
         return parse(lrcContent: subtitleBody)
     }
+
+    // MARK: - PetitLyrics WSY (逐字音節時間軸 XML, lyricsType = 3) 解析
+    public func parsePetitLyricsWSY(wsyXML: String) -> [LyricLine] {
+        let trimmed = wsyXML.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return [] }
+
+        let parser = XMLParser(data: data)
+        parser.shouldResolveExternalEntities = false
+        let delegate = PetitLyricsWSYXMLDelegate()
+        parser.delegate = delegate
+        guard parser.parse(), !delegate.lines.isEmpty else { return [] }
+
+        return delegate.lines.sorted { $0.timeMs < $1.timeMs }
+    }
+
+    // MARK: - PetitLyrics LSY (普通逐行時間軸二進位 XOR 解碼, lyricsType = 2 搭配 lyricsType = 1 純文字)
+    public func decodePetitLyricsLSY(lsyBase64: String, plainLyricsBase64: String) -> [LyricLine] {
+        guard let encryptedData = Data(base64Encoded: lsyBase64, options: .ignoreUnknownCharacters),
+              let plainData = Data(base64Encoded: plainLyricsBase64, options: .ignoreUnknownCharacters),
+              let plainText = String(data: plainData, encoding: .utf8) else {
+            return []
+        }
+
+        let bytes = [UInt8](encryptedData)
+        guard bytes.count >= 0xce else { return [] }
+
+        var protectionKey = UInt16(bytes[0x1a]) | (UInt16(bytes[0x1b]) << 8)
+        let protectionKeySwitchFlag = bytes[0x19] != 0
+        if protectionKeySwitchFlag {
+            protectionKey = (protectionKey & 0x0003)
+                | ((protectionKey & 0x000c) << 2)
+                | ((protectionKey & 0x0030) >> 2)
+                | ((protectionKey & 0x00c0) << 2)
+                | ((protectionKey & 0x0300) >> 2)
+                | ((protectionKey & 0x0c00) << 2)
+                | ((protectionKey & 0x3000) >> 2)
+                | (protectionKey & 0xc000)
+        }
+
+        let lineCountRaw = UInt32(bytes[0x38])
+            | (UInt32(bytes[0x39]) << 8)
+            | (UInt32(bytes[0x3a]) << 16)
+            | (UInt32(bytes[0x3b]) << 24)
+        let lineCount = Int(lineCountRaw)
+        guard lineCount > 0, lineCount <= 10_000, 0xcc + lineCount * 2 <= bytes.count else {
+            return []
+        }
+
+        let normalizedText = plainText
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let textLines = normalizedText.components(separatedBy: "\n")
+
+        var lines: [LyricLine] = []
+        lines.reserveCapacity(lineCount)
+        var epoch = 0
+        var previousCs = -1
+
+        for lineIdx in 0..<lineCount {
+            let offset = 0xcc + lineIdx * 2
+            let timeRaw = UInt16(bytes[offset]) | (UInt16(bytes[offset + 1]) << 8)
+            let decodedCs = Int(timeRaw ^ protectionKey)
+            var timeCs = decodedCs + epoch * 65536
+            if previousCs >= 0 && (previousCs - timeCs) > 32768 {
+                epoch += 1
+                timeCs = decodedCs + epoch * 65536
+            }
+            previousCs = timeCs
+
+            let rawLine = lineIdx < textLines.count ? textLines[lineIdx] : ""
+            let cleanLine = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleanLine.isEmpty else { continue }
+
+            lines.append(LyricLine(
+                timeMs: max(0, timeCs * 10),
+                text: cleanLine,
+                syllables: nil
+            ))
+        }
+
+        return lines.sorted { $0.timeMs < $1.timeMs }
+    }
 }
 
+// MARK: - PetitLyrics WSY XMLParser Delegate
+private final class PetitLyricsWSYXMLDelegate: NSObject, XMLParserDelegate {
+    struct RawWord {
+        let text: String
+        let startMs: Int
+        let endMs: Int?
+    }
+
+    var lines: [LyricLine] = []
+
+    private var currentElement = ""
+    private var inLine = false
+    private var inWord = false
+
+    private var currentLineString = ""
+    private var currentWords: [RawWord] = []
+
+    private var currentWordString = ""
+    private var currentStartTime = ""
+    private var currentEndTime = ""
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String] = [:]
+    ) {
+        currentElement = elementName
+        if elementName == "line" {
+            inLine = true
+            currentLineString = ""
+            currentWords.removeAll(keepingCapacity: true)
+        } else if elementName == "word" {
+            inWord = true
+            currentWordString = ""
+            currentStartTime = ""
+            currentEndTime = ""
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if inWord {
+            switch currentElement {
+            case "wordstring":
+                currentWordString += string
+            case "starttime":
+                currentStartTime += string
+            case "endtime":
+                currentEndTime += string
+            default:
+                break
+            }
+        } else if inLine {
+            if currentElement == "linestring" {
+                currentLineString += string
+            }
+        }
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?
+    ) {
+        if elementName == "word" {
+            if let rawStart = Int(currentStartTime.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                let startMs = max(0, rawStart)
+                let endMs = Int(currentEndTime.trimmingCharacters(in: .whitespacesAndNewlines))
+                currentWords.append(RawWord(
+                    text: currentWordString,
+                    startMs: startMs,
+                    endMs: endMs
+                ))
+            }
+            inWord = false
+        } else if elementName == "line" {
+            finalizeCurrentLine()
+            inLine = false
+        }
+        currentElement = ""
+    }
+
+    private static func isCJK(_ c: Character) -> Bool {
+        guard let scalar = c.unicodeScalars.first, c.unicodeScalars.count == 1 else { return false }
+        let val = scalar.value
+        return (0x4E00...0x9FFF).contains(val) ||   // CJK Unified Ideographs
+               (0x3400...0x4DBF).contains(val) ||   // CJK Extension A
+               (0x3040...0x309F).contains(val) ||   // Hiragana
+               (0x30A0...0x30FF).contains(val) ||   // Katakana
+               (0xAC00...0xD7AF).contains(val)      // Hangul
+    }
+
+    private static func isLatinWordChar(_ c: Character) -> Bool {
+        if c.isWhitespace { return false }
+        return (c.isLetter || c.isNumber || c == "'" || c == "’" || c == "-") && !isCJK(c)
+    }
+
+    private static func isKatakanaChar(_ c: Character) -> Bool {
+        guard let scalar = c.unicodeScalars.first, c.unicodeScalars.count == 1 else { return false }
+        return (0x30A0...0x30FF).contains(scalar.value) && c != "・"
+    }
+
+    private static func isKinsokuTrailingChar(_ c: Character) -> Bool {
+        let kinsokuSet: Set<Character> = [
+            "、", "。", "，", "．", "！", "？", "!", "?",
+            "：", "；", ":", ";", "…", "—", "～", "~",
+            "）", "]", "}", "」", "』", "”", "\"", "’", "'",
+            "ー", "っ", "ッ", "ゃ", "ゅ", "ょ", "ャ", "ュ", "ョ",
+            "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ァ", "ィ", "ゥ", "ェ", "ォ"
+        ]
+        return kinsokuSet.contains(c)
+    }
+
+    private static func shouldMerge(prevChar: Character, nextChar: Character) -> Bool {
+        if nextChar.isWhitespace {
+            return true
+        }
+        if isKinsokuTrailingChar(nextChar) {
+            return true
+        }
+        if isLatinWordChar(prevChar) && isLatinWordChar(nextChar) {
+            return true
+        }
+        if isKatakanaChar(prevChar) && isKatakanaChar(nextChar) {
+            return true
+        }
+        return false
+    }
+
+    private func finalizeCurrentLine() {
+        let validWords = currentWords.filter { !$0.text.isEmpty }
+        guard !validWords.isEmpty else { return }
+
+        // 確認非空字詞時間軸單調遞增；若損毀則僅捨棄逐字音節並退回逐行時間軸，避免整行歌詞遺失
+        var isMonotonic = true
+        for i in 0..<(validWords.count - 1) {
+            if validWords[i].startMs > validWords[i + 1].startMs {
+                isMonotonic = false
+                break
+            }
+        }
+
+        var syllables: [LyricSyllable] = []
+        if isMonotonic {
+            // 關鍵排版聚合：PetitLyrics WSY 原始資料將英文單字（如 Weekend、Cruel）與日文外來語（片假名如 アイドル、ラブストーリー）
+            // 拆散為單一字母或單一字元，若直接轉為 LyricSyllable 會導致 SyllableFlowLayout 將單字拆碎折行。
+            // 依語法與禁則規則聚合為完整單字，保留字詞原子性與行內平滑光暈。
+            struct MergedWord {
+                var text: String
+                var startMs: Int
+                var endMs: Int
+            }
+
+            var mergedWords: [MergedWord] = []
+            for word in validWords {
+                guard let firstChar = word.text.first else { continue }
+                let wordEndMs = word.endMs ?? (word.startMs + 200)
+
+                if let lastIdx = mergedWords.indices.last,
+                   let lastChar = mergedWords[lastIdx].text.last,
+                   Self.shouldMerge(prevChar: lastChar, nextChar: firstChar) {
+                    mergedWords[lastIdx].text += word.text
+                    mergedWords[lastIdx].endMs = max(mergedWords[lastIdx].endMs, wordEndMs)
+                } else {
+                    mergedWords.append(MergedWord(
+                        text: word.text,
+                        startMs: word.startMs,
+                        endMs: wordEndMs
+                    ))
+                }
+            }
+
+            for (i, mWord) in mergedWords.enumerated() {
+                let durationMs: Int
+                if mWord.endMs >= mWord.startMs {
+                    durationMs = max(20, mWord.endMs - mWord.startMs)
+                } else if i + 1 < mergedWords.count {
+                    durationMs = max(20, mergedWords[i + 1].startMs - mWord.startMs)
+                } else {
+                    durationMs = 200
+                }
+
+                syllables.append(LyricSyllable(
+                    text: mWord.text,
+                    timeMs: mWord.startMs,
+                    durationMs: durationMs
+                ))
+            }
+        }
+
+        let rawLine = currentLineString.trimmingCharacters(in: .newlines)
+        let joinedWords = validWords.map { $0.text }.joined()
+        let lineText = rawLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? joinedWords : rawLine
+        guard !lineText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        let lineStartMs = syllables.first?.timeMs ?? validWords.first?.startMs ?? 0
+        lines.append(LyricLine(
+            timeMs: lineStartMs,
+            text: lineText,
+            syllables: syllables.isEmpty ? nil : syllables
+        ))
+    }
+}

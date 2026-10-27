@@ -81,7 +81,7 @@ struct SettingsView: View {
                 } header: {
                     Text("歌詞來源")
                 } footer: {
-                    Text("可自訂 Musixmatch、網易雲音樂與 LRCLIB 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。")
+                    Text("可自訂 Musixmatch、網易雲音樂、LRCLIB 與 PetitLyrics 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。")
                 }
 
                 // MARK: - 歌詞視覺效果
@@ -281,7 +281,7 @@ struct SettingsView: View {
                     HStack {
                         Text("歌詞來源")
                         Spacer()
-                        Text("Musixmatch / 網易雲 (NetEase) / LRCLIB")
+                        Text("Musixmatch / 網易雲 (NetEase) / LRCLIB / PetitLyrics")
                             .foregroundColor(.secondary)
                     }
                     HStack {

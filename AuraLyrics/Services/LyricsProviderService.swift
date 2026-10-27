@@ -35,12 +35,21 @@ public final class LyricsProviderService: ObservableObject {
            !saved.isEmpty {
             var list = saved
             let existingIds = Set(saved.map { $0.id })
+            var didInsertNewDefaults = false
             for def in LyricsSearchPriorityItem.defaultList {
                 if !existingIds.contains(def.id) {
-                    list.append(def)
+                    if def.isWordSync, let lastWordIdx = list.lastIndex(where: { $0.isWordSync }) {
+                        list.insert(def, at: lastWordIdx + 1)
+                    } else {
+                        list.append(def)
+                    }
+                    didInsertNewDefaults = true
                 }
             }
             self.priorityItems = list
+            if didInsertNewDefaults {
+                savePriorityItems(list)
+            }
         } else {
             self.priorityItems = LyricsSearchPriorityItem.defaultList
             UserDefaults.standard.set(currentPrioritySchemaVersion, forKey: prioritySchemaVersionKey)
@@ -203,6 +212,8 @@ public final class LyricsProviderService: ObservableObject {
                 res = await fetchFromNetEase(title: cleanTitle, artist: cleanArtist, durationSec: track.duration)
             case .lrclib:
                 res = await fetchFromLRCLIB(title: cleanTitle, artist: cleanArtist, durationSec: track.duration)
+            case .petitlyrics:
+                res = await fetchFromPetitLyrics(title: cleanTitle, artist: cleanArtist, durationSec: track.duration)
             }
             sourceCache[source] = res
             return res
@@ -236,11 +247,25 @@ public final class LyricsProviderService: ObservableObject {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
 
+        // 若手動搜尋字串包含空白（例如「歌名 歌手」或「First Love 宇多田ヒカル」），以最後一個空白拆分歌名與歌手供 PetitLyrics 結構化查詢
+        let petitTitle: String
+        let petitArtist: String
+        if let lastSpaceIdx = trimmed.lastIndex(where: { $0.isWhitespace }) {
+            let head = String(trimmed[..<lastSpaceIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let tail = String(trimmed[trimmed.index(after: lastSpaceIdx)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            petitTitle = head.isEmpty ? trimmed : head
+            petitArtist = head.isEmpty ? "" : tail
+        } else {
+            petitTitle = trimmed
+            petitArtist = ""
+        }
+
         async let mxmTask = fetchFromMusixmatch(title: trimmed, artist: "", durationSec: durationSec)
         async let netEaseTask = fetchFromNetEase(title: trimmed, artist: "", durationSec: durationSec)
         async let lrclibTask = fetchFromLRCLIB(title: trimmed, artist: "", durationSec: durationSec)
+        async let petitTask = fetchFromPetitLyrics(title: petitTitle, artist: petitArtist, durationSec: durationSec)
 
-        let (mxmResult, netEaseResult, lrclibResult) = await (mxmTask, netEaseTask, lrclibTask)
+        let (mxmResult, netEaseResult, lrclibResult, petitResult) = await (mxmTask, netEaseTask, lrclibTask, petitTask)
         var results: [SyncedLyrics] = []
         if let mxm = mxmResult {
             results.append(mxm)
@@ -250,6 +275,9 @@ public final class LyricsProviderService: ObservableObject {
         }
         if let lrclib = lrclibResult, !results.contains(where: { $0.id == lrclib.id }) {
             results.append(lrclib)
+        }
+        if let petit = petitResult, !results.contains(where: { $0.id == petit.id }) {
+            results.append(petit)
         }
         return results
     }
@@ -642,4 +670,431 @@ public final class LyricsProviderService: ObservableObject {
 
         return nil
     }
+
+    // MARK: - PetitLyrics API 請求（支援 WSY 逐字時間軸 XML + LSY 逐行二進位 XOR 解碼）
+    // shortcut: README.md and README.zh-TW.md do not yet list PetitLyrics (WSY/LSY) as a supported lyrics source, update both README files before the next release
+    public func fetchFromPetitLyrics(title: String, artist: String, durationSec: TimeInterval = 0) async -> SyncedLyrics? {
+        let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanTitle.isEmpty else { return nil }
+
+        var candidates = await requestPetitLyricsCandidates(
+            title: cleanTitle,
+            artist: cleanArtist,
+            lyricsType: 3,
+            maxCount: 5
+        )
+        var resolvedQueryTitle = cleanTitle
+        var resolvedQueryArtist = cleanArtist
+        var usedAlternativeSplit = false
+
+        func hasExactTitleMatch(_ list: [PetitLyricsCandidate], targetTitle: String) -> Bool {
+            let normTarget = Self.normalizeComparisonText(targetTitle.lowercased())
+            guard !normTarget.isEmpty else { return false }
+            return list.contains {
+                Self.normalizeComparisonText($0.title.lowercased()) == normTarget
+            }
+        }
+
+        // 若含歌手查詢無結果或未命中完整歌名（如手動搜尋將含空白的多字歌名或複合歌手拆開，或羅馬拼音/日文歌手別名差異），依序降級重試
+        if (!hasExactTitleMatch(candidates, targetTitle: cleanTitle) || candidates.isEmpty) && !cleanArtist.isEmpty {
+            let combinedTitle = "\(cleanTitle) \(cleanArtist)"
+            let tokens = combinedTitle.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+
+            var fallbackQueries: [(title: String, artist: String, isAltSplit: Bool)] = [
+                (combinedTitle, "", true)
+            ]
+            if tokens.count >= 3 {
+                let firstWordTitle = tokens[0]
+                let restArtist = tokens.dropFirst().joined(separator: " ")
+                fallbackQueries.append((firstWordTitle, restArtist, true))
+            }
+            if tokens.count >= 4 {
+                let mid = tokens.count / 2
+                let midTitle = tokens[..<mid].joined(separator: " ")
+                let midArtist = tokens[mid...].joined(separator: " ")
+                fallbackQueries.append((midTitle, midArtist, true))
+            }
+            fallbackQueries.append((cleanTitle, "", false))
+
+            var seenPairs: Set<String> = ["\(cleanTitle)\u{0}\(cleanArtist)"]
+            for queryPair in fallbackQueries {
+                let key = "\(queryPair.title)\u{0}\(queryPair.artist)"
+                guard seenPairs.insert(key).inserted else { continue }
+
+                let retryCandidates = await requestPetitLyricsCandidates(
+                    title: queryPair.title,
+                    artist: queryPair.artist,
+                    lyricsType: 3,
+                    maxCount: 5
+                )
+                if hasExactTitleMatch(retryCandidates, targetTitle: queryPair.title) {
+                    candidates = retryCandidates
+                    resolvedQueryTitle = queryPair.title
+                    resolvedQueryArtist = queryPair.artist
+                    usedAlternativeSplit = queryPair.isAltSplit
+                    break
+                } else if candidates.isEmpty && !retryCandidates.isEmpty {
+                    candidates = retryCandidates
+                    resolvedQueryTitle = queryPair.title
+                    resolvedQueryArtist = queryPair.artist
+                    usedAlternativeSplit = queryPair.isAltSplit
+                }
+            }
+        }
+
+        // 僅保留具備時間軸（lyricsType = 3 逐字 WSY 或 lyricsType = 2 逐行 LSY）的候選項目
+        let syncedCandidates = candidates.filter {
+            $0.lyricsType == 3 || $0.lyricsType == 2 || $0.availableLyricsType == 3 || $0.availableLyricsType == 2
+        }
+        guard !syncedCandidates.isEmpty else { return nil }
+
+        let targetTitleForScoring = resolvedQueryTitle
+        let targetArtistForScoring = usedAlternativeSplit ? resolvedQueryArtist : cleanArtist
+        let targetTitleLower = targetTitleForScoring.lowercased()
+        let targetArtistLower = targetArtistForScoring.lowercased()
+        let normTargetTitle = Self.normalizeComparisonText(targetTitleLower)
+        let normTargetArtist = Self.normalizeComparisonText(targetArtistLower)
+
+        // 依「逐字優先 + 時長誤差 + 歌手/標題匹配度」自動評分選出最佳版本
+        let scoredCandidates = syncedCandidates.enumerated().map { (index, candidate) -> (candidate: PetitLyricsCandidate, score: Double, index: Int) in
+            let candTitleLower = candidate.title.lowercased()
+            let normCandTitle = Self.normalizeComparisonText(candTitleLower)
+            let normCandArtist = Self.normalizeComparisonText(candidate.artist.lowercased())
+            var score: Double = 100.0
+
+            // 1. 排除非目標的 Remix / Live / 伴奏版本
+            if candTitleLower.contains("remix") && !targetTitleLower.contains("remix") {
+                score -= 50.0
+            }
+            if candTitleLower.contains("live") && !targetTitleLower.contains("live") {
+                score -= 40.0
+            }
+            if candTitleLower.contains("instrumental") || candidate.title.contains("伴奏") || candidate.title.contains("カラオケ") || candTitleLower.contains("off vocal") {
+                score -= 60.0
+            }
+
+            // 2. 逐字時間軸優先加分 (lyricsType = 3 WSY > lyricsType = 2 LSY)
+            let effectiveType = (candidate.lyricsType == 3 || candidate.lyricsType == 2) ? candidate.lyricsType : candidate.availableLyricsType
+            if effectiveType == 3 {
+                score += 50.0
+            } else if effectiveType == 2 {
+                score += 20.0
+            }
+
+            // 3. 時長誤差評分
+            if durationSec > 0, candidate.durationSec > 0 {
+                let diff = abs(candidate.durationSec - durationSec)
+                if diff < 3.0 {
+                    score += 40.0
+                } else if diff < 8.0 {
+                    score += 15.0
+                } else {
+                    score -= min(30.0, diff * 2.0)
+                }
+            }
+
+            // 4. 標題與歌手匹配度
+            if !normTargetTitle.isEmpty && !normCandTitle.isEmpty {
+                if normCandTitle == normTargetTitle {
+                    score += 25.0
+                } else if normCandTitle.contains(normTargetTitle) || normTargetTitle.contains(normCandTitle) {
+                    score += 10.0
+                } else {
+                    score -= 35.0
+                }
+            }
+
+            if !normTargetArtist.isEmpty && !normCandArtist.isEmpty {
+                if normCandArtist == normTargetArtist {
+                    score += 30.0
+                } else if normCandArtist.contains(normTargetArtist) || normTargetArtist.contains(normCandArtist) {
+                    score += 20.0
+                }
+            }
+
+            return (candidate, score, index)
+        }
+
+        let sortedCandidates = scoredCandidates.sorted {
+            if $0.score != $1.score {
+                return $0.score > $1.score
+            }
+            return $0.index < $1.index
+        }.map { $0.candidate }
+
+        for candidate in sortedCandidates {
+            if let origLines = await decodePetitLyricsCandidate(candidate), !origLines.isEmpty {
+                let (cleanLines, extractedCredits) = LRCParser.shared.extractCredits(from: origLines)
+                let finalLines = cleanLines.isEmpty ? origLines : cleanLines
+                guard !finalLines.isEmpty else { continue }
+
+                var credits = extractedCredits
+                if !candidate.writer.isEmpty {
+                    let writerCredit = "Written by \(candidate.writer)"
+                    if !credits.contains(writerCredit) {
+                        credits.append(writerCredit)
+                    }
+                }
+                if !candidate.composer.isEmpty {
+                    let composerCredit = "Composed by \(candidate.composer)"
+                    if !credits.contains(composerCredit) {
+                        credits.append(composerCredit)
+                    }
+                }
+
+                let resolvedTitle: String
+                let resolvedArtist: String
+                if usedAlternativeSplit {
+                    resolvedTitle = candidate.title.isEmpty ? resolvedQueryTitle : candidate.title
+                    resolvedArtist = candidate.artist.isEmpty ? resolvedQueryArtist : candidate.artist
+                } else {
+                    resolvedTitle = cleanTitle
+                    resolvedArtist = cleanArtist.isEmpty ? candidate.artist : cleanArtist
+                }
+
+                return SyncedLyrics(
+                    trackTitle: resolvedTitle,
+                    artistName: resolvedArtist,
+                    lines: finalLines,
+                    credits: credits,
+                    offsetMs: 0,
+                    source: "PetitLyrics"
+                )
+            }
+        }
+
+        return nil
+    }
+
+    private static func normalizeComparisonText(_ text: String) -> String {
+        text.replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "　", with: "")
+    }
+
+    private func decodePetitLyricsCandidate(_ candidate: PetitLyricsCandidate) async -> [LyricLine]? {
+        if candidate.lyricsType == 3 || candidate.availableLyricsType == 3 {
+            var wsyBase64 = (candidate.lyricsType == 3) ? candidate.lyricsData : ""
+            if wsyBase64.isEmpty, !candidate.lyricsId.isEmpty {
+                let wsyCandidates = await requestPetitLyricsCandidates(
+                    title: "",
+                    artist: "",
+                    lyricsId: candidate.lyricsId,
+                    lyricsType: 3,
+                    maxCount: 1
+                )
+                wsyBase64 = wsyCandidates.first(where: { $0.lyricsType == 3 && !$0.lyricsData.isEmpty })?.lyricsData ?? ""
+            }
+            if !wsyBase64.isEmpty,
+               let xmlData = Data(base64Encoded: wsyBase64, options: .ignoreUnknownCharacters),
+               let wsyXML = String(data: xmlData, encoding: .utf8) {
+                let lines = LRCParser.shared.parsePetitLyricsWSY(wsyXML: wsyXML)
+                if !lines.isEmpty {
+                    return lines
+                }
+            }
+        }
+
+        if candidate.lyricsType == 2 || candidate.availableLyricsType == 2 || !candidate.lyricsId.isEmpty {
+            var lsyBase64 = (candidate.lyricsType == 2) ? candidate.lyricsData : ""
+            if lsyBase64.isEmpty, !candidate.lyricsId.isEmpty {
+                let lsyCandidates = await requestPetitLyricsCandidates(
+                    title: "",
+                    artist: "",
+                    lyricsId: candidate.lyricsId,
+                    lyricsType: 2,
+                    maxCount: 1
+                )
+                lsyBase64 = lsyCandidates.first(where: { $0.lyricsType == 2 && !$0.lyricsData.isEmpty })?.lyricsData ?? ""
+            }
+            guard !lsyBase64.isEmpty,
+                  let plainBase64 = await fetchPetitLyricsPlainText(for: candidate),
+                  !plainBase64.isEmpty else {
+                return nil
+            }
+            let lines = LRCParser.shared.decodePetitLyricsLSY(
+                lsyBase64: lsyBase64,
+                plainLyricsBase64: plainBase64
+            )
+            return lines.isEmpty ? nil : lines
+        }
+
+        return nil
+    }
+
+    private func fetchPetitLyricsPlainText(for candidate: PetitLyricsCandidate) async -> String? {
+        if !candidate.lyricsId.isEmpty {
+            let byId = await requestPetitLyricsCandidates(
+                title: "",
+                artist: "",
+                lyricsId: candidate.lyricsId,
+                lyricsType: 1,
+                maxCount: 1
+            )
+            if let match = byId.first(where: { $0.lyricsType == 1 && !$0.lyricsData.isEmpty }) {
+                return match.lyricsData
+            }
+        }
+
+        let byMeta = await requestPetitLyricsCandidates(
+            title: candidate.title,
+            artist: candidate.artist,
+            album: candidate.album,
+            lyricsType: 1,
+            maxCount: 1
+        )
+        return byMeta.first(where: { $0.lyricsType == 1 && !$0.lyricsData.isEmpty })?.lyricsData
+    }
+
+    private func requestPetitLyricsCandidates(
+        title: String,
+        artist: String,
+        album: String = "",
+        lyricsId: String = "",
+        lyricsType: Int,
+        maxCount: Int
+    ) async -> [PetitLyricsCandidate] {
+        guard let url = URL(string: "https://p1.petitlyrics.com/api/GetPetitLyricsData.php") else {
+            return []
+        }
+
+        var formItems: [URLQueryItem] = [
+            URLQueryItem(name: "clientAppId", value: "p1110417"),
+            URLQueryItem(name: "terminalType", value: "10"),
+            URLQueryItem(name: "lyricsType", value: String(lyricsType)),
+            URLQueryItem(name: "maxcount", value: String(maxCount)),
+            URLQueryItem(name: "maxCount", value: String(maxCount))
+        ]
+
+        if !lyricsId.isEmpty {
+            formItems.append(URLQueryItem(name: "key_lyricsId", value: lyricsId))
+        } else {
+            formItems.append(URLQueryItem(name: "key_title", value: title))
+            if !artist.isEmpty {
+                formItems.append(URLQueryItem(name: "key_artist", value: artist))
+            }
+            if !album.isEmpty {
+                formItems.append(URLQueryItem(name: "key_album", value: album))
+            }
+        }
+
+        var formComponents = URLComponents()
+        formComponents.queryItems = formItems
+        guard let bodyString = formComponents.percentEncodedQuery,
+              let bodyData = bodyString.data(using: .utf8) else {
+            return []
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
+        request.setValue("AuraLyrics-iOS-OpenSource/1.0", forHTTPHeaderField: "User-Agent")
+        request.httpBody = bodyData
+        request.timeoutInterval = 8
+
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                return []
+            }
+            let parser = XMLParser(data: data)
+            parser.shouldResolveExternalEntities = false
+            let delegate = PetitLyricsResponseXMLDelegate()
+            parser.delegate = delegate
+            guard parser.parse() else { return [] }
+            return delegate.candidates
+        } catch {
+            print("[LyricsProvider] PetitLyrics 請求失敗: \(error.localizedDescription)")
+            return []
+        }
+    }
 }
+
+// MARK: - PetitLyrics API 回應模型與 XML 解析器
+private struct PetitLyricsCandidate {
+    var lyricsId: String = ""
+    var title: String = ""
+    var artist: String = ""
+    var album: String = ""
+    var writer: String = ""
+    var composer: String = ""
+    var lyricsType: Int = 0
+    var availableLyricsType: Int = 0
+    var durationSec: Double = 0
+    var lyricsData: String = ""
+}
+
+private final class PetitLyricsResponseXMLDelegate: NSObject, XMLParserDelegate {
+    var candidates: [PetitLyricsCandidate] = []
+
+    private var currentElement = ""
+    private var inSong = false
+    private var currentCandidate = PetitLyricsCandidate()
+    private var currentText = ""
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String] = [:]
+    ) {
+        currentElement = elementName
+        currentText = ""
+        if elementName == "song" {
+            inSong = true
+            currentCandidate = PetitLyricsCandidate()
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard inSong, !currentElement.isEmpty else { return }
+        currentText += string
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?
+    ) {
+        guard inSong else { return }
+        let trimmed = currentText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch elementName {
+        case "lyricsId":
+            currentCandidate.lyricsId = trimmed
+        case "title":
+            currentCandidate.title = trimmed
+        case "artist":
+            currentCandidate.artist = trimmed
+        case "album":
+            currentCandidate.album = trimmed
+        case "writer":
+            currentCandidate.writer = trimmed
+        case "composer":
+            currentCandidate.composer = trimmed
+        case "lyricsType":
+            currentCandidate.lyricsType = Int(trimmed) ?? 0
+        case "availableLyricsType":
+            currentCandidate.availableLyricsType = Int(trimmed) ?? 0
+        case "duration", "trackDuration":
+            if let rawDur = Double(trimmed), rawDur > 0 {
+                // PetitLyrics API 回傳的 duration 通常為毫秒（如 213288 代表 213.288 秒）
+                currentCandidate.durationSec = rawDur > 2000 ? (rawDur / 1000.0) : rawDur
+            }
+        case "lyricsData":
+            currentCandidate.lyricsData = trimmed
+        case "song":
+            if !currentCandidate.lyricsData.isEmpty || !currentCandidate.lyricsId.isEmpty {
+                candidates.append(currentCandidate)
+            }
+            inSong = false
+        default:
+            break
+        }
+        currentElement = ""
+        currentText = ""
+    }
+}
+

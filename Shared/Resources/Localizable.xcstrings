@@ -2673,6 +2673,22 @@
         }
       }
     },
+    "逐字時間軸 (WSY)": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "逐字時間軸 (WSY)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Word-by-word Sync (WSY)"
+          }
+        }
+      }
+    },
     "普通逐行時間軸 (LRC)": {
       "localizations": {
         "zh-Hant": {
@@ -2737,18 +2753,34 @@
         }
       }
     },
-    "可自訂 Musixmatch、網易雲音樂與 LRCLIB 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。": {
+    "可自訂 Musixmatch、網易雲音樂、LRCLIB 與 PetitLyrics 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。": {
       "localizations": {
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "可自訂 Musixmatch、網易雲音樂與 LRCLIB 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。"
+            "value": "可自訂 Musixmatch、網易雲音樂、LRCLIB 與 PetitLyrics 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Customize the search priority among Musixmatch, NetEase, and LRCLIB, distinguishing between word-level and line-level sync."
+            "value": "Customize the search priority among Musixmatch, NetEase, LRCLIB, and PetitLyrics, distinguishing between word-level and line-level sync."
+          }
+        }
+      }
+    },
+    "Musixmatch / 網易雲 (NetEase) / LRCLIB / PetitLyrics": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Musixmatch / 網易雲 (NetEase) / LRCLIB / PetitLyrics"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Musixmatch / NetEase / LRCLIB / PetitLyrics"
           }
         }
       }
