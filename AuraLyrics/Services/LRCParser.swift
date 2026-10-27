@@ -641,7 +641,7 @@ public final class LRCParser: Sendable {
             let timeRaw = UInt16(bytes[offset]) | (UInt16(bytes[offset + 1]) << 8)
             let decodedCs = Int(timeRaw ^ protectionKey)
             var timeCs = decodedCs + epoch * 65536
-            if previousCs >= 0 && timeCs < previousCs {
+            if previousCs >= 0 && (previousCs - timeCs) > 32768 {
                 epoch += 1
                 timeCs = decodedCs + epoch * 65536
             }
@@ -747,52 +747,55 @@ private final class PetitLyricsWSYXMLDelegate: NSObject, XMLParserDelegate {
     }
 
     private func finalizeCurrentLine() {
-        guard !currentWords.isEmpty else { return }
+        let validWords = currentWords.filter { !$0.text.isEmpty }
+        guard !validWords.isEmpty else { return }
 
-        // 確認行內字詞時間軸單調遞增，排除損毀資料
-        for i in 0..<(currentWords.count - 1) {
-            if currentWords[i].startMs > currentWords[i + 1].startMs {
-                return
+        // 確認非空字詞時間軸單調遞增；若損毀則僅捨棄逐字音節並退回逐行時間軸，避免整行歌詞遺失
+        var isMonotonic = true
+        for i in 0..<(validWords.count - 1) {
+            if validWords[i].startMs > validWords[i + 1].startMs {
+                isMonotonic = false
+                break
             }
         }
 
         var syllables: [LyricSyllable] = []
-        for (i, word) in currentWords.enumerated() {
-            guard !word.text.isEmpty else { continue }
-
-            // 若單一 token 為純半形空白且前方已有音節，合併至前一音節以維持平滑流光
-            if word.text == " " && !syllables.isEmpty {
-                syllables[syllables.count - 1].text += " "
-                continue
-            }
-
-            let durationMs: Int
-            if let endMs = word.endMs, endMs >= word.startMs {
-                durationMs = max(20, endMs - word.startMs)
-            } else {
-                var nextStart = word.startMs + 200
-                for j in (i + 1)..<currentWords.count {
-                    if !currentWords[j].text.isEmpty && currentWords[j].text != " " {
-                        nextStart = currentWords[j].startMs
-                        break
-                    }
+        if isMonotonic {
+            for (i, word) in validWords.enumerated() {
+                // 若單一 token 為純半形空白且前方已有音節，合併至前一音節以維持平滑流光
+                if word.text == " " && !syllables.isEmpty {
+                    syllables[syllables.count - 1].text += " "
+                    continue
                 }
-                durationMs = max(20, nextStart - word.startMs)
-            }
 
-            syllables.append(LyricSyllable(
-                text: word.text,
-                timeMs: word.startMs,
-                durationMs: durationMs
-            ))
+                let durationMs: Int
+                if let endMs = word.endMs, endMs >= word.startMs {
+                    durationMs = max(20, endMs - word.startMs)
+                } else {
+                    var nextStart = word.startMs + 200
+                    for j in (i + 1)..<validWords.count {
+                        if validWords[j].text != " " {
+                            nextStart = validWords[j].startMs
+                            break
+                        }
+                    }
+                    durationMs = max(20, nextStart - word.startMs)
+                }
+
+                syllables.append(LyricSyllable(
+                    text: word.text,
+                    timeMs: word.startMs,
+                    durationMs: durationMs
+                ))
+            }
         }
 
         let rawLine = currentLineString.trimmingCharacters(in: .newlines)
-        let joinedWords = syllables.map { $0.text }.joined()
+        let joinedWords = validWords.map { $0.text }.joined()
         let lineText = rawLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? joinedWords : rawLine
         guard !lineText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
-        let lineStartMs = syllables.first?.timeMs ?? currentWords.first?.startMs ?? 0
+        let lineStartMs = syllables.first?.timeMs ?? validWords.first?.startMs ?? 0
         lines.append(LyricLine(
             timeMs: lineStartMs,
             text: lineText,

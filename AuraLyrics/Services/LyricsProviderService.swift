@@ -684,33 +684,62 @@ public final class LyricsProviderService: ObservableObject {
             lyricsType: 3,
             maxCount: 5
         )
-        var matchedViaCombinedQuery = false
+        var resolvedQueryTitle = cleanTitle
+        var resolvedQueryArtist = cleanArtist
+        var usedAlternativeSplit = false
 
-        // 若含歌手查詢無結果或未命中完整歌名（如手動搜尋將含空白的多字歌名拆開，或羅馬拼音/日文歌手別名差異），依序降級重試
-        let hasExactTitleMatch = candidates.contains {
-            Self.normalizeComparisonText($0.title.lowercased()) == Self.normalizeComparisonText(cleanTitle.lowercased())
-        }
-        if (!hasExactTitleMatch || candidates.isEmpty) && !cleanArtist.isEmpty {
-            let combinedTitle = "\(cleanTitle) \(cleanArtist)"
-            let combinedCandidates = await requestPetitLyricsCandidates(
-                title: combinedTitle,
-                artist: "",
-                lyricsType: 3,
-                maxCount: 5
-            )
-            let combinedHasExactTitle = combinedCandidates.contains {
-                Self.normalizeComparisonText($0.title.lowercased()) == Self.normalizeComparisonText(combinedTitle.lowercased())
+        func hasExactTitleMatch(_ list: [PetitLyricsCandidate], targetTitle: String) -> Bool {
+            let normTarget = Self.normalizeComparisonText(targetTitle.lowercased())
+            guard !normTarget.isEmpty else { return false }
+            return list.contains {
+                Self.normalizeComparisonText($0.title.lowercased()) == normTarget
             }
-            if combinedHasExactTitle || (candidates.isEmpty && !combinedCandidates.isEmpty) {
-                candidates = combinedCandidates
-                matchedViaCombinedQuery = true
-            } else if candidates.isEmpty {
-                candidates = await requestPetitLyricsCandidates(
-                    title: cleanTitle,
-                    artist: "",
+        }
+
+        // 若含歌手查詢無結果或未命中完整歌名（如手動搜尋將含空白的多字歌名或複合歌手拆開，或羅馬拼音/日文歌手別名差異），依序降級重試
+        if (!hasExactTitleMatch(candidates, targetTitle: cleanTitle) || candidates.isEmpty) && !cleanArtist.isEmpty {
+            let combinedTitle = "\(cleanTitle) \(cleanArtist)"
+            let tokens = combinedTitle.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+
+            var fallbackQueries: [(title: String, artist: String, isAltSplit: Bool)] = [
+                (combinedTitle, "", true)
+            ]
+            if tokens.count >= 3 {
+                let firstWordTitle = tokens[0]
+                let restArtist = tokens.dropFirst().joined(separator: " ")
+                fallbackQueries.append((firstWordTitle, restArtist, true))
+            }
+            if tokens.count >= 4 {
+                let mid = tokens.count / 2
+                let midTitle = tokens[..<mid].joined(separator: " ")
+                let midArtist = tokens[mid...].joined(separator: " ")
+                fallbackQueries.append((midTitle, midArtist, true))
+            }
+            fallbackQueries.append((cleanTitle, "", false))
+
+            var seenPairs: Set<String> = ["\(cleanTitle)\u{0}\(cleanArtist)"]
+            for queryPair in fallbackQueries {
+                let key = "\(queryPair.title)\u{0}\(queryPair.artist)"
+                guard seenPairs.insert(key).inserted else { continue }
+
+                let retryCandidates = await requestPetitLyricsCandidates(
+                    title: queryPair.title,
+                    artist: queryPair.artist,
                     lyricsType: 3,
                     maxCount: 5
                 )
+                if hasExactTitleMatch(retryCandidates, targetTitle: queryPair.title) {
+                    candidates = retryCandidates
+                    resolvedQueryTitle = queryPair.title
+                    resolvedQueryArtist = queryPair.artist
+                    usedAlternativeSplit = queryPair.isAltSplit
+                    break
+                } else if candidates.isEmpty && !retryCandidates.isEmpty {
+                    candidates = retryCandidates
+                    resolvedQueryTitle = queryPair.title
+                    resolvedQueryArtist = queryPair.artist
+                    usedAlternativeSplit = queryPair.isAltSplit
+                }
             }
         }
 
@@ -720,8 +749,8 @@ public final class LyricsProviderService: ObservableObject {
         }
         guard !syncedCandidates.isEmpty else { return nil }
 
-        let targetTitleForScoring = matchedViaCombinedQuery ? "\(cleanTitle) \(cleanArtist)" : cleanTitle
-        let targetArtistForScoring = matchedViaCombinedQuery ? "" : cleanArtist
+        let targetTitleForScoring = resolvedQueryTitle
+        let targetArtistForScoring = usedAlternativeSplit ? resolvedQueryArtist : cleanArtist
         let targetTitleLower = targetTitleForScoring.lowercased()
         let targetArtistLower = targetArtistForScoring.lowercased()
         let normTargetTitle = Self.normalizeComparisonText(targetTitleLower)
@@ -816,9 +845,9 @@ public final class LyricsProviderService: ObservableObject {
 
                 let resolvedTitle: String
                 let resolvedArtist: String
-                if matchedViaCombinedQuery {
-                    resolvedTitle = candidate.title.isEmpty ? "\(cleanTitle) \(cleanArtist)" : candidate.title
-                    resolvedArtist = candidate.artist
+                if usedAlternativeSplit {
+                    resolvedTitle = candidate.title.isEmpty ? resolvedQueryTitle : candidate.title
+                    resolvedArtist = candidate.artist.isEmpty ? resolvedQueryArtist : candidate.artist
                 } else {
                     resolvedTitle = cleanTitle
                     resolvedArtist = cleanArtist.isEmpty ? candidate.artist : cleanArtist
@@ -844,16 +873,29 @@ public final class LyricsProviderService: ObservableObject {
     }
 
     private func decodePetitLyricsCandidate(_ candidate: PetitLyricsCandidate) async -> [LyricLine]? {
-        if candidate.lyricsType == 3 {
-            guard let xmlData = Data(base64Encoded: candidate.lyricsData, options: .ignoreUnknownCharacters),
-                  let wsyXML = String(data: xmlData, encoding: .utf8) else {
-                return nil
+        if candidate.lyricsType == 3 || candidate.availableLyricsType == 3 {
+            var wsyBase64 = (candidate.lyricsType == 3) ? candidate.lyricsData : ""
+            if wsyBase64.isEmpty, !candidate.lyricsId.isEmpty {
+                let wsyCandidates = await requestPetitLyricsCandidates(
+                    title: "",
+                    artist: "",
+                    lyricsId: candidate.lyricsId,
+                    lyricsType: 3,
+                    maxCount: 1
+                )
+                wsyBase64 = wsyCandidates.first(where: { $0.lyricsType == 3 && !$0.lyricsData.isEmpty })?.lyricsData ?? ""
             }
-            let lines = LRCParser.shared.parsePetitLyricsWSY(wsyXML: wsyXML)
-            return lines.isEmpty ? nil : lines
+            if !wsyBase64.isEmpty,
+               let xmlData = Data(base64Encoded: wsyBase64, options: .ignoreUnknownCharacters),
+               let wsyXML = String(data: xmlData, encoding: .utf8) {
+                let lines = LRCParser.shared.parsePetitLyricsWSY(wsyXML: wsyXML)
+                if !lines.isEmpty {
+                    return lines
+                }
+            }
         }
 
-        if candidate.lyricsType == 2 || candidate.availableLyricsType == 2 {
+        if candidate.lyricsType == 2 || candidate.availableLyricsType == 2 || !candidate.lyricsId.isEmpty {
             var lsyBase64 = (candidate.lyricsType == 2) ? candidate.lyricsData : ""
             if lsyBase64.isEmpty, !candidate.lyricsId.isEmpty {
                 let lsyCandidates = await requestPetitLyricsCandidates(
@@ -863,7 +905,7 @@ public final class LyricsProviderService: ObservableObject {
                     lyricsType: 2,
                     maxCount: 1
                 )
-                lsyBase64 = lsyCandidates.first(where: { $0.lyricsType == 2 })?.lyricsData ?? ""
+                lsyBase64 = lsyCandidates.first(where: { $0.lyricsType == 2 && !$0.lyricsData.isEmpty })?.lyricsData ?? ""
             }
             guard !lsyBase64.isEmpty,
                   let plainBase64 = await fetchPetitLyricsPlainText(for: candidate),
@@ -1044,7 +1086,7 @@ private final class PetitLyricsResponseXMLDelegate: NSObject, XMLParserDelegate 
         case "lyricsData":
             currentCandidate.lyricsData = trimmed
         case "song":
-            if !currentCandidate.lyricsData.isEmpty {
+            if !currentCandidate.lyricsData.isEmpty || !currentCandidate.lyricsId.isEmpty {
                 candidates.append(currentCandidate)
             }
             inSong = false
