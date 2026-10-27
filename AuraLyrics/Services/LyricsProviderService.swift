@@ -317,8 +317,16 @@ public final class LyricsProviderService: ObservableObject {
                 "sixstones", "naniwa danshi", "king & prince", "arashi", "嵐", "smap", "v6", "kinki kids"
             ]
             let isJpArtist = japaneseArtists.contains { ja in
-                if ja.count <= 4 && !ja.contains(" ") && !ja.contains("-") && !ja.contains("~") {
-                    return artistTokens.contains(ja) || artistLower == ja
+                let isPureLatin = ja.unicodeScalars.allSatisfy { $0.isASCII }
+                if isPureLatin {
+                    if artistLower == ja { return true }
+                    if ja.contains(" ") || ja.contains("-") || ja.contains("/") {
+                        let paddedArtist = " \(artistLower) "
+                        let paddedJa = " \(ja) "
+                        return paddedArtist.contains(paddedJa)
+                    } else {
+                        return artistTokens.contains(ja)
+                    }
                 } else {
                     return artistLower == ja || artistLower.contains(ja)
                 }
@@ -1607,11 +1615,24 @@ public struct MetadataNormalizer {
             if match1 || match2 {
                 artistScore = 25.0
             } else {
-                // 若歌名極短 (<= 3 字) 且歌名僅部分相似 (sim < 0.8)，歌手又完全不同且時長差 > 3.5s，判定為同名異曲淘汰
-                if targetTitle.count <= 3 && bestTitleSim < 0.8 && (targetDuration == 0 || diff > 3.5) {
+                // 歌手完全不符：嚴格防範「同名異曲」張冠李戴
+                // 1. 若時長誤差 > 3.0 秒，或雙方任何一方缺乏有效時長無法驗證，直接淘汰！
+                if targetDuration <= 0 || candidateDuration <= 0 || diff > 3.0 {
                     return nil
                 }
-                artistScore = -20.0
+                // 2. 跨語系假名污染防護：若目標曲目完全不含日文假名，而候選歌手或曲名包含日文假名，直接淘汰
+                let targetHasKana = (targetTitle + targetArtist).unicodeScalars.contains { s in
+                    let v = s.value
+                    return (v >= 0x3040 && v <= 0x309F) || (v >= 0x30A0 && v <= 0x30FF) || (v >= 0xFF66 && v <= 0xFF9F)
+                }
+                let candHasKana = (candidateArtist + candidateTitle).unicodeScalars.contains { s in
+                    let v = s.value
+                    return (v >= 0x3040 && v <= 0x309F) || (v >= 0x30A0 && v <= 0x30FF) || (v >= 0xFF66 && v <= 0xFF9F)
+                }
+                if !targetHasKana && candHasKana {
+                    return nil
+                }
+                artistScore = -40.0
             }
         }
 
