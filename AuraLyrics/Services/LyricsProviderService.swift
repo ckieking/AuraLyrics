@@ -1325,15 +1325,17 @@ public final class LyricsProviderService: ObservableObject {
 public struct MetadataNormalizer {
     public static func foldText(_ text: String) -> String {
         var transformed = text
-        if let transform = StringTransform("Hant-Hans"),
-           let t1 = transformed.applyingTransform(transform, reverse: false) {
+        let primaryTransform = StringTransform("Hant-Hans")
+        if let t1 = transformed.applyingTransform(primaryTransform, reverse: false) {
             transformed = t1
-        } else if let transform = StringTransform("Traditional-Simplified"),
-                  let t1 = transformed.applyingTransform(transform, reverse: false) {
-            transformed = t1
+        } else {
+            let fallbackTransform = StringTransform("Traditional-Simplified")
+            if let t2 = transformed.applyingTransform(fallbackTransform, reverse: false) {
+                transformed = t2
+            }
         }
-        if let t2 = transformed.applyingTransform(.fullwidthToHalfwidth, reverse: false) {
-            transformed = t2
+        if let t3 = transformed.applyingTransform(.fullwidthToHalfwidth, reverse: false) {
+            transformed = t3
         }
         let lower = transformed.lowercased()
         var stripped = ""
