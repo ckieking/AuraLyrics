@@ -145,4 +145,6 @@ open AuraLyrics.xcodeproj
 
 ## License
 
-This project is licensed under the [MIT License](./LICENSE).
+Copyright (c) 2026 ckieking and AuraLyrics Contributors.
+
+This project is licensed under the [Mozilla Public License 2.0 (MPL-2.0)](./LICENSE).

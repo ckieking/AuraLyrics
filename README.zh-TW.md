@@ -143,4 +143,6 @@ open AuraLyrics.xcodeproj
 
 ## 開源授權 (License)
 
-本專案採 [MIT License](./LICENSE) 授權條款開源發布。
+Copyright (c) 2026 ckieking and AuraLyrics Contributors.
+
+本專案採 [Mozilla Public License 2.0 (MPL-2.0)](./LICENSE) 授權條款開源發布。

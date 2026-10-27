@@ -287,7 +287,7 @@ struct SettingsView: View {
                     HStack {
                         Text("開源授權")
                         Spacer()
-                        Text("MIT License")
+                        Text("MPL-2.0")
                             .foregroundColor(.secondary)
                     }
                 } header: {
