@@ -174,6 +174,7 @@ public final class AppleMusicMonitor: ObservableObject {
         let artist = nowPlaying.artist ?? String(localized: "未知歌手")
         let album = nowPlaying.albumTitle ?? ""
         let duration = nowPlaying.playbackDuration
+        let genre = nowPlaying.genre ?? ""
 
         if !force && lastPersistentID != 0 && lastPersistentID == persistentID && currentTrack.title == title && currentTrack.artist == artist && (!currentLyrics.lines.isEmpty || isLoadingLyrics) {
             return
@@ -194,7 +195,8 @@ public final class AppleMusicMonitor: ObservableObject {
             artist: artist,
             album: album,
             duration: duration,
-            artworkData: artworkData
+            artworkData: artworkData,
+            genre: genre
         )
 
         currentTrack = newTrack
@@ -292,7 +294,8 @@ public final class AppleMusicMonitor: ObservableObject {
                     artist: currentTrack.artist,
                     album: currentTrack.album,
                     duration: nowPlaying.playbackDuration,
-                    artworkData: currentTrack.artworkData
+                    artworkData: currentTrack.artworkData,
+                    genre: currentTrack.genre.isEmpty ? (nowPlaying.genre ?? "") : currentTrack.genre
                 )
                 currentTrack = updatedTrack
             }

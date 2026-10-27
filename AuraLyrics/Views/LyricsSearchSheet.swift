@@ -202,7 +202,7 @@ struct LyricsSearchSheet: View {
                 .font(.headline)
                 .foregroundColor(.primary)
 
-            Text("輸入歌名、歌手或關鍵字\n搜尋 LRCLIB 與網易雲歌詞")
+            Text("輸入歌名、歌手或關鍵字\n搜尋 Musixmatch、網易雲、LRCLIB 與 PetitLyrics 歌詞")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
@@ -253,9 +253,22 @@ struct LyricsSearchSheet: View {
         searchResults = []
 
         let duration = currentTrack.duration
+        let targetTitle: String
+        let targetArtist: String
+        let defaultQuery = "\(currentTrack.title) \(currentTrack.artist)".trimmingCharacters(in: .whitespaces)
+        if query == defaultQuery && !currentTrack.title.isEmpty && currentTrack.title != TrackInfo.placeholder.title {
+            targetTitle = currentTrack.title
+            targetArtist = currentTrack.artist
+        } else {
+            targetTitle = ""
+            targetArtist = ""
+        }
+
         searchTask = Task { @MainActor in
             let results = await LyricsProviderService.shared.searchOnlineLyrics(
                 query: query,
+                targetTitle: targetTitle,
+                targetArtist: targetArtist,
                 durationSec: duration
             )
             guard !Task.isCancelled else { return }

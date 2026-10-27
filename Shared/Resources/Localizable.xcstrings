@@ -1,6 +1,134 @@
 {
   "sourceLanguage": "zh-Hant",
   "strings": {
+    "日語": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日語"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Japanese"
+          }
+        }
+      }
+    },
+    "華語 / 亞洲": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "華語 / 亞洲"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mandarin / Asian"
+          }
+        }
+      }
+    },
+    "歐美 / 預設": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歐美 / 預設"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Western / Default"
+          }
+        }
+      }
+    },
+    "搜尋語系": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜尋語系"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Language"
+          }
+        }
+      }
+    },
+    "%@ 順位清單": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 順位清單"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ Priority List"
+          }
+        }
+      }
+    },
+    "僅重設目前語系": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅重設目前語系"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset Current Language Only"
+          }
+        }
+      }
+    },
+    "重設全部語系": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重設全部語系"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset All Languages"
+          }
+        }
+      }
+    },
+    "輸入歌名、歌手或關鍵字\n搜尋 Musixmatch、網易雲、LRCLIB 與 PetitLyrics 歌詞": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "輸入歌名、歌手或關鍵字\n搜尋 Musixmatch、網易雲、LRCLIB 與 PetitLyrics 歌詞"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter track, artist, or keywords\nto search Musixmatch, NetEase, LRCLIB & PetitLyrics"
+          }
+        }
+      }
+    },
     "正在播放": {
       "localizations": {
         "zh-Hant": {
