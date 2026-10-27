@@ -4,7 +4,7 @@ import SwiftUI
 struct LyricsSourcePriorityView: View {
     @ObservedObject var lyricsProvider = LyricsProviderService.shared
 
-    @State private var selectedProfile: LyricsLanguageProfile = .japanese
+    @State private var selectedProfile: LyricsLanguageProfile = .western
     @State private var items: [LyricsSearchPriorityItem] = []
     @State private var showResetAlert = false
 
@@ -20,15 +20,6 @@ struct LyricsSourcePriorityView: View {
                 .pickerStyle(.segmented)
             } header: {
                 Text("搜尋語系")
-            } footer: {
-                switch selectedProfile {
-                case .japanese:
-                    Text("自動辨識含日文假名、日系專屬標記、J-Pop/Anime 類型或日本常見歌手之曲目，預設優先採用日文庫最完整之 PetitLyrics 逐字時間軸。")
-                case .asian:
-                    Text("自動辨識含中文、韓文諺文或華語/韓語類型之曲目，預設優先採用網易雲音樂逐字時間軸與雙語翻譯。")
-                case .western:
-                    Text("其餘歐美流行或未分類曲目，預設優先採用 Musixmatch 與 LRCLIB。")
-                }
             }
 
             // MARK: - 該語系搜尋順位列表

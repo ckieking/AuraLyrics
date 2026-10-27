@@ -11,12 +11,12 @@ public final class LyricsProviderService: ObservableObject {
     private let currentCacheSchemaVersion = 3
     private let priorityOrderPrefix = "lyricsSearchPriorityOrder_"
     private let prioritySchemaVersionPrefix = "lyricsSearchPrioritySchemaVersion_"
-    private let currentPrioritySchemaVersion = 3
+    private let currentPrioritySchemaVersion = 4
 
     @Published public private(set) var priorityProfiles: [LyricsLanguageProfile: [LyricsSearchPriorityItem]] = [:]
 
     public var priorityItems: [LyricsSearchPriorityItem] {
-        priorityProfiles[.asian] ?? LyricsSearchPriorityItem.defaultList(for: .asian)
+        priorityProfiles[.western] ?? LyricsSearchPriorityItem.defaultList(for: .western)
     }
 
     private init() {
@@ -91,7 +91,7 @@ public final class LyricsProviderService: ObservableObject {
     }
 
     public func savePriorityItems(_ items: [LyricsSearchPriorityItem]) {
-        savePriorityItems(items, for: .asian)
+        savePriorityItems(items, for: .western)
     }
 
     public func resetPriorityItems(for profile: LyricsLanguageProfile) {
@@ -99,7 +99,7 @@ public final class LyricsProviderService: ObservableObject {
     }
 
     public func resetPriorityItems() {
-        resetPriorityItems(for: .asian)
+        resetPriorityItems(for: .western)
     }
 
     public func resetAllPriorityItems() {
@@ -115,10 +115,10 @@ public final class LyricsProviderService: ObservableObject {
             }
             return String(localized: "無")
         }
-        let j = topDesc(for: .japanese)
-        let a = topDesc(for: .asian)
         let w = topDesc(for: .western)
-        return "日: \(j) / 亞: \(a) / 歐美: \(w)"
+        let a = topDesc(for: .asian)
+        let j = topDesc(for: .japanese)
+        return "歐美: \(w) / 亞: \(a) / 日: \(j)"
     }
 
     // MARK: - 快取遷移 (Cache Schema v3)

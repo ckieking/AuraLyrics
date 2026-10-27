@@ -245,17 +245,17 @@ public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable 
 
 /// 歌詞語系獨立順位設定分類
 public enum LyricsLanguageProfile: String, CaseIterable, Identifiable, Codable, Sendable {
-    case japanese = "japanese"
-    case asian = "asian"
     case western = "western"
+    case asian = "asian"
+    case japanese = "japanese"
 
     public var id: String { rawValue }
 
     public var localizedTitle: String {
         switch self {
-        case .japanese: return String(localized: "日語")
-        case .asian: return String(localized: "華語 / 亞洲")
         case .western: return String(localized: "歐美 / 預設")
+        case .asian: return String(localized: "華語 / 亞洲")
+        case .japanese: return String(localized: "日語")
         }
     }
 }
@@ -313,40 +313,40 @@ public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashab
         case .japanese:
             return [
                 LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
-                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true),
-                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
                 LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
-                LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true)
+                LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true)
             ]
         case .asian:
             return [
                 LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
-                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
-                LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
-                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true),
                 LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
-                LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true)
+                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true)
             ]
         case .western:
             return [
-                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
-                LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
-                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
-                LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
                 LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
-                LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true)
+                LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
+                LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true)
             ]
         }
     }
 
-    public static let defaultList: [LyricsSearchPriorityItem] = defaultList(for: .asian)
+    public static let defaultList: [LyricsSearchPriorityItem] = defaultList(for: .western)
 }
 
 /// PiP 懸浮窗樣式風格
