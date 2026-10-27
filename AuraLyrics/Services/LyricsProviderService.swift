@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import NaturalLanguage
 
 /// 歌詞來源與本地快取管理器（純手機端連線，無須後端伺服器）
 public final class LyricsProviderService: ObservableObject {
@@ -280,7 +281,7 @@ public final class LyricsProviderService: ObservableObject {
 
         let jpSymbols: Set<Character> = [
             "々", "〆", "ヶ", "ゐ", "ゑ", "ヰ", "ヱ",
-            "咲", "雫", "凪", "叶", "桜", "遥", "凛", "澤", "齋", "邊", "濱",
+            "咲", "雫", "凪", "桜", "遥", "凛", "澤", "齋", "邊", "濱",
             "峠", "辻", "笹", "榊", "畑", "畠", "栃", "栂", "椙", "籾", "鰯",
             "鯖", "鯵", "噺", "麿", "躾"
         ]
@@ -297,42 +298,17 @@ public final class LyricsProviderService: ObservableObject {
             return .asian
         }
 
-        // 3. 日本常見羅馬拼音/英文與純漢字歌手特徵庫
-        let artistLower = artist.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if !artistLower.isEmpty {
-            let artistTokens = Set(artistLower.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty })
-            let japaneseArtists: [String] = [
-                "yoasobi", "ado", "vaundy", "lisa", "aimer", "king gnu", "kenshi yonezu", "米津玄師", "米津玄师",
-                "fujii kaze", "藤井風", "藤井风", "radwimps", "one ok rock", "official髭男dism", "official hige dandism",
-                "hikaru utada", "宇多田光", "宇多田ヒカル", "mrs. green apple", "back number", "yorushika", "ヨルシカ",
-                "zutomayo", "ずっと真夜中でいいのに", "eve", "tatsuya kitani", "creepy nuts", "aimyon", "あいみょん",
-                "sekai no owari", "perfume", "babymetal", "sawano hiroyuki", "澤野弘之", "久石讓", "久石让",
-                "坂本龍一", "坂本龙一", "椎名林檎", "東京事變", "东京事变", "中島美嘉", "中岛美嘉", "濱崎步", "滨崎步",
-                "安室奈美惠", "星野源", "菅田將暉", "菅田将晖", "優里", "yuuri", "imase", "tani yuuki", "milet",
-                "yama", "ikura", "ayase", "b'z", "mr.children", "spitz", "glay", "l'arc~en~ciel", "uverworld",
-                "man with a mission", "asian kung-fu generation", "bump of chicken", "kana-boon", "amazarashi",
-                "ling tosite sigure", "sakanaction", "daoko", "majiko", "reol", "sayuri", "supercell", "flow",
-                "spyair", "granrodeo", "myth & roid", "ali", "scandal", "wacci", "novelbright", "macaroni empitsu",
-                "sumika", "she's", "saucy dog", "dish//", "dish", "da-ice", "generations", "jo1", "ini", "snow man",
-                "sixstones", "naniwa danshi", "king & prince", "arashi", "嵐", "smap", "v6", "kinki kids"
-            ]
-            let isJpArtist = japaneseArtists.contains { ja in
-                let isPureLatin = ja.unicodeScalars.allSatisfy { $0.isASCII }
-                if isPureLatin {
-                    if artistLower == ja { return true }
-                    if ja.contains(" ") || ja.contains("-") || ja.contains("/") {
-                        let paddedArtist = " \(artistLower) "
-                        let paddedJa = " \(ja) "
-                        return paddedArtist.contains(paddedJa)
-                    } else {
-                        return artistTokens.contains(ja)
-                    }
-                } else {
-                    return artistLower == ja || artistLower.contains(ja)
-                }
-            }
-            if isJpArtist {
+        // 3. Apple 原生 NaturalLanguage 語意辨識器 (離線本機 NLP 機率推斷)
+        let recognizer = NLLanguageRecognizer()
+        recognizer.processString(combinedMeta)
+        if let dominant = recognizer.dominantLanguage {
+            switch dominant {
+            case .japanese:
                 return .japanese
+            case .korean, .simplifiedChinese, .traditionalChinese:
+                return .asian
+            default:
+                break
             }
         }
 
