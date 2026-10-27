@@ -746,6 +746,53 @@ private final class PetitLyricsWSYXMLDelegate: NSObject, XMLParserDelegate {
         currentElement = ""
     }
 
+    private static func isCJK(_ c: Character) -> Bool {
+        guard let scalar = c.unicodeScalars.first, c.unicodeScalars.count == 1 else { return false }
+        let val = scalar.value
+        return (0x4E00...0x9FFF).contains(val) ||   // CJK Unified Ideographs
+               (0x3400...0x4DBF).contains(val) ||   // CJK Extension A
+               (0x3040...0x309F).contains(val) ||   // Hiragana
+               (0x30A0...0x30FF).contains(val) ||   // Katakana
+               (0xAC00...0xD7AF).contains(val)      // Hangul
+    }
+
+    private static func isLatinWordChar(_ c: Character) -> Bool {
+        if c.isWhitespace { return false }
+        return (c.isLetter || c.isNumber || c == "'" || c == "’" || c == "-") && !isCJK(c)
+    }
+
+    private static func isKatakanaChar(_ c: Character) -> Bool {
+        guard let scalar = c.unicodeScalars.first, c.unicodeScalars.count == 1 else { return false }
+        return (0x30A0...0x30FF).contains(scalar.value) && c != "・"
+    }
+
+    private static func isKinsokuTrailingChar(_ c: Character) -> Bool {
+        let kinsokuSet: Set<Character> = [
+            "、", "。", "，", "．", "！", "？", "!", "?",
+            "：", "；", ":", ";", "…", "—", "～", "~",
+            "）", "]", "}", "」", "』", "”", "\"", "’", "'",
+            "ー", "っ", "ッ", "ゃ", "ゅ", "ょ", "ャ", "ュ", "ョ",
+            "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ァ", "ィ", "ゥ", "ェ", "ォ"
+        ]
+        return kinsokuSet.contains(c)
+    }
+
+    private static func shouldMerge(prevChar: Character, nextChar: Character) -> Bool {
+        if nextChar.isWhitespace {
+            return true
+        }
+        if isKinsokuTrailingChar(nextChar) {
+            return true
+        }
+        if isLatinWordChar(prevChar) && isLatinWordChar(nextChar) {
+            return true
+        }
+        if isKatakanaChar(prevChar) && isKatakanaChar(nextChar) {
+            return true
+        }
+        return false
+    }
+
     private func finalizeCurrentLine() {
         let validWords = currentWords.filter { !$0.text.isEmpty }
         guard !validWords.isEmpty else { return }
@@ -761,30 +808,47 @@ private final class PetitLyricsWSYXMLDelegate: NSObject, XMLParserDelegate {
 
         var syllables: [LyricSyllable] = []
         if isMonotonic {
-            for (i, word) in validWords.enumerated() {
-                // 若單一 token 為純半形空白且前方已有音節，合併至前一音節以維持平滑流光
-                if word.text == " " && !syllables.isEmpty {
-                    syllables[syllables.count - 1].text += " "
-                    continue
-                }
+            // 關鍵排版聚合：PetitLyrics WSY 原始資料將英文單字（如 Weekend、Cruel）與日文外來語（片假名如 アイドル、ラブストーリー）
+            // 拆散為單一字母或單一字元，若直接轉為 LyricSyllable 會導致 SyllableFlowLayout 將單字拆碎折行。
+            // 依語法與禁則規則聚合為完整單字，保留字詞原子性與行內平滑光暈。
+            struct MergedWord {
+                var text: String
+                var startMs: Int
+                var endMs: Int
+            }
 
-                let durationMs: Int
-                if let endMs = word.endMs, endMs >= word.startMs {
-                    durationMs = max(20, endMs - word.startMs)
+            var mergedWords: [MergedWord] = []
+            for word in validWords {
+                guard let firstChar = word.text.first else { continue }
+                let wordEndMs = word.endMs ?? (word.startMs + 200)
+
+                if let lastIdx = mergedWords.indices.last,
+                   let lastChar = mergedWords[lastIdx].text.last,
+                   Self.shouldMerge(prevChar: lastChar, nextChar: firstChar) {
+                    mergedWords[lastIdx].text += word.text
+                    mergedWords[lastIdx].endMs = max(mergedWords[lastIdx].endMs, wordEndMs)
                 } else {
-                    var nextStart = word.startMs + 200
-                    for j in (i + 1)..<validWords.count {
-                        if validWords[j].text != " " {
-                            nextStart = validWords[j].startMs
-                            break
-                        }
-                    }
-                    durationMs = max(20, nextStart - word.startMs)
+                    mergedWords.append(MergedWord(
+                        text: word.text,
+                        startMs: word.startMs,
+                        endMs: wordEndMs
+                    ))
+                }
+            }
+
+            for (i, mWord) in mergedWords.enumerated() {
+                let durationMs: Int
+                if mWord.endMs >= mWord.startMs {
+                    durationMs = max(20, mWord.endMs - mWord.startMs)
+                } else if i + 1 < mergedWords.count {
+                    durationMs = max(20, mergedWords[i + 1].startMs - mWord.startMs)
+                } else {
+                    durationMs = 200
                 }
 
                 syllables.append(LyricSyllable(
-                    text: word.text,
-                    timeMs: word.startMs,
+                    text: mWord.text,
+                    timeMs: mWord.startMs,
                     durationMs: durationMs
                 ))
             }
