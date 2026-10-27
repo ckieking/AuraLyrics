@@ -578,5 +578,225 @@ public final class LRCParser: Sendable {
         // 若為標準 LRC 字串格式
         return parse(lrcContent: subtitleBody)
     }
+
+    // MARK: - PetitLyrics WSY (逐字音節時間軸 XML, lyricsType = 3) 解析
+    public func parsePetitLyricsWSY(wsyXML: String) -> [LyricLine] {
+        let trimmed = wsyXML.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return [] }
+
+        let parser = XMLParser(data: data)
+        parser.shouldResolveExternalEntities = false
+        let delegate = PetitLyricsWSYXMLDelegate()
+        parser.delegate = delegate
+        guard parser.parse(), !delegate.lines.isEmpty else { return [] }
+
+        return delegate.lines.sorted { $0.timeMs < $1.timeMs }
+    }
+
+    // MARK: - PetitLyrics LSY (普通逐行時間軸二進位 XOR 解碼, lyricsType = 2 搭配 lyricsType = 1 純文字)
+    public func decodePetitLyricsLSY(lsyBase64: String, plainLyricsBase64: String) -> [LyricLine] {
+        guard let encryptedData = Data(base64Encoded: lsyBase64, options: .ignoreUnknownCharacters),
+              let plainData = Data(base64Encoded: plainLyricsBase64, options: .ignoreUnknownCharacters),
+              let plainText = String(data: plainData, encoding: .utf8) else {
+            return []
+        }
+
+        let bytes = [UInt8](encryptedData)
+        guard bytes.count >= 0xce else { return [] }
+
+        var protectionKey = UInt16(bytes[0x1a]) | (UInt16(bytes[0x1b]) << 8)
+        let protectionKeySwitchFlag = bytes[0x19] != 0
+        if protectionKeySwitchFlag {
+            protectionKey = (protectionKey & 0x0003)
+                | ((protectionKey & 0x000c) << 2)
+                | ((protectionKey & 0x0030) >> 2)
+                | ((protectionKey & 0x00c0) << 2)
+                | ((protectionKey & 0x0300) >> 2)
+                | ((protectionKey & 0x0c00) << 2)
+                | ((protectionKey & 0x3000) >> 2)
+                | (protectionKey & 0xc000)
+        }
+
+        let lineCountRaw = UInt32(bytes[0x38])
+            | (UInt32(bytes[0x39]) << 8)
+            | (UInt32(bytes[0x3a]) << 16)
+            | (UInt32(bytes[0x3b]) << 24)
+        let lineCount = Int(lineCountRaw)
+        guard lineCount > 0, lineCount <= 10_000, 0xcc + lineCount * 2 <= bytes.count else {
+            return []
+        }
+
+        let normalizedText = plainText
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+        let textLines = normalizedText.components(separatedBy: "\n")
+
+        var lines: [LyricLine] = []
+        lines.reserveCapacity(lineCount)
+        var epoch = 0
+        var previousCs = -1
+
+        for lineIdx in 0..<lineCount {
+            let offset = 0xcc + lineIdx * 2
+            let timeRaw = UInt16(bytes[offset]) | (UInt16(bytes[offset + 1]) << 8)
+            let decodedCs = Int(timeRaw ^ protectionKey)
+            var timeCs = decodedCs + epoch * 65536
+            if previousCs >= 0 && timeCs < previousCs {
+                epoch += 1
+                timeCs = decodedCs + epoch * 65536
+            }
+            previousCs = timeCs
+
+            let rawLine = lineIdx < textLines.count ? textLines[lineIdx] : ""
+            let cleanLine = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleanLine.isEmpty else { continue }
+
+            lines.append(LyricLine(
+                timeMs: max(0, timeCs * 10),
+                text: cleanLine,
+                syllables: nil
+            ))
+        }
+
+        return lines.sorted { $0.timeMs < $1.timeMs }
+    }
 }
 
+// MARK: - PetitLyrics WSY XMLParser Delegate
+private final class PetitLyricsWSYXMLDelegate: NSObject, XMLParserDelegate {
+    struct RawWord {
+        let text: String
+        let startMs: Int
+        let endMs: Int?
+    }
+
+    var lines: [LyricLine] = []
+
+    private var currentElement = ""
+    private var inLine = false
+    private var inWord = false
+
+    private var currentLineString = ""
+    private var currentWords: [RawWord] = []
+
+    private var currentWordString = ""
+    private var currentStartTime = ""
+    private var currentEndTime = ""
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String] = [:]
+    ) {
+        currentElement = elementName
+        if elementName == "line" {
+            inLine = true
+            currentLineString = ""
+            currentWords.removeAll(keepingCapacity: true)
+        } else if elementName == "word" {
+            inWord = true
+            currentWordString = ""
+            currentStartTime = ""
+            currentEndTime = ""
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        if inWord {
+            switch currentElement {
+            case "wordstring":
+                currentWordString += string
+            case "starttime":
+                currentStartTime += string
+            case "endtime":
+                currentEndTime += string
+            default:
+                break
+            }
+        } else if inLine {
+            if currentElement == "linestring" {
+                currentLineString += string
+            }
+        }
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?
+    ) {
+        if elementName == "word" {
+            if let rawStart = Int(currentStartTime.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                let startMs = max(0, rawStart)
+                let endMs = Int(currentEndTime.trimmingCharacters(in: .whitespacesAndNewlines))
+                currentWords.append(RawWord(
+                    text: currentWordString,
+                    startMs: startMs,
+                    endMs: endMs
+                ))
+            }
+            inWord = false
+        } else if elementName == "line" {
+            finalizeCurrentLine()
+            inLine = false
+        }
+        currentElement = ""
+    }
+
+    private func finalizeCurrentLine() {
+        guard !currentWords.isEmpty else { return }
+
+        // 確認行內字詞時間軸單調遞增，排除損毀資料
+        for i in 0..<(currentWords.count - 1) {
+            if currentWords[i].startMs > currentWords[i + 1].startMs {
+                return
+            }
+        }
+
+        var syllables: [LyricSyllable] = []
+        for (i, word) in currentWords.enumerated() {
+            guard !word.text.isEmpty else { continue }
+
+            // 若單一 token 為純半形空白且前方已有音節，合併至前一音節以維持平滑流光
+            if word.text == " " && !syllables.isEmpty {
+                syllables[syllables.count - 1].text += " "
+                continue
+            }
+
+            let durationMs: Int
+            if let endMs = word.endMs, endMs >= word.startMs {
+                durationMs = max(20, endMs - word.startMs)
+            } else {
+                var nextStart = word.startMs + 200
+                for j in (i + 1)..<currentWords.count {
+                    if !currentWords[j].text.isEmpty && currentWords[j].text != " " {
+                        nextStart = currentWords[j].startMs
+                        break
+                    }
+                }
+                durationMs = max(20, nextStart - word.startMs)
+            }
+
+            syllables.append(LyricSyllable(
+                text: word.text,
+                timeMs: word.startMs,
+                durationMs: durationMs
+            ))
+        }
+
+        let rawLine = currentLineString.trimmingCharacters(in: .newlines)
+        let joinedWords = syllables.map { $0.text }.joined()
+        let lineText = rawLine.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? joinedWords : rawLine
+        guard !lineText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+        let lineStartMs = syllables.first?.timeMs ?? currentWords.first?.startMs ?? 0
+        lines.append(LyricLine(
+            timeMs: lineStartMs,
+            text: lineText,
+            syllables: syllables.isEmpty ? nil : syllables
+        ))
+    }
+}

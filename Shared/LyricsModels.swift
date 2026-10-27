@@ -201,6 +201,7 @@ public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable 
     case musixmatch = "Musixmatch"
     case netease = "NetEase"
     case lrclib = "LRCLIB"
+    case petitlyrics = "PetitLyrics"
 
     public var id: String { rawValue }
 
@@ -209,6 +210,7 @@ public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable 
         case .musixmatch: return "Musixmatch"
         case .netease: return String(localized: "網易雲音樂 (NetEase)")
         case .lrclib: return "LRCLIB"
+        case .petitlyrics: return "PetitLyrics"
         }
     }
 }
@@ -240,6 +242,8 @@ public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashab
                 return String(localized: "逐字時間軸 (YRC/KRC)")
             case .lrclib:
                 return String(localized: "逐字時間軸 (Enhanced LRC)")
+            case .petitlyrics:
+                return String(localized: "逐字時間軸 (WSY)")
             }
         } else {
             return String(localized: "普通逐行時間軸 (LRC)")
@@ -254,6 +258,8 @@ public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashab
             return "cloud.fill"
         case .lrclib:
             return "music.note.list"
+        case .petitlyrics:
+            return "sparkles.rectangle.stack"
         }
     }
 
@@ -261,9 +267,11 @@ public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashab
         LyricsSearchPriorityItem(id: "netease_word", source: .netease, isWordSync: true, isEnabled: true),
         LyricsSearchPriorityItem(id: "musixmatch_word", source: .musixmatch, isWordSync: true, isEnabled: true),
         LyricsSearchPriorityItem(id: "lrclib_word", source: .lrclib, isWordSync: true, isEnabled: true),
+        LyricsSearchPriorityItem(id: "petitlyrics_word", source: .petitlyrics, isWordSync: true, isEnabled: true),
         LyricsSearchPriorityItem(id: "netease_line", source: .netease, isWordSync: false, isEnabled: true),
         LyricsSearchPriorityItem(id: "musixmatch_line", source: .musixmatch, isWordSync: false, isEnabled: true),
-        LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true)
+        LyricsSearchPriorityItem(id: "lrclib_line", source: .lrclib, isWordSync: false, isEnabled: true),
+        LyricsSearchPriorityItem(id: "petitlyrics_line", source: .petitlyrics, isWordSync: false, isEnabled: true)
     ]
 }
 
