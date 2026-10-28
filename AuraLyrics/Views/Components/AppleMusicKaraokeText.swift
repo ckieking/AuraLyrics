@@ -9,6 +9,7 @@ public struct AppleMusicKaraokeText: View {
     let isCurrent: Bool
     let currentPlaybackTimeMs: Int
     let blurRadius: CGFloat
+    let opacity: Double
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -17,13 +18,15 @@ public struct AppleMusicKaraokeText: View {
         syllables: [LyricSyllable]? = nil,
         isCurrent: Bool,
         currentPlaybackTimeMs: Int = 0,
-        blurRadius: CGFloat = 0
+        blurRadius: CGFloat = 0,
+        opacity: Double = 0.35
     ) {
         self.text = text
         self.syllables = syllables
         self.isCurrent = isCurrent
         self.currentPlaybackTimeMs = currentPlaybackTimeMs
         self.blurRadius = blurRadius
+        self.opacity = opacity
     }
 
     public var body: some View {
@@ -32,25 +35,33 @@ public struct AppleMusicKaraokeText: View {
                 // 普通行級時間軸（或減弱動態）：
                 // 無論是否唱到，字級與字重嚴格統一為 SF Pro 32pt Bold，折行點完全一致，絕不因播放而突發性換行
                 // 非當前行零陰影開銷，僅當前行綻放立體粉光
-                Text(text)
-                    .font(.system(size: 32, weight: .bold, design: .default))
-                    .foregroundColor(isCurrent ? .white : Color.white.opacity(0.35))
-                    .multilineTextAlignment(.leading)
-                    .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: isCurrent ? 5 : 0, x: 0, y: 0)
-                    .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: isCurrent ? 14 : 0, x: 0, y: 0)
-                    .blur(radius: isCurrent ? 0 : blurRadius)
+                if isCurrent {
+                    Text(text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.leading)
+                        .shadow(color: Color.white.opacity(0.45), radius: 5, x: 0, y: 0)
+                        .shadow(color: Color.pink.opacity(0.55), radius: 14, x: 0, y: 0)
+                } else {
+                    InactivePlainLyricView(
+                        text: text,
+                        opacity: opacity
+                    )
+                    .equatable()
+                }
             } else if let validSyllables = syllables, !validSyllables.isEmpty {
                 // 逐字音節時間軸：
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
                 // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
                 if !isCurrent {
-                    // 非當前行：採用 Equatable 隔離視圖，並透過 drawingGroup() 預合成為單一 Metal 紋理快取
-                    // 當模糊半徑未改變時（如距離 >= 3 行的所有歌詞），SwiftUI 100% 複用 GPU 紋理，穩跑 120fps！
+                    // 非當前行：採用 Equatable 隔離視圖，原生文字渲染 0 離屏 Pass，避免重複重繪
+                    // 當透明度未改變時，SwiftUI 複用既有圖層渲染節點，穩跑 120fps！
                     InactiveSyllableLyricView(
                         text: text,
                         syllables: validSyllables,
-                        blurRadius: blurRadius
+                        opacity: opacity
                     )
+                    .equatable()
                 } else {
                     let grouped = buildSyllableCharGroups(from: validSyllables)
                     let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: grouped.allChars)
@@ -427,16 +438,16 @@ public struct SyllableFlowLayout: Layout {
     }
 }
 
-// MARK: - 非當前播放行 Equatable 快取視圖 (預合成 Metal 紋理並執行階梯景深模糊)
+// MARK: - 非當前播放行 Equatable 快取視圖 (原生文字渲染，0 離屏 Pass，避免重複重繪)
 private struct InactiveSyllableLyricView: View, Equatable {
     let text: String
     let syllables: [LyricSyllable]
-    let blurRadius: CGFloat
+    let opacity: Double
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.text == rhs.text &&
         lhs.syllables == rhs.syllables &&
-        lhs.blurRadius == rhs.blurRadius
+        lhs.opacity == rhs.opacity
     }
 
     var body: some View {
@@ -449,10 +460,28 @@ private struct InactiveSyllableLyricView: View, Equatable {
                 } else {
                     Text(syl.text)
                         .font(.system(size: 32, weight: .bold, design: .default))
-                        .foregroundColor(Color.white.opacity(0.35))
+                        .foregroundColor(Color.white.opacity(opacity))
                 }
             }
         }
-        .blur(radius: blurRadius)
     }
 }
+
+// MARK: - 非當前播放行普通歌詞 Equatable 快取視圖 (原生文字渲染，0 離屏 Pass)
+private struct InactivePlainLyricView: View, Equatable {
+    let text: String
+    let opacity: Double
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.text == rhs.text &&
+        lhs.opacity == rhs.opacity
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 32, weight: .bold, design: .default))
+            .foregroundColor(Color.white.opacity(opacity))
+            .multilineTextAlignment(.leading)
+    }
+}
+

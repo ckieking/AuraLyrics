@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
+    @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
     var body: some View {
         NavigationStack {
@@ -81,10 +82,12 @@ struct SettingsView: View {
                 // MARK: - 歌詞視覺效果
                 Section {
                     Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur)
+                    InactiveLyricOpacitySlider(
+                        opacity: $inactiveLyricOpacity,
+                        isEnabled: enableLyricDefocusBlur
+                    )
                 } header: {
                     Text("歌詞視覺效果")
-                } footer: {
-                    Text("開啟後處於焦點外的歌詞將呈現模糊效果，聚焦當前播放行；關閉可降低發熱及耗電。")
                 }
 
                 // MARK: - 歌詞同步時間微調（全域共用）
@@ -335,5 +338,65 @@ struct SettingsView: View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.9.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) Beta (Build \(build))"
+    }
+}
+
+// MARK: - 非焦點歌詞透明度無極調節滑桿（單行純淨版：滑桿 + 百分比，具備預設值標記與磁吸）
+private struct InactiveLyricOpacitySlider: View {
+    @Binding var opacity: Double
+    let isEnabled: Bool
+
+    private let defaultValue: Double = 0.10
+    private let range: ClosedRange<Double> = 0.05...0.60
+    private let snapRange: ClosedRange<Double> = 0.088...0.112
+
+    @State private var isSnapped: Bool = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            GeometryReader { geo in
+                let trackWidth = max(0, geo.size.width - 28)
+                let defaultRatio = (defaultValue - range.lowerBound) / (range.upperBound - range.lowerBound)
+                let markX = 14 + trackWidth * CGFloat(defaultRatio)
+
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(isEnabled ? (abs(opacity - defaultValue) < 0.003 ? Color.pink : Color.secondary.opacity(0.35)) : Color.secondary.opacity(0.2))
+                        .frame(width: 2, height: 12)
+                        .cornerRadius(1)
+                        .position(x: markX, y: geo.size.height / 2)
+                        .allowsHitTesting(false)
+
+                    Slider(
+                        value: Binding(
+                            get: { opacity },
+                            set: { newVal in
+                                if snapRange.contains(newVal) {
+                                    if !isSnapped {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        isSnapped = true
+                                    }
+                                    opacity = defaultValue
+                                } else {
+                                    isSnapped = false
+                                    opacity = newVal
+                                }
+                            }
+                        ),
+                        in: range
+                    )
+                    .tint(.pink)
+                }
+            }
+            .frame(height: 32)
+
+            Text("\(Int(round(opacity * 100)))%")
+                .font(.system(.subheadline, design: .monospaced).weight(.medium))
+                .foregroundColor(.secondary)
+                .frame(width: 42, alignment: .trailing)
+        }
+        .padding(.vertical, 2)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1.0 : 0.45)
     }
 }
