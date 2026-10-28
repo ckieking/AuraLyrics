@@ -372,7 +372,7 @@ struct NowPlayingView: View {
     /// 計算非焦點歌詞行之光學景深階梯透明度（原生硬體友善渲染，0 離屏 Pass，杜絕動畫雪崩與 GPU 負載）
     private func lyricOpacity(for index: Int) -> Double {
         guard let current = monitor.currentLineIndex else {
-            return reduceTransparency ? 0.70 : 0.55
+            return reduceTransparency ? 0.70 : 0.40
         }
         let distance = abs(index - current)
         if distance == 0 {
@@ -382,15 +382,15 @@ struct NowPlayingView: View {
             return 0.70
         }
         guard enableLyricDefocusBlur else {
-            return 0.55
+            return 0.50
         }
-        return (distance == 1) ? 0.48 : 0.28
+        return (distance == 1) ? 0.32 : 0.15
     }
 
     /// 計算翻譯文字之階梯式景深透明度（依循無障礙與視覺焦點階層）
     private func translationOpacity(for index: Int) -> Double {
         guard let current = monitor.currentLineIndex else {
-            return reduceTransparency ? 0.75 : 0.60
+            return reduceTransparency ? 0.75 : 0.45
         }
         let distance = abs(index - current)
         if distance == 0 {
@@ -400,9 +400,9 @@ struct NowPlayingView: View {
             return 0.75
         }
         guard enableLyricDefocusBlur else {
-            return 0.60
+            return 0.55
         }
-        return (distance == 1) ? 0.48 : 0.32
+        return (distance == 1) ? 0.35 : 0.18
     }
 
     private func updateCachedArtwork() {
