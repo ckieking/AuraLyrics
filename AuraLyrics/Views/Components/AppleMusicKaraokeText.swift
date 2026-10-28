@@ -32,25 +32,33 @@ public struct AppleMusicKaraokeText: View {
                 // 普通行級時間軸（或減弱動態）：
                 // 無論是否唱到，字級與字重嚴格統一為 SF Pro 32pt Bold，折行點完全一致，絕不因播放而突發性換行
                 // 非當前行零陰影開銷，僅當前行綻放立體粉光
-                Text(text)
-                    .font(.system(size: 32, weight: .bold, design: .default))
-                    .foregroundColor(isCurrent ? .white : Color.white.opacity(0.35))
-                    .multilineTextAlignment(.leading)
-                    .shadow(color: isCurrent ? Color.white.opacity(0.45) : .clear, radius: isCurrent ? 5 : 0, x: 0, y: 0)
-                    .shadow(color: isCurrent ? Color.pink.opacity(0.55) : .clear, radius: isCurrent ? 14 : 0, x: 0, y: 0)
-                    .blur(radius: isCurrent ? 0 : blurRadius)
+                if isCurrent {
+                    Text(text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(.white)
+                        .multilineTextAlignment(.leading)
+                        .shadow(color: Color.white.opacity(0.45), radius: 5, x: 0, y: 0)
+                        .shadow(color: Color.pink.opacity(0.55), radius: 14, x: 0, y: 0)
+                } else {
+                    InactivePlainLyricView(
+                        text: text,
+                        blurRadius: blurRadius
+                    )
+                    .equatable()
+                }
             } else if let validSyllables = syllables, !validSyllables.isEmpty {
                 // 逐字音節時間軸：
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
                 // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
                 if !isCurrent {
                     // 非當前行：採用 Equatable 隔離視圖，並透過 drawingGroup() 預合成為單一 Metal 紋理快取
-                    // 當模糊半徑未改變時（如距離 >= 3 行的所有歌詞），SwiftUI 100% 複用 GPU 紋理，穩跑 120fps！
+                    // 當模糊半徑未改變時，SwiftUI 100% 複用 GPU 紋理，穩跑 120fps！
                     InactiveSyllableLyricView(
                         text: text,
                         syllables: validSyllables,
                         blurRadius: blurRadius
                     )
+                    .equatable()
                 } else {
                     let grouped = buildSyllableCharGroups(from: validSyllables)
                     let continuousFocus = calculateContinuousFocus(currentPlayMs: currentPlaybackTimeMs, lineChars: grouped.allChars)
@@ -440,7 +448,7 @@ private struct InactiveSyllableLyricView: View, Equatable {
     }
 
     var body: some View {
-        SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+        let content = SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
             ForEach(syllables) { syl in
                 if syl.text.trimmingCharacters(in: .whitespaces).isEmpty {
                     Text(syl.text)
@@ -453,6 +461,40 @@ private struct InactiveSyllableLyricView: View, Equatable {
                 }
             }
         }
-        .blur(radius: blurRadius)
+
+        if blurRadius > 0 {
+            content
+                .blur(radius: blurRadius)
+                .drawingGroup()
+        } else {
+            content
+        }
     }
 }
+
+// MARK: - 非當前播放行普通歌詞 Equatable 快取視圖
+private struct InactivePlainLyricView: View, Equatable {
+    let text: String
+    let blurRadius: CGFloat
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.text == rhs.text &&
+        lhs.blurRadius == rhs.blurRadius
+    }
+
+    var body: some View {
+        let content = Text(text)
+            .font(.system(size: 32, weight: .bold, design: .default))
+            .foregroundColor(Color.white.opacity(0.35))
+            .multilineTextAlignment(.leading)
+
+        if blurRadius > 0 {
+            content
+                .blur(radius: blurRadius)
+                .drawingGroup()
+        } else {
+            content
+        }
+    }
+}
+
