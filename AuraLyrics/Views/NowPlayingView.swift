@@ -228,7 +228,7 @@ struct NowPlayingView: View {
                             HStack(alignment: .top, spacing: 0) {
                                 VStack(alignment: .leading, spacing: 6) {
                                     if isCurrent {
-                                        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying)) { _ in
+                                        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying || scenePhase != .active)) { _ in
                                             let currentPlayMs = monitor.interpolatedPlaybackTimeMs()
                                             AppleMusicKaraokeText(
                                                 text: line.text,
@@ -387,7 +387,7 @@ struct NowPlayingView: View {
 
     /// 依據與當前焦點行之距離，計算光學景深多階模糊半徑 (Progressive Optical Defocus Blur)
     private func defocusBlurRadius(for index: Int) -> CGFloat {
-        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling else {
+        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, scenePhase == .active else {
             return 0.0
         }
         guard let current = monitor.currentLineIndex else {
@@ -395,14 +395,15 @@ struct NowPlayingView: View {
         }
         let distance = abs(index - current)
         switch distance {
-        case 0:
+        case 0, 1:
+            // 焦點行 (0) 與即將唱到的相鄰行 (1)：零模糊！
+            // 依循 Apple Music 原生設計：即將唱到的下一句保持清晰向量字體，景深透過透明度呈現；
+            // 徹底消除切行時焦點周邊核心行的離屏卷積計算，換行平滑滾動 100% 絲滑無卡頓！
             return 0.0
-        case 1:
-            return 0.9  // 相鄰行：輕柔失焦微光
         case 2:
-            return 2.0  // 次相鄰行：清晰可見的中度散景
+            return 1.8  // 次相鄰行：清晰可見的中度散景
         default:
-            return 3.6  // 遠距行：深邃景深融入流光背景
+            return 3.0  // 遠距行：深邃景深融入流光背景
         }
     }
 
@@ -428,9 +429,9 @@ struct NowPlayingView: View {
         let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
         switch distance {
         case 1:
-            return min(0.40, max(0.28, base * 2.6)) // 距離 1：較高亮度，保留可辨識度
+            return min(0.40, max(0.30, base * 2.8)) // 距離 1：保持清晰易讀，約 35%
         case 2:
-            return min(0.25, max(0.16, base * 1.7)) // 距離 2：層次過渡
+            return min(0.24, max(0.16, base * 1.8)) // 距離 2：層次過渡
         default:
             return base                             // 距離 >= 3：背景深處
         }
@@ -457,7 +458,7 @@ struct NowPlayingView: View {
         let base = min(max(inactiveLyricOpacity * 1.15, 0.06), 0.65)
         switch distance {
         case 1:
-            return min(0.35, max(0.24, base * 2.4))
+            return min(0.36, max(0.26, base * 2.5))
         case 2:
             return min(0.22, max(0.14, base * 1.5))
         default:
