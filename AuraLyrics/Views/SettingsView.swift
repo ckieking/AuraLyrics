@@ -13,6 +13,7 @@ struct SettingsView: View {
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
+    @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
     var body: some View {
         NavigationStack {
@@ -80,11 +81,22 @@ struct SettingsView: View {
 
                 // MARK: - 歌詞視覺效果
                 Section {
-                    Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur)
+                    Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur.animation())
+                    if enableLyricDefocusBlur {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("非焦點歌詞透明度")
+                                Spacer()
+                                Text("\(Int(round(inactiveLyricOpacity * 100)))%")
+                                    .font(.system(.subheadline, design: .monospaced))
+                                    .foregroundColor(.secondary)
+                            }
+                            Slider(value: $inactiveLyricOpacity, in: 0.05...0.60, step: 0.01)
+                                .tint(.pink)
+                        }
+                    }
                 } header: {
                     Text("歌詞視覺效果")
-                } footer: {
-                    Text("開啟後處於焦點外的歌詞將呈現模糊效果，聚焦當前播放行；關閉可降低發熱及耗電。")
                 }
 
                 // MARK: - 歌詞同步時間微調（全域共用）

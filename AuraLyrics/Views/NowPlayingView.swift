@@ -17,6 +17,7 @@ struct NowPlayingView: View {
     @State private var showFileImporter = false
     @AppStorage("showBilingualLyrics") private var showTranslation = true
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
+    @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
     /// 零重繪之可視行索引與滾動狀態追蹤器（參考型別，不觸發全視圖 body 刷新）
     @State private var tracker = ViewportTracker()
@@ -384,7 +385,9 @@ struct NowPlayingView: View {
         guard enableLyricDefocusBlur else {
             return 0.50
         }
-        return (distance == 1) ? 0.32 : 0.15
+        let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
+        let neighbor = min(0.85, base * 2.2)
+        return (distance == 1) ? neighbor : base
     }
 
     /// 計算翻譯文字之階梯式景深透明度（依循無障礙與視覺焦點階層）
@@ -402,7 +405,9 @@ struct NowPlayingView: View {
         guard enableLyricDefocusBlur else {
             return 0.55
         }
-        return (distance == 1) ? 0.35 : 0.18
+        let base = min(max(inactiveLyricOpacity * 1.15, 0.06), 0.65)
+        let neighbor = min(0.85, base * 2.2)
+        return (distance == 1) ? neighbor : base
     }
 
     private func updateCachedArtwork() {

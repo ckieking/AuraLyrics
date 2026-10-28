@@ -929,6 +929,22 @@
         }
       }
     },
+    "非焦點歌詞透明度": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非焦點歌詞透明度"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inactive Lyrics Opacity"
+          }
+        }
+      }
+    },
     "歌詞視覺效果": {
       "localizations": {
         "zh-Hant": {
