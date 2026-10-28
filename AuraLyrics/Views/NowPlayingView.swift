@@ -262,8 +262,12 @@ struct NowPlayingView: View {
                                 tracker.scrollIdleTask = nil
                                 tracker.isUserScrolling = false
                                 monitor.seek(toMs: line.timeMs)
-                                withAnimation(.easeInOut(duration: 0.35)) {
+                                if reduceMotion {
                                     proxy.scrollTo(index, anchor: .center)
+                                } else {
+                                    withAnimation(.easeInOut(duration: 0.35)) {
+                                        proxy.scrollTo(index, anchor: .center)
+                                    }
                                 }
                             }
                             .onAppear {
@@ -275,7 +279,7 @@ struct NowPlayingView: View {
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
-                            .animation(.easeInOut(duration: 0.35), value: isCurrent)
+                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: isCurrent)
                         }
 
                         // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)

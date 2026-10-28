@@ -51,8 +51,8 @@ public struct AppleMusicKaraokeText: View {
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
                 // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
                 if !isCurrent {
-                    // 非當前行：採用 Equatable 隔離視圖，並透過 drawingGroup() 預合成為單一 Metal 紋理快取
-                    // 當模糊半徑未改變時，SwiftUI 100% 複用 GPU 紋理，穩跑 120fps！
+                    // 非當前行：採用 Equatable 隔離視圖，避免 body 重複評估與重繪
+                    // 當模糊半徑未改變時，SwiftUI 複用既有圖層渲染節點，穩跑 120fps！
                     InactiveSyllableLyricView(
                         text: text,
                         syllables: validSyllables,
@@ -435,7 +435,7 @@ public struct SyllableFlowLayout: Layout {
     }
 }
 
-// MARK: - 非當前播放行 Equatable 快取視圖 (預合成 Metal 紋理並執行階梯景深模糊)
+// MARK: - 非當前播放行 Equatable 快取視圖 (避免重複重繪並維持文字向量邊緣與無障礙文字清晰度)
 private struct InactiveSyllableLyricView: View, Equatable {
     let text: String
     let syllables: [LyricSyllable]
@@ -465,7 +465,6 @@ private struct InactiveSyllableLyricView: View, Equatable {
         if blurRadius > 0 {
             content
                 .blur(radius: blurRadius)
-                .drawingGroup()
         } else {
             content
         }
@@ -491,7 +490,6 @@ private struct InactivePlainLyricView: View, Equatable {
         if blurRadius > 0 {
             content
                 .blur(radius: blurRadius)
-                .drawingGroup()
         } else {
             content
         }
