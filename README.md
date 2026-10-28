@@ -135,6 +135,19 @@ open AuraLyrics.xcodeproj
 
 ---
 
+## Sponsor & Support
+
+AuraLyrics is an independent, non-commercial open-source project. If you find AuraLyrics useful and enjoy the dynamic lyrics experience, consider supporting ongoing maintenance and development with a small crypto donation:
+
+| Network | Supported Assets | Wallet Address |
+| :--- | :--- | :--- |
+| **Solana** *(Recommended, near-zero fees)* | SOL, USDC (SPL) | `3rL3zsXXamy9Dg6EaVfmfSLr24tGvJzXNyRnL7j4m2yN` |
+| **EVM** *(Polygon / Arbitrum / Base / Ethereum)* | USDT, USDC, POL, ETH | `0x4c2d0955795160d85ce62389898b3dc18b26e4bc` |
+
+> 💡 **Notice**: Please double-check the transfer network before sending funds to prevent loss of assets. Thank you for your support!
+
+---
+
 ## Copyright & Disclaimer
 
 - **Lyrics, Translations & Artwork**: All lyrics, translations, and album artwork displayed in this project belong to their respective songwriters, artists, publishers, and record labels.
