@@ -398,7 +398,8 @@ struct NowPlayingView: View {
             return 0.50
         }
         if isUserScrolling {
-            return 0.65 // 使用者滑動螢幕時即時解除暗化，清晰展示全部可見歌詞
+            // 滑動時適度提升至便於閱讀的清晰度，但嚴格不超過當前播放行未唱到字元的基底亮度 (0.35)，維持視覺焦點
+            return max(inactiveLyricOpacity, 0.32) <= 0.35 ? 0.32 : inactiveLyricOpacity
         }
         let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
         let neighbor = min(0.85, base * 2.2)
@@ -421,7 +422,7 @@ struct NowPlayingView: View {
             return 0.55
         }
         if isUserScrolling {
-            return 0.65
+            return max(inactiveLyricOpacity, 0.28) <= 0.35 ? 0.28 : inactiveLyricOpacity
         }
         let base = min(max(inactiveLyricOpacity * 1.15, 0.06), 0.65)
         let neighbor = min(0.85, base * 2.2)
