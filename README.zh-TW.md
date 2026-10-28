@@ -133,6 +133,21 @@ open AuraLyrics.xcodeproj
 
 ---
 
+## 贊助與支持 (Sponsor & Support)
+
+AuraLyrics 是一個由個人獨立維護的非商業開源專案。如果你喜歡這個專案，覺得它改善了你的動態歌詞體驗，歡迎透過加密貨幣小額打賞支持專案持續維護與改進！
+
+| 網路 (Network) | 支援資產 (Assets) | 收款地址 (Wallet Address) |
+| :--- | :--- | :--- |
+| **Solana** *(推薦，手續費極低)* | SOL, USDC (SPL) | `3rL3zsXXamy9Dg6EaVfmfSLr24tGvJzXNyRnL7j4m2yN` |
+| **EVM** *(Polygon / Arbitrum / Base / Ethereum)* | USDT, USDC, POL, ETH | `0x4c2d0955795160d85ce62389898b3dc18b26e4bc` |
+
+> 💡 **轉帳提示**：
+> - 轉帳前請務必確認選擇對應的**傳輸網路**（Solana 或 EVM 相容網路），避免資產遺失。
+> - 感謝每一份支持，所有贊助將全數用於專案維護與後續開發開銷！
+
+---
+
 ## 版權聲明與免責聲明 (Copyright & Disclaimer)
 
 - **歌詞、翻譯與專輯封面**：本專案所展示之歌詞、翻譯內容及專輯封面圖片，其版權與商標權均歸原創作者、詞曲作者、發行商及唱片公司所有。
