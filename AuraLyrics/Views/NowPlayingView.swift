@@ -223,6 +223,7 @@ struct NowPlayingView: View {
                         ForEach(Array(monitor.currentLyrics.lines.enumerated()), id: \.element.id) { index, line in
                             let isCurrent = (index == monitor.currentLineIndex)
                             let rowOpacity = lyricOpacity(for: index)
+                            let rowBlur = defocusBlurRadius(for: index)
 
                             HStack(alignment: .top, spacing: 0) {
                                 VStack(alignment: .leading, spacing: 6) {
@@ -286,6 +287,8 @@ struct NowPlayingView: View {
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
+                            .blur(radius: isCurrent ? 0 : rowBlur)
+                            .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowBlur)
                             .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                         }
 
@@ -382,7 +385,28 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 計算非焦點歌詞行之光學景深階梯透明度（原生硬體友善渲染，0 離屏 Pass，杜絕動畫雪崩與 GPU 負載）
+    /// 依據與當前焦點行之距離，計算光學景深多階模糊半徑 (Progressive Optical Defocus Blur)
+    private func defocusBlurRadius(for index: Int) -> CGFloat {
+        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling else {
+            return 0.0
+        }
+        guard let current = monitor.currentLineIndex else {
+            return 0.0
+        }
+        let distance = abs(index - current)
+        switch distance {
+        case 0:
+            return 0.0
+        case 1:
+            return 0.9  // 相鄰行：輕柔失焦微光
+        case 2:
+            return 2.0  // 次相鄰行：清晰可見的中度散景
+        default:
+            return 3.6  // 遠距行：深邃景深融入流光背景
+        }
+    }
+
+    /// 依據與當前焦點行之距離，計算光學景深多階透明度 (Progressive Depth Opacity)
     private func lyricOpacity(for index: Int) -> Double {
         guard let current = monitor.currentLineIndex else {
             return reduceTransparency ? 0.70 : 0.40
@@ -402,8 +426,14 @@ struct NowPlayingView: View {
             return max(inactiveLyricOpacity, 0.32) <= 0.35 ? 0.32 : inactiveLyricOpacity
         }
         let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
-        let neighbor = min(0.85, base * 2.2)
-        return (distance == 1) ? neighbor : base
+        switch distance {
+        case 1:
+            return min(0.40, max(0.28, base * 2.6)) // 距離 1：較高亮度，保留可辨識度
+        case 2:
+            return min(0.25, max(0.16, base * 1.7)) // 距離 2：層次過渡
+        default:
+            return base                             // 距離 >= 3：背景深處
+        }
     }
 
     /// 計算翻譯文字之階梯式景深透明度（依循無障礙與視覺焦點階層）
@@ -425,8 +455,14 @@ struct NowPlayingView: View {
             return max(inactiveLyricOpacity, 0.28) <= 0.35 ? 0.28 : inactiveLyricOpacity
         }
         let base = min(max(inactiveLyricOpacity * 1.15, 0.06), 0.65)
-        let neighbor = min(0.85, base * 2.2)
-        return (distance == 1) ? neighbor : base
+        switch distance {
+        case 1:
+            return min(0.35, max(0.24, base * 2.4))
+        case 2:
+            return min(0.22, max(0.14, base * 1.5))
+        default:
+            return base
+        }
     }
 
     private func updateCachedArtwork() {
