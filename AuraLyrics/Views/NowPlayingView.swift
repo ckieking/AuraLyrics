@@ -230,8 +230,7 @@ struct NowPlayingView: View {
                                                 text: line.text,
                                                 syllables: line.syllables,
                                                 isCurrent: true,
-                                                currentPlaybackTimeMs: currentPlayMs,
-                                                blurRadius: 0
+                                                currentPlaybackTimeMs: currentPlayMs
                                             )
                                         }
                                     } else {
@@ -240,14 +239,14 @@ struct NowPlayingView: View {
                                             syllables: line.syllables,
                                             isCurrent: false,
                                             currentPlaybackTimeMs: 0,
-                                            blurRadius: blurRadius(for: index)
+                                            opacity: lyricOpacity(for: index)
                                         )
                                     }
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
                                             .font(.system(size: 16, weight: .medium, design: .default))
-                                            .foregroundColor(isCurrent ? .pink : Color.white.opacity(0.42))
+                                            .foregroundColor(isCurrent ? .pink : Color.white.opacity(translationOpacity(for: index)))
                                     }
                                 }
                                 .fixedSize(horizontal: false, vertical: true)
@@ -369,12 +368,42 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 計算主歌詞行的單層級景深模糊半徑（非焦點行統一 2.0pt；不受手動滑動干擾，杜絕全視圖動畫雪崩）
-    private func blurRadius(for index: Int) -> CGFloat {
-        guard enableLyricDefocusBlur, !reduceTransparency, monitor.currentLineIndex != nil else {
-            return 0.0
+    /// 計算非焦點歌詞行之光學景深階梯透明度（原生硬體友善渲染，0 離屏 Pass，杜絕動畫雪崩與 GPU 負載）
+    private func lyricOpacity(for index: Int) -> Double {
+        if reduceTransparency {
+            return 0.70
         }
-        return (index == monitor.currentLineIndex) ? 0.0 : 2.0
+        guard enableLyricDefocusBlur, let current = monitor.currentLineIndex else {
+            return 0.55
+        }
+        let distance = abs(index - current)
+        switch distance {
+        case 0:
+            return 1.0
+        case 1:
+            return 0.48
+        default:
+            return 0.28
+        }
+    }
+
+    /// 計算翻譯文字之階梯式景深透明度（依循無障礙與視覺焦點階層）
+    private func translationOpacity(for index: Int) -> Double {
+        if reduceTransparency {
+            return 0.75
+        }
+        guard enableLyricDefocusBlur, let current = monitor.currentLineIndex else {
+            return 0.60
+        }
+        let distance = abs(index - current)
+        switch distance {
+        case 0:
+            return 1.0
+        case 1:
+            return 0.48
+        default:
+            return 0.32
+        }
     }
 
     private func updateCachedArtwork() {

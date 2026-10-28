@@ -9,6 +9,7 @@ public struct AppleMusicKaraokeText: View {
     let isCurrent: Bool
     let currentPlaybackTimeMs: Int
     let blurRadius: CGFloat
+    let opacity: Double
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -17,13 +18,15 @@ public struct AppleMusicKaraokeText: View {
         syllables: [LyricSyllable]? = nil,
         isCurrent: Bool,
         currentPlaybackTimeMs: Int = 0,
-        blurRadius: CGFloat = 0
+        blurRadius: CGFloat = 0,
+        opacity: Double = 0.35
     ) {
         self.text = text
         self.syllables = syllables
         self.isCurrent = isCurrent
         self.currentPlaybackTimeMs = currentPlaybackTimeMs
         self.blurRadius = blurRadius
+        self.opacity = opacity
     }
 
     public var body: some View {
@@ -42,7 +45,7 @@ public struct AppleMusicKaraokeText: View {
                 } else {
                     InactivePlainLyricView(
                         text: text,
-                        blurRadius: blurRadius
+                        opacity: opacity
                     )
                     .equatable()
                 }
@@ -51,12 +54,12 @@ public struct AppleMusicKaraokeText: View {
                 // 當前行與非當前行全面採用完全相同的 32pt SyllableFlowLayout！
                 // 若長歌詞需要折行，在尚未唱到時就已經預先折好，唱到時文字幾何位置 0 偏移，原地發光
                 if !isCurrent {
-                    // 非當前行：採用 Equatable 隔離視圖，避免 body 重複評估與重繪
-                    // 當模糊半徑未改變時，SwiftUI 複用既有圖層渲染節點，穩跑 120fps！
+                    // 非當前行：採用 Equatable 隔離視圖，原生文字渲染 0 離屏 Pass，避免重複重繪
+                    // 當透明度未改變時，SwiftUI 複用既有圖層渲染節點，穩跑 120fps！
                     InactiveSyllableLyricView(
                         text: text,
                         syllables: validSyllables,
-                        blurRadius: blurRadius
+                        opacity: opacity
                     )
                     .equatable()
                 } else {
@@ -435,20 +438,20 @@ public struct SyllableFlowLayout: Layout {
     }
 }
 
-// MARK: - 非當前播放行 Equatable 快取視圖 (避免重複重繪並維持文字向量邊緣與無障礙文字清晰度)
+// MARK: - 非當前播放行 Equatable 快取視圖 (原生文字渲染，0 離屏 Pass，避免重複重繪)
 private struct InactiveSyllableLyricView: View, Equatable {
     let text: String
     let syllables: [LyricSyllable]
-    let blurRadius: CGFloat
+    let opacity: Double
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.text == rhs.text &&
         lhs.syllables == rhs.syllables &&
-        lhs.blurRadius == rhs.blurRadius
+        lhs.opacity == rhs.opacity
     }
 
     var body: some View {
-        let content = SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
+        SyllableFlowLayout(horizontalSpacing: 0, verticalSpacing: 10) {
             ForEach(syllables) { syl in
                 if syl.text.trimmingCharacters(in: .whitespaces).isEmpty {
                     Text(syl.text)
@@ -457,42 +460,28 @@ private struct InactiveSyllableLyricView: View, Equatable {
                 } else {
                     Text(syl.text)
                         .font(.system(size: 32, weight: .bold, design: .default))
-                        .foregroundColor(Color.white.opacity(0.35))
+                        .foregroundColor(Color.white.opacity(opacity))
                 }
             }
-        }
-
-        if blurRadius > 0 {
-            content
-                .blur(radius: blurRadius)
-        } else {
-            content
         }
     }
 }
 
-// MARK: - 非當前播放行普通歌詞 Equatable 快取視圖
+// MARK: - 非當前播放行普通歌詞 Equatable 快取視圖 (原生文字渲染，0 離屏 Pass)
 private struct InactivePlainLyricView: View, Equatable {
     let text: String
-    let blurRadius: CGFloat
+    let opacity: Double
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.text == rhs.text &&
-        lhs.blurRadius == rhs.blurRadius
+        lhs.opacity == rhs.opacity
     }
 
     var body: some View {
-        let content = Text(text)
+        Text(text)
             .font(.system(size: 32, weight: .bold, design: .default))
-            .foregroundColor(Color.white.opacity(0.35))
+            .foregroundColor(Color.white.opacity(opacity))
             .multilineTextAlignment(.leading)
-
-        if blurRadius > 0 {
-            content
-                .blur(radius: blurRadius)
-        } else {
-            content
-        }
     }
 }
 
