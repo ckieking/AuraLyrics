@@ -288,7 +288,6 @@ struct NowPlayingView: View {
                             .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
                             .blur(radius: isCurrent ? 0 : rowBlur)
-                            .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowBlur)
                             .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                         }
 
@@ -395,15 +394,14 @@ struct NowPlayingView: View {
         }
         let distance = abs(index - current)
         switch distance {
-        case 0, 1:
-            // 焦點行 (0) 與即將唱到的相鄰行 (1)：零模糊！
-            // 依循 Apple Music 原生設計：即將唱到的下一句保持清晰向量字體，景深透過透明度呈現；
-            // 徹底消除切行時焦點周邊核心行的離屏卷積計算，換行平滑滾動 100% 絲滑無卡頓！
-            return 0.0
+        case 0:
+            return 0.0  // 僅焦點行絕對銳利純淨（刀鋒字形 + 空間粉白發光光暈）
+        case 1:
+            return 0.6  // 上下相鄰行：微柔焦散景（細微光學景深，不與焦點行混同，且不失預讀清晰度）
         case 2:
             return 1.8  // 次相鄰行：清晰可見的中度散景
         default:
-            return 3.0  // 遠距行：深邃景深融入流光背景
+            return 3.0  // 遠距行：深邃光學景深融入流光背景
         }
     }
 
