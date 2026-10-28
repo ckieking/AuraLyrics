@@ -220,6 +220,7 @@ struct NowPlayingView: View {
                     LazyVStack(spacing: 26) {
                         ForEach(Array(monitor.currentLyrics.lines.enumerated()), id: \.element.id) { index, line in
                             let isCurrent = (index == monitor.currentLineIndex)
+                            let rowOpacity = lyricOpacity(for: index)
 
                             HStack(alignment: .top, spacing: 0) {
                                 VStack(alignment: .leading, spacing: 6) {
@@ -239,7 +240,7 @@ struct NowPlayingView: View {
                                             syllables: line.syllables,
                                             isCurrent: false,
                                             currentPlaybackTimeMs: 0,
-                                            opacity: lyricOpacity(for: index)
+                                            opacity: rowOpacity
                                         )
                                     }
 
@@ -278,7 +279,7 @@ struct NowPlayingView: View {
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
-                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: isCurrent)
+                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                         }
 
                         // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)
@@ -370,40 +371,38 @@ struct NowPlayingView: View {
 
     /// 計算非焦點歌詞行之光學景深階梯透明度（原生硬體友善渲染，0 離屏 Pass，杜絕動畫雪崩與 GPU 負載）
     private func lyricOpacity(for index: Int) -> Double {
+        guard let current = monitor.currentLineIndex else {
+            return reduceTransparency ? 0.70 : 0.55
+        }
+        let distance = abs(index - current)
+        if distance == 0 {
+            return 1.0
+        }
         if reduceTransparency {
             return 0.70
         }
-        guard enableLyricDefocusBlur, let current = monitor.currentLineIndex else {
+        guard enableLyricDefocusBlur else {
             return 0.55
         }
-        let distance = abs(index - current)
-        switch distance {
-        case 0:
-            return 1.0
-        case 1:
-            return 0.48
-        default:
-            return 0.28
-        }
+        return (distance == 1) ? 0.48 : 0.28
     }
 
     /// 計算翻譯文字之階梯式景深透明度（依循無障礙與視覺焦點階層）
     private func translationOpacity(for index: Int) -> Double {
+        guard let current = monitor.currentLineIndex else {
+            return reduceTransparency ? 0.75 : 0.60
+        }
+        let distance = abs(index - current)
+        if distance == 0 {
+            return 1.0
+        }
         if reduceTransparency {
             return 0.75
         }
-        guard enableLyricDefocusBlur, let current = monitor.currentLineIndex else {
+        guard enableLyricDefocusBlur else {
             return 0.60
         }
-        let distance = abs(index - current)
-        switch distance {
-        case 0:
-            return 1.0
-        case 1:
-            return 0.48
-        default:
-            return 0.32
-        }
+        return (distance == 1) ? 0.48 : 0.32
     }
 
     private func updateCachedArtwork() {
