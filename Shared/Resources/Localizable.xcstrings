@@ -945,6 +945,22 @@
         }
       }
     },
+    "預設 10%": {
+      "localizations": {
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "預設 10%"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default 10%"
+          }
+        }
+      }
+    },
     "歌詞視覺效果": {
       "localizations": {
         "zh-Hant": {

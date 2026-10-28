@@ -81,20 +81,11 @@ struct SettingsView: View {
 
                 // MARK: - 歌詞視覺效果
                 Section {
-                    Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur.animation())
-                    if enableLyricDefocusBlur {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("非焦點歌詞透明度")
-                                Spacer()
-                                Text("\(Int(round(inactiveLyricOpacity * 100)))%")
-                                    .font(.system(.subheadline, design: .monospaced))
-                                    .foregroundColor(.secondary)
-                            }
-                            Slider(value: $inactiveLyricOpacity, in: 0.05...0.60, step: 0.01)
-                                .tint(.pink)
-                        }
-                    }
+                    Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur)
+                    InactiveLyricOpacitySlider(
+                        opacity: $inactiveLyricOpacity,
+                        isEnabled: enableLyricDefocusBlur
+                    )
                 } header: {
                     Text("歌詞視覺效果")
                 }
@@ -347,5 +338,82 @@ struct SettingsView: View {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.9.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(version) Beta (Build \(build))"
+    }
+}
+
+// MARK: - 非焦點歌詞透明度無極調節滑桿（具備預設值吸附與刻度標記）
+private struct InactiveLyricOpacitySlider: View {
+    @Binding var opacity: Double
+    let isEnabled: Bool
+
+    private let defaultValue: Double = 0.10
+    private let range: ClosedRange<Double> = 0.05...0.60
+    private let snapRange: ClosedRange<Double> = 0.088...0.112
+
+    @State private var isSnapped: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("非焦點歌詞透明度")
+                Spacer()
+                if abs(opacity - defaultValue) < 0.003 {
+                    Text(String(localized: "預設 10%"))
+                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                        .foregroundColor(isEnabled ? .pink : .secondary)
+                } else {
+                    Text("\(Int(round(opacity * 100)))%")
+                        .font(.system(.subheadline, design: .monospaced))
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            GeometryReader { geo in
+                let trackWidth = max(0, geo.size.width - 28)
+                let defaultRatio = (defaultValue - range.lowerBound) / (range.upperBound - range.lowerBound)
+                let markX = 14 + trackWidth * CGFloat(defaultRatio)
+
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(isEnabled ? (abs(opacity - defaultValue) < 0.003 ? Color.pink : Color.secondary.opacity(0.35)) : Color.secondary.opacity(0.2))
+                        .frame(width: 2, height: 12)
+                        .cornerRadius(1)
+                        .position(x: markX, y: geo.size.height / 2)
+                        .allowsHitTesting(false)
+
+                    Slider(
+                        value: Binding(
+                            get: { opacity },
+                            set: { newVal in
+                                if snapRange.contains(newVal) {
+                                    if !isSnapped {
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        isSnapped = true
+                                    }
+                                    opacity = defaultValue
+                                } else {
+                                    isSnapped = false
+                                    opacity = newVal
+                                }
+                            }
+                        ),
+                        in: range
+                    )
+                    .tint(.pink)
+                }
+            }
+            .frame(height: 32)
+
+            HStack {
+                Text("5%")
+                Spacer()
+                Text("60%")
+            }
+            .font(.caption2)
+            .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 4)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1.0 : 0.45)
     }
 }

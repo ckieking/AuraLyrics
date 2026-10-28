@@ -15,6 +15,7 @@ struct NowPlayingView: View {
 
     @State private var showSearchSheet = false
     @State private var showFileImporter = false
+    @State private var isUserScrolling = false
     @AppStorage("showBilingualLyrics") private var showTranslation = true
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
@@ -262,6 +263,11 @@ struct NowPlayingView: View {
                                 tracker.scrollIdleTask?.cancel()
                                 tracker.scrollIdleTask = nil
                                 tracker.isUserScrolling = false
+                                if isUserScrolling {
+                                    withAnimation(.easeInOut(duration: 0.35)) {
+                                        isUserScrolling = false
+                                    }
+                                }
                                 monitor.seek(toMs: line.timeMs)
                                 if reduceMotion {
                                     proxy.scrollTo(index, anchor: .center)
@@ -280,7 +286,7 @@ struct NowPlayingView: View {
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
-                            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
+                            .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                         }
 
                         // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)
@@ -312,12 +318,18 @@ struct NowPlayingView: View {
                     tracker.scrollIdleTask?.cancel()
                     tracker.scrollIdleTask = nil
                     tracker.isUserScrolling = true
+                    if !isUserScrolling {
+                        isUserScrolling = true
+                    }
                 } else if newPhase == .idle {
                     tracker.scrollIdleTask?.cancel()
                     tracker.scrollIdleTask = Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        try? await Task.sleep(nanoseconds: 1_200_000_000)
                         guard !Task.isCancelled else { return }
                         tracker.isUserScrolling = false
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            isUserScrolling = false
+                        }
                     }
                 }
             }
@@ -385,6 +397,9 @@ struct NowPlayingView: View {
         guard enableLyricDefocusBlur else {
             return 0.50
         }
+        if isUserScrolling {
+            return 0.65 // 使用者滑動螢幕時即時解除暗化，清晰展示全部可見歌詞
+        }
         let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
         let neighbor = min(0.85, base * 2.2)
         return (distance == 1) ? neighbor : base
@@ -404,6 +419,9 @@ struct NowPlayingView: View {
         }
         guard enableLyricDefocusBlur else {
             return 0.55
+        }
+        if isUserScrolling {
+            return 0.65
         }
         let base = min(max(inactiveLyricOpacity * 1.15, 0.06), 0.65)
         let neighbor = min(0.85, base * 2.2)
