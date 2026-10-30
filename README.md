@@ -141,8 +141,8 @@ AuraLyrics is an independent, non-commercial open-source project. If you find Au
 
 | Network | Supported Assets | Wallet Address |
 | :--- | :--- | :--- |
-| **Solana** *(Recommended, near-zero fees)* | SOL, USDC (SPL) | `3rL3zsXXamy9Dg6EaVfmfSLr24tGvJzXNyRnL7j4m2yN` |
-| **EVM** *(Polygon / Arbitrum / Base / Ethereum)* | USDT, USDC, POL, ETH | `0x4c2d0955795160d85ce62389898b3dc18b26e4bc` |
+| **Solana** *(Recommended, near-zero fees)* | SOL, USDC (SPL) | `AJmb91ouXw9bcZAbEKVEwMry4tEPEfNp9q4MTSxAYv2R` |
+| **EVM** *(Polygon / Arbitrum / Base / Ethereum)* | USDT, USDC, POL, ETH | `0xaf778597964e626c98b84c0846af4f6dafbe4b57` |
 
 > 💡 **Notice**: Please double-check the transfer network before sending funds to prevent loss of assets. Thank you for your support!
 
