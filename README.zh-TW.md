@@ -139,8 +139,8 @@ AuraLyrics 是一個由個人獨立維護的非商業開源專案。如果你喜
 
 | 網路 (Network) | 支援資產 (Assets) | 收款地址 (Wallet Address) |
 | :--- | :--- | :--- |
-| **Solana** *(推薦，手續費極低)* | SOL, USDC (SPL) | `3rL3zsXXamy9Dg6EaVfmfSLr24tGvJzXNyRnL7j4m2yN` |
-| **EVM** *(Polygon / Arbitrum / Base / Ethereum)* | USDT, USDC, POL, ETH | `0x4c2d0955795160d85ce62389898b3dc18b26e4bc` |
+| **Solana** *(推薦，手續費極低)* | SOL, USDC (SPL) | `AJmb91ouXw9bcZAbEKVEwMry4tEPEfNp9q4MTSxAYv2R` |
+| **EVM** *(Polygon / Arbitrum / Base / Ethereum)* | USDT, USDC, POL, ETH | `0xaf778597964e626c98b84c0846af4f6dafbe4b57` |
 
 > 💡 **轉帳提示**：
 > - 轉帳前請務必確認選擇對應的**傳輸網路**（Solana 或 EVM 相容網路），避免資產遺失。
