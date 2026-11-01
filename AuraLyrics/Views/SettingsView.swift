@@ -9,15 +9,179 @@ struct SettingsView: View {
     @ObservedObject var pipVM = PiPLyricsViewModel.shared
     @ObservedObject var musicMonitor = AppleMusicMonitor.shared
     @ObservedObject var lyricsProvider = LyricsProviderService.shared
+    @ObservedObject var spotifyService = SpotifyService.shared
 
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
+    @State private var showCopiedRedirectToast = false
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
     var body: some View {
         NavigationStack {
             Form {
+                // MARK: - 音樂播放來源 (Apple Music / Spotify Web API / Spotify App Remote)
+                Section {
+                    Picker("播放來源", selection: $musicMonitor.playbackSource) {
+                        ForEach(PlaybackSource.allCases) { source in
+                            Text(source.localizedTitle).tag(source)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    if musicMonitor.playbackSource != .appleMusic {
+                        // Spotify Client ID 設定
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Spotify Client ID")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack {
+                                TextField("貼上 Spotify Client ID", text: $spotifyService.clientId)
+                                    .font(.system(.subheadline, design: .monospaced))
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
+
+                                if !spotifyService.clientId.isEmpty {
+                                    Button {
+                                        spotifyService.clientId = ""
+                                    } label: {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 2)
+
+                        // Redirect URI 一鍵複製
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Redirect URI")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(SpotifyService.redirectURI)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundColor(.primary)
+                            }
+                            Spacer()
+                            Button {
+                                UIPasteboard.general.string = SpotifyService.redirectURI
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                showCopiedRedirectToast = true
+                                Task {
+                                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                                    showCopiedRedirectToast = false
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: showCopiedRedirectToast ? "checkmark" : "doc.on.doc")
+                                    Text(showCopiedRedirectToast ? "已複製" : "複製")
+                                }
+                                .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+
+                        // Web API 模式專屬控制項
+                        if musicMonitor.playbackSource == .spotifyWebAPI {
+                            HStack {
+                                Label {
+                                    Text("Web API 狀態")
+                                } icon: {
+                                    Image(systemName: "globe")
+                                        .foregroundColor(.pink)
+                                }
+                                Spacer()
+                                HStack(spacing: 5) {
+                                    Image(systemName: spotifyService.isWebAPILoggedIn ? "checkmark.circle.fill" : "person.crop.circle.badge.xmark")
+                                        .foregroundColor(spotifyService.isWebAPILoggedIn ? .green : .secondary)
+                                    Text(spotifyService.isWebAPILoggedIn ? String(localized: "已登入") : String(localized: "未登入"))
+                                        .fontWeight(.medium)
+                                        .foregroundColor(spotifyService.isWebAPILoggedIn ? .green : .secondary)
+                                }
+                                .font(.subheadline)
+                            }
+
+                            if spotifyService.isWebAPILoggedIn {
+                                Button(role: .destructive) {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    spotifyService.logoutWebAPI()
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "rectangle.portrait.and.arrow.right")
+                                        Text("登出 Spotify 帳號")
+                                    }
+                                }
+                            } else {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    spotifyService.startWebAPILogin()
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "arrow.right.circle.fill")
+                                        Text("登入 Spotify 帳號 (OAuth PKCE)")
+                                    }
+                                }
+                                .disabled(spotifyService.clientId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                        }
+
+                        // App Remote 模式專屬控制項
+                        if musicMonitor.playbackSource == .spotifyAppRemote {
+                            HStack {
+                                Label {
+                                    Text("App Remote 狀態")
+                                } icon: {
+                                    Image(systemName: "app.connected.to.app.below.fill")
+                                        .foregroundColor(.pink)
+                                }
+                                Spacer()
+                                HStack(spacing: 5) {
+                                    Image(systemName: spotifyService.isAppRemoteConnected ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                        .foregroundColor(spotifyService.isAppRemoteConnected ? .green : .orange)
+                                    Text(spotifyService.appRemoteStatusText)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(spotifyService.isAppRemoteConnected ? .green : .secondary)
+                                }
+                                .font(.subheadline)
+                            }
+
+                            if spotifyService.isAppRemoteConnected {
+                                Button(role: .destructive) {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    spotifyService.disconnectAppRemote()
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "xmark.circle")
+                                        Text("中斷 App Remote 連線")
+                                    }
+                                }
+                            } else {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    spotifyService.connectAppRemote()
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "link.badge.plus")
+                                        Text("連線本機 Spotify App")
+                                    }
+                                }
+                                .disabled(spotifyService.clientId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("音樂播放來源")
+                } footer: {
+                    if musicMonitor.playbackSource == .appleMusic {
+                        Text("使用系統內建 Apple Music 播放器，即時追蹤本地音樂進度。")
+                    } else if musicMonitor.playbackSource == .spotifyWebAPI {
+                        Text("Spotify Web API 模式：需於 Spotify 開發者後台申請 Client ID 並將 Redirect URI 加入 Redirect Allowlist。支援免費與 Premium 會員。")
+                    } else {
+                        Text("Spotify App Remote 模式：透過本機 IPC 跨 App 通訊，需安裝 Spotify App 且需 Premium 會員資格。")
+                    }
+                }
                 // MARK: - 子母畫面 (PiP) 實時預覽與開關
                 Section {
                     // 1:1 實時 PiP 預覽視窗卡
@@ -316,9 +480,23 @@ struct SettingsView: View {
                     .liquidGlassCapsule()
                     .padding(.bottom, 20)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
+                } else if showCopiedRedirectToast {
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("已複製 Redirect URI")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .liquidGlassCapsule()
+                    .padding(.bottom, 20)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: cacheClearedToast)
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showCopiedRedirectToast)
         }
     }
 

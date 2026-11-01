@@ -24,6 +24,14 @@ public final class AppleMusicMonitor: ObservableObject {
         }
     }
 
+    /// 音樂播放來源 (Apple Music / Spotify Web API / Spotify App Remote)
+    @Published public var playbackSource: PlaybackSource {
+        didSet {
+            UserDefaults.standard.set(playbackSource.rawValue, forKey: "playbackSource")
+            handlePlaybackSourceChanged()
+        }
+    }
+
     private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
     private let timerQueue = DispatchQueue(label: "com.auralyrics.monitor.timerQueue", qos: .userInteractive)
     private var timerSource: DispatchSourceTimer?
@@ -42,6 +50,8 @@ public final class AppleMusicMonitor: ObservableObject {
 
     private init() {
         self.globalOffsetMs = UserDefaults.standard.integer(forKey: "globalLyricsOffsetMs")
+        let savedSource = UserDefaults.standard.string(forKey: "playbackSource") ?? PlaybackSource.appleMusic.rawValue
+        self.playbackSource = PlaybackSource(rawValue: savedSource) ?? .appleMusic
         setupNotifications()
     }
 
@@ -97,9 +107,11 @@ public final class AppleMusicMonitor: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 self.isInBackground = false
-                self.musicPlayer.beginGeneratingPlaybackNotifications()
-                self.handleTrackChanged(force: true)
-                self.handlePlaybackStateChanged()
+                if self.playbackSource == .appleMusic {
+                    self.musicPlayer.beginGeneratingPlaybackNotifications()
+                    self.handleTrackChanged(force: true)
+                    self.handlePlaybackStateChanged()
+                }
             }
         }
 
@@ -111,16 +123,52 @@ public final class AppleMusicMonitor: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 self.isInBackground = false
-                self.handleTrackChanged()
-                self.handlePlaybackStateChanged()
+                if self.playbackSource == .appleMusic {
+                    self.handleTrackChanged()
+                    self.handlePlaybackStateChanged()
+                }
             }
         }
     }
 
+    // MARK: - 播放來源切換管理
+    private func handlePlaybackSourceChanged() {
+        switch playbackSource {
+        case .appleMusic:
+            SpotifyService.shared.stop()
+            musicPlayer.beginGeneratingPlaybackNotifications()
+            handleTrackChanged(force: true)
+            handlePlaybackStateChanged()
+        case .spotifyWebAPI:
+            musicPlayer.endGeneratingPlaybackNotifications()
+            resetTrackState()
+            SpotifyService.shared.start(source: .spotifyWebAPI)
+        case .spotifyAppRemote:
+            musicPlayer.endGeneratingPlaybackNotifications()
+            resetTrackState()
+            SpotifyService.shared.start(source: .spotifyAppRemote)
+        }
+    }
+
+    private func resetTrackState() {
+        lyricsFetchTask?.cancel()
+        lyricsFetchTask = nil
+        currentTrack = .placeholder
+        currentLyrics = .empty
+        currentLineIndex = nil
+        playbackProgress = 0.0
+        isPlaying = false
+        anchorPlaybackTimeSec = 0
+        anchorMediaTime = 0
+        lastPersistentID = 0
+        lastPlaybackStoreID = ""
+        lastPlaybackTimeSec = 0
+        syncExternalEngines()
+    }
+
     // MARK: - 啟動監聽與高精度時間軸定時器 (DispatchSourceTimer 前景背景統一驅動)
     public func startMonitoring() {
-        handleTrackChanged(force: true)
-        handlePlaybackStateChanged()
+        handlePlaybackSourceChanged()
 
         stopTimer()
 
@@ -145,6 +193,7 @@ public final class AppleMusicMonitor: ObservableObject {
         lyricsFetchTask?.cancel()
         lyricsFetchTask = nil
         musicPlayer.endGeneratingPlaybackNotifications()
+        SpotifyService.shared.stop()
     }
 
     // MARK: - 曲目變更處理 (支援強制刷新與即時清空舊歌詞)
@@ -270,6 +319,25 @@ public final class AppleMusicMonitor: ObservableObject {
     private func tick() {
         let now = CACurrentMediaTime()
         lastTickTimestamp = now
+
+        // Spotify 模式：複用本地 150ms 高精度插值時鐘，不輪詢 MPMusicPlayerController
+        if playbackSource != .appleMusic {
+            if isPlaying {
+                currentPlaybackTimeSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
+            } else {
+                currentPlaybackTimeSec = anchorPlaybackTimeSec
+            }
+
+            if currentTrack.duration > 0 {
+                playbackProgress = min(max(currentPlaybackTimeSec / currentTrack.duration, 0.0), 1.0)
+                if abs(PiPLyricsViewModel.shared.progress - playbackProgress) > 0.002 {
+                    PiPLyricsViewModel.shared.progress = playbackProgress
+                }
+            }
+
+            refreshCurrentLineIndex()
+            return
+        }
 
         // 1. 多維度換歌與曲目資訊補齊
         if let nowPlaying = musicPlayer.nowPlayingItem {
@@ -479,8 +547,9 @@ public final class AppleMusicMonitor: ObservableObject {
     // MARK: - 點擊歌詞行跳轉播放進度
     public func seek(toMs targetLineTimeMs: Int) {
         let rawMs = targetLineTimeMs - globalOffsetMs - currentLyrics.offsetMs
-        let targetSec = max(0.0, Double(rawMs) / 1000.0)
-        musicPlayer.currentPlaybackTime = targetSec
+        let targetMs = max(0, rawMs)
+        let targetSec = Double(targetMs) / 1000.0
+
         currentPlaybackTimeSec = targetSec
         anchorPlaybackTimeSec = targetSec
         anchorMediaTime = CACurrentMediaTime()
@@ -489,6 +558,107 @@ public final class AppleMusicMonitor: ObservableObject {
             playbackProgress = min(max(targetSec / currentTrack.duration, 0.0), 1.0)
         }
         refreshCurrentLineIndex(forceSync: true)
+
+        switch playbackSource {
+        case .appleMusic:
+            musicPlayer.currentPlaybackTime = targetSec
+        case .spotifyWebAPI:
+            SpotifyService.shared.seekWebAPI(toMs: targetMs)
+        case .spotifyAppRemote:
+            SpotifyService.shared.seekAppRemote(toMs: targetMs)
+        }
+    }
+
+    // MARK: - Spotify 外部快照更新接收
+    public func applySpotifySnapshot(_ snapshot: SpotifyTrackSnapshot?) {
+        guard playbackSource != .appleMusic else { return }
+
+        guard let snapshot = snapshot else {
+            if currentTrack.title != TrackInfo.placeholder.title {
+                resetTrackState()
+            }
+            return
+        }
+
+        let newTrack = snapshot.track
+        let isNewSong = (newTrack.title != currentTrack.title || newTrack.artist != currentTrack.artist)
+        let reportedSec = Double(snapshot.progressMs) / 1000.0
+        let now = snapshot.timestamp
+
+        if isNewSong {
+            lyricsFetchTask?.cancel()
+            currentTrack = newTrack
+            currentLyrics = .empty
+            currentLineIndex = nil
+            playbackProgress = 0.0
+            isPlaying = snapshot.isPlaying
+            currentPlaybackTimeSec = reportedSec
+            anchorPlaybackTimeSec = reportedSec
+            anchorMediaTime = now
+            lastPlaybackTimeSec = reportedSec
+            syncExternalEngines()
+
+            lyricsFetchTask = Task { [weak self] in
+                guard let self = self else { return }
+                self.isLoadingLyrics = true
+                let fetched = await LyricsProviderService.shared.fetchLyrics(track: newTrack)
+                guard !Task.isCancelled else { return }
+                if let fetched = fetched {
+                    self.currentLyrics = fetched
+                } else {
+                    self.currentLyrics = .empty
+                }
+                self.refreshCurrentLineIndex(forceSync: true)
+                self.isLoadingLyrics = false
+            }
+        } else {
+            // 同首歌屬性補全
+            if currentTrack.artworkData == nil && newTrack.artworkData != nil {
+                var updated = currentTrack
+                updated.artworkData = newTrack.artworkData
+                currentTrack = updated
+            }
+            if currentTrack.duration <= 0 && newTrack.duration > 0 {
+                var updated = currentTrack
+                updated.duration = newTrack.duration
+                currentTrack = updated
+            }
+
+            let wasPlaying = self.isPlaying
+            self.isPlaying = snapshot.isPlaying
+
+            if snapshot.isPlaying {
+                let predictedSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
+                let drift = abs(reportedSec - predictedSec)
+                if drift > 1.2 || !wasPlaying {
+                    anchorPlaybackTimeSec = reportedSec
+                    anchorMediaTime = now
+                    currentPlaybackTimeSec = reportedSec
+                }
+            } else {
+                anchorPlaybackTimeSec = reportedSec
+                anchorMediaTime = now
+                currentPlaybackTimeSec = reportedSec
+            }
+
+            if wasPlaying != snapshot.isPlaying {
+                if snapshot.isPlaying {
+                    LiveActivityLyricsEngine.shared.handlePlaybackResumed(track: currentTrack)
+                } else {
+                    LiveActivityLyricsEngine.shared.handlePlaybackPaused()
+                }
+                syncExternalEngines()
+            }
+        }
+    }
+
+    public func updateArtworkIfCurrent(trackTitle: String, artist: String, artworkData: Data) {
+        if currentTrack.title == trackTitle && currentTrack.artist == artist {
+            var updated = currentTrack
+            updated.artworkData = artworkData
+            currentTrack = updated
+            syncExternalEngines()
+        }
     }
 
     // MARK: - 調整全域共用之時間軸微調偏移量
