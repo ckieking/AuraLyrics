@@ -15,18 +15,13 @@ struct NowPlayingView: View {
 
     @State private var showSearchSheet = false
     @State private var showFileImporter = false
+    @State private var isUserScrolling = false
     @AppStorage("showBilingualLyrics") private var showTranslation = true
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
+    @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
-    /// 零重繪之可視行索引追蹤器（參考型別，不觸發全視圖 body 刷新）
+    /// 零重繪之可視行索引與滾動狀態追蹤器（參考型別，不觸發全視圖 body 刷新）
     @State private var tracker = ViewportTracker()
-
-    /// 焦點歌詞當前是否在螢幕可視範圍內（僅在布林值翻轉時更新 @State）
-    @State private var isCurrentLineInViewport: Bool = true
-
-    /// 記錄使用者是否正在手動滑動螢幕（滑動時立即解除模糊，閒置 1.5s 平滑恢復）
-    @State private var isUserScrolling: Bool = false
-    @State private var scrollIdleTask: Task<Void, Never>? = nil
 
     /// 快取解碼後之專輯封面圖，避免在 body 內高頻重複解碼 PNG
     @State private var cachedArtworkImage: UIImage? = nil
@@ -227,18 +222,19 @@ struct NowPlayingView: View {
                     LazyVStack(spacing: 26) {
                         ForEach(Array(monitor.currentLyrics.lines.enumerated()), id: \.element.id) { index, line in
                             let isCurrent = (index == monitor.currentLineIndex)
+                            let rowOpacity = lyricOpacity(for: index)
+                            let rowBlur = defocusBlurRadius(for: index)
 
                             HStack(alignment: .top, spacing: 0) {
                                 VStack(alignment: .leading, spacing: 6) {
                                     if isCurrent {
-                                        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying)) { _ in
+                                        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying || scenePhase != .active)) { _ in
                                             let currentPlayMs = monitor.interpolatedPlaybackTimeMs()
                                             AppleMusicKaraokeText(
                                                 text: line.text,
                                                 syllables: line.syllables,
                                                 isCurrent: true,
-                                                currentPlaybackTimeMs: currentPlayMs,
-                                                blurRadius: 0
+                                                currentPlaybackTimeMs: currentPlayMs
                                             )
                                         }
                                     } else {
@@ -247,17 +243,14 @@ struct NowPlayingView: View {
                                             syllables: line.syllables,
                                             isCurrent: false,
                                             currentPlaybackTimeMs: 0,
-                                            blurRadius: blurRadius(for: index)
+                                            opacity: rowOpacity
                                         )
-                                        .animation(.easeInOut(duration: 0.35), value: blurRadius(for: index))
                                     }
 
                                     if showTranslation, let trans = line.translation, !trans.isEmpty {
                                         Text(trans)
                                             .font(.system(size: 16, weight: .medium, design: .default))
-                                            .foregroundColor(isCurrent ? .pink : Color.white.opacity(0.65))
-                                            .blur(radius: isCurrent ? 0 : translationBlurRadius(for: index))
-                                            .animation(.easeInOut(duration: 0.35), value: translationBlurRadius(for: index))
+                                            .foregroundColor(isCurrent ? .pink : Color.white.opacity(translationOpacity(for: index)))
                                     }
                                 }
                                 .fixedSize(horizontal: false, vertical: true)
@@ -268,26 +261,34 @@ struct NowPlayingView: View {
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                scrollIdleTask?.cancel()
-                                scrollIdleTask = nil
-                                isUserScrolling = false
+                                tracker.scrollIdleTask?.cancel()
+                                tracker.scrollIdleTask = nil
+                                tracker.isUserScrolling = false
+                                if isUserScrolling {
+                                    withAnimation(.easeInOut(duration: 0.35)) {
+                                        isUserScrolling = false
+                                    }
+                                }
                                 monitor.seek(toMs: line.timeMs)
-                                isCurrentLineInViewport = true
-                                withAnimation(.easeInOut(duration: 0.35)) {
+                                if reduceMotion {
                                     proxy.scrollTo(index, anchor: .center)
+                                } else {
+                                    withAnimation(.easeInOut(duration: 0.35)) {
+                                        proxy.scrollTo(index, anchor: .center)
+                                    }
                                 }
                             }
                             .onAppear {
                                 tracker.visibleIndices.insert(index)
-                                checkCurrentLineVisibility()
                             }
                             .onDisappear {
                                 tracker.visibleIndices.remove(index)
-                                checkCurrentLineVisibility()
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
+                            .blur(radius: isCurrent ? 0 : rowBlur)
+                            .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                         }
 
                         // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)
@@ -316,26 +317,29 @@ struct NowPlayingView: View {
             }
             .onScrollPhaseChange { oldPhase, newPhase in
                 if newPhase == .interacting || newPhase == .decelerating {
-                    scrollIdleTask?.cancel()
-                    scrollIdleTask = nil
+                    tracker.scrollIdleTask?.cancel()
+                    tracker.scrollIdleTask = nil
+                    tracker.isUserScrolling = true
                     if !isUserScrolling {
                         isUserScrolling = true
                     }
                 } else if newPhase == .idle {
-                    scrollIdleTask?.cancel()
-                    scrollIdleTask = Task { @MainActor in
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    tracker.scrollIdleTask?.cancel()
+                    tracker.scrollIdleTask = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 1_200_000_000)
                         guard !Task.isCancelled else { return }
-                        isUserScrolling = false
+                        tracker.isUserScrolling = false
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            isUserScrolling = false
+                        }
                     }
                 }
             }
             //智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
-                checkCurrentLineVisibility()
                 guard let index = newIndex else { return }
                 let isVisible = tracker.visibleIndices.contains(index) || index <= 1
-                if isVisible && !isUserScrolling {
+                if isVisible && !tracker.isUserScrolling {
                     if reduceMotion {
                         proxy.scrollTo(index, anchor: .center)
                     } else {
@@ -362,8 +366,8 @@ struct NowPlayingView: View {
                 }
             }
             .onDisappear {
-                scrollIdleTask?.cancel()
-                scrollIdleTask = nil
+                tracker.scrollIdleTask?.cancel()
+                tracker.scrollIdleTask = nil
             }
             .onChange(of: monitor.currentTrack.artworkData) { _, _ in
                 updateCachedArtwork()
@@ -380,39 +384,83 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 計算主歌詞行的單層級景深模糊半徑（非焦點行統一 2.0pt，換行時僅 2 行切換狀態，極致省電流暢）
-    private func blurRadius(for index: Int) -> CGFloat {
-        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
+    /// 依據與當前焦點行之距離，計算光學景深多階模糊半徑 (Progressive Optical Defocus Blur)
+    private func defocusBlurRadius(for index: Int) -> CGFloat {
+        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, scenePhase == .active else {
             return 0.0
         }
         guard let current = monitor.currentLineIndex else {
             return 0.0
         }
-        return (index == current) ? 0.0 : 2.0
+        let distance = abs(index - current)
+        switch distance {
+        case 0:
+            return 0.0  // 僅焦點行絕對銳利純淨（刀鋒字形 + 空間粉白發光光暈）
+        case 1:
+            return 0.6  // 上下相鄰行：微柔焦散景（細微光學景深，不與焦點行混同，且不失預讀清晰度）
+        case 2:
+            return 1.8  // 次相鄰行：清晰可見的中度散景
+        default:
+            return 3.0  // 遠距行：深邃光學景深融入流光背景
+        }
     }
 
-    /// 計算翻譯文字的單層級景深模糊半徑
-    private func translationBlurRadius(for index: Int) -> CGFloat {
-        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, isCurrentLineInViewport else {
-            return 0.0
-        }
+    /// 依據與當前焦點行之距離，計算光學景深多階透明度 (Progressive Depth Opacity)
+    private func lyricOpacity(for index: Int) -> Double {
         guard let current = monitor.currentLineIndex else {
-            return 0.0
+            return reduceTransparency ? 0.70 : 0.40
         }
-        return (index == current) ? 0.0 : 1.2
+        let distance = abs(index - current)
+        if distance == 0 {
+            return 1.0
+        }
+        if reduceTransparency {
+            return 0.70
+        }
+        guard enableLyricDefocusBlur else {
+            return 0.50
+        }
+        if isUserScrolling {
+            // 滑動時適度提升至便於閱讀的清晰度，但嚴格不超過當前播放行未唱到字元的基底亮度 (0.35)，維持視覺焦點
+            return max(inactiveLyricOpacity, 0.32) <= 0.35 ? 0.32 : inactiveLyricOpacity
+        }
+        let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
+        switch distance {
+        case 1:
+            return min(0.40, max(0.30, base * 2.8)) // 距離 1：保持清晰易讀，約 35%
+        case 2:
+            return min(0.24, max(0.16, base * 1.8)) // 距離 2：層次過渡
+        default:
+            return base                             // 距離 >= 3：背景深處
+        }
     }
 
-    /// 檢查焦點行是否在目前畫面可視範圍內（僅在結果翻轉時更新 @State）
-    private func checkCurrentLineVisibility() {
+    /// 計算翻譯文字之階梯式景深透明度（依循無障礙與視覺焦點階層）
+    private func translationOpacity(for index: Int) -> Double {
         guard let current = monitor.currentLineIndex else {
-            if !isCurrentLineInViewport {
-                isCurrentLineInViewport = true
-            }
-            return
+            return reduceTransparency ? 0.75 : 0.45
         }
-        let isVisible = tracker.visibleIndices.contains(current) || current <= 1
-        if isCurrentLineInViewport != isVisible {
-            isCurrentLineInViewport = isVisible
+        let distance = abs(index - current)
+        if distance == 0 {
+            return 1.0
+        }
+        if reduceTransparency {
+            return 0.75
+        }
+        guard enableLyricDefocusBlur else {
+            return 0.55
+        }
+        if isUserScrolling {
+            return max(inactiveLyricOpacity, 0.28) <= 0.35 ? 0.28 : inactiveLyricOpacity
+        }
+        let base = min(max(inactiveLyricOpacity * 1.15, 0.06), 0.65)
+        switch distance {
+        case 1:
+            return min(0.36, max(0.26, base * 2.5))
+        case 2:
+            return min(0.22, max(0.14, base * 1.5))
+        default:
+            return base
         }
     }
 
@@ -461,8 +509,10 @@ struct NowPlayingView: View {
     }
 }
 
-/// 零重繪之可視行索引追蹤器（參考型別，不觸發全視圖 body 刷新）
+/// 零重繪之可視行索引與滾動狀態追蹤器（參考型別，不觸發全視圖 body 刷新）
 private final class ViewportTracker {
     var visibleIndices: Set<Int> = []
+    var isUserScrolling: Bool = false
+    var scrollIdleTask: Task<Void, Never>? = nil
 }
 
