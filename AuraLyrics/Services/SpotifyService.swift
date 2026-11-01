@@ -422,7 +422,7 @@ public final class SpotifyService: NSObject, ObservableObject {
                 return defaultDelay
             }
 
-            let playResp = try JSONDecoder().decode(SpotifyCurrentlyPlayingResponse.self, data: data)
+            let playResp = try JSONDecoder().decode(SpotifyCurrentlyPlayingResponse.self, from: data)
             if playResp.currently_playing_type == "ad" {
                 return defaultDelay
             }
