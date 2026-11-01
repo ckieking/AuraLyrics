@@ -40,9 +40,6 @@ struct AuraLyricsApp: App {
                 .onAppear {
                     BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
                 }
-                .onOpenURL { url in
-                    SpotifyService.shared.handleOpenURL(url)
-                }
         }
     }
 }

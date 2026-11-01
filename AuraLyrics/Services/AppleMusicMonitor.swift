@@ -24,7 +24,7 @@ public final class AppleMusicMonitor: ObservableObject {
         }
     }
 
-    /// 音樂播放來源 (Apple Music / Spotify Web API / Spotify App Remote)
+    /// 音樂播放來源 (Apple Music / Spotify)
     @Published public var playbackSource: PlaybackSource {
         didSet {
             UserDefaults.standard.set(playbackSource.rawValue, forKey: "playbackSource")
@@ -51,8 +51,13 @@ public final class AppleMusicMonitor: ObservableObject {
 
     private init() {
         self.globalOffsetMs = UserDefaults.standard.integer(forKey: "globalLyricsOffsetMs")
-        let savedSource = UserDefaults.standard.string(forKey: "playbackSource") ?? PlaybackSource.appleMusic.rawValue
-        self.playbackSource = PlaybackSource(rawValue: savedSource) ?? .appleMusic
+        let rawSaved = UserDefaults.standard.string(forKey: "playbackSource") ?? PlaybackSource.appleMusic.rawValue
+        if rawSaved == "spotifyWebAPI" || rawSaved == "spotifyAppRemote" {
+            self.playbackSource = .spotify
+            UserDefaults.standard.set(PlaybackSource.spotify.rawValue, forKey: "playbackSource")
+        } else {
+            self.playbackSource = PlaybackSource(rawValue: rawSaved) ?? .appleMusic
+        }
         setupNotifications()
     }
 
@@ -140,14 +145,10 @@ public final class AppleMusicMonitor: ObservableObject {
             musicPlayer.beginGeneratingPlaybackNotifications()
             handleTrackChanged(force: true)
             handlePlaybackStateChanged()
-        case .spotifyWebAPI:
+        case .spotify:
             musicPlayer.endGeneratingPlaybackNotifications()
             resetTrackState()
-            SpotifyService.shared.start(source: .spotifyWebAPI)
-        case .spotifyAppRemote:
-            musicPlayer.endGeneratingPlaybackNotifications()
-            resetTrackState()
-            SpotifyService.shared.start(source: .spotifyAppRemote)
+            SpotifyService.shared.start(source: .spotify)
         }
     }
 
@@ -568,10 +569,8 @@ public final class AppleMusicMonitor: ObservableObject {
         switch playbackSource {
         case .appleMusic:
             musicPlayer.currentPlaybackTime = targetSec
-        case .spotifyWebAPI:
-            SpotifyService.shared.seekWebAPI(toMs: targetMs)
-        case .spotifyAppRemote:
-            SpotifyService.shared.seekAppRemote(toMs: targetMs)
+        case .spotify:
+            SpotifyService.shared.seek(toMs: targetMs)
         }
     }
 

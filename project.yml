@@ -15,11 +15,6 @@ settings:
   MARKETING_VERSION: "0.9.0"
   CURRENT_PROJECT_VERSION: "1"
 
-packages:
-  SpotifyiOS:
-    url: https://github.com/spotify/ios-sdk
-    from: 5.0.0
-
 targets:
   AuraLyrics:
     type: application
@@ -37,8 +32,6 @@ targets:
       CURRENT_PROJECT_VERSION: "1"
     dependencies:
       - target: AuraLyricsWidget
-      - package: SpotifyiOS
-        product: SpotifyiOS
 
   AuraLyricsWidget:
     type: app-extension
