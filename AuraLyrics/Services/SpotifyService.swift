@@ -61,7 +61,11 @@ public final class SpotifyService: NSObject, ObservableObject {
     private var codeVerifier: String?
     private var authSession: ASWebAuthenticationSession?
     private var webAPIPollingTask: Task<Void, Never>?
-    private var artworkCache: [String: Data] = [:]
+    private let artworkCache: NSCache<NSString, NSData> = {
+        let cache = NSCache<NSString, NSData>()
+        cache.countLimit = 100
+        return cache
+    }()
 
     // App Remote 核心物件
     private var appRemote: SPTAppRemote?
@@ -98,7 +102,9 @@ public final class SpotifyService: NSObject, ObservableObject {
                         self.connectAppRemote(forceReauth: false)
                     }
                 } else if AppleMusicMonitor.shared.playbackSource == .spotifyWebAPI {
-                    self.triggerImmediateWebAPIPoll()
+                    if self.isWebAPILoggedIn {
+                        self.startWebAPIPolling()
+                    }
                 }
             }
         }
@@ -115,6 +121,8 @@ public final class SpotifyService: NSObject, ObservableObject {
                    let remote = self.appRemote,
                    remote.isConnected {
                     remote.disconnect()
+                } else if AppleMusicMonitor.shared.playbackSource == .spotifyWebAPI {
+                    self.stopWebAPIPolling()
                 }
             }
         }
@@ -155,6 +163,18 @@ public final class SpotifyService: NSObject, ObservableObject {
         }
 
         // 2. App Remote 授權回傳 (含 Access Token 或錯誤)
+        if appRemote == nil {
+            let cleanId = clientId.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleanId.isEmpty {
+                let config = SPTConfiguration(clientID: cleanId, redirectURL: URL(string: Self.redirectURI)!)
+                config.playURI = ""
+                self.configuration = config
+                let remote = SPTAppRemote(configuration: config, logLevel: .none)
+                remote.delegate = self
+                self.appRemote = remote
+            }
+        }
+
         if let remote = appRemote, let params = remote.authorizationParameters(from: url) {
             if let accessToken = params[SPTAppRemoteAccessTokenKey] {
                 UserDefaults.standard.set(accessToken, forKey: kAppRemoteAccessToken)
@@ -212,10 +232,8 @@ public final class SpotifyService: NSObject, ObservableObject {
         stopWebAPIPolling()
         clearTokens()
         isWebAPILoggedIn = false
-        artworkCache.removeAll()
-        if AppleMusicMonitor.shared.playbackSource == .spotifyWebAPI {
-            AppleMusicMonitor.shared.applySpotifySnapshot(nil)
-        }
+        artworkCache.removeAllObjects()
+        AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotifyWebAPI)
     }
 
     // MARK: PKCE 憑證生成
@@ -244,6 +262,7 @@ public final class SpotifyService: NSObject, ObservableObject {
               let verifier = self.codeVerifier else {
             return
         }
+        self.codeVerifier = nil
 
         let cleanId = clientId.trimmingCharacters(in: .whitespacesAndNewlines)
         var request = URLRequest(url: URL(string: "https://accounts.spotify.com/api/token")!)
@@ -335,7 +354,9 @@ public final class SpotifyService: NSObject, ObservableObject {
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            clearTokens()
             isWebAPILoggedIn = false
+            stopWebAPIPolling()
             throw SpotifyServiceError.tokenRefreshFailed
         }
         let tokenResp = try JSONDecoder().decode(SpotifyTokenResponse.self, data: data)
@@ -349,10 +370,11 @@ public final class SpotifyService: NSObject, ObservableObject {
         webAPIPollingTask?.cancel()
         webAPIPollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self = self else { break }
+                guard let self = self, self.isWebAPILoggedIn else { break }
                 let nextDelay = await self.fetchCurrentlyPlayingWebAPI()
-                guard !Task.isCancelled else { break }
+                guard !Task.isCancelled, self.isWebAPILoggedIn else { break }
                 try? await Task.sleep(nanoseconds: UInt64(nextDelay * 1_000_000_000))
+                guard !Task.isCancelled, self.isWebAPILoggedIn else { break }
             }
         }
     }
@@ -392,7 +414,7 @@ public final class SpotifyService: NSObject, ObservableObject {
 
             // HTTP 204: 當前無音樂播放
             if httpResponse.statusCode == 204 {
-                AppleMusicMonitor.shared.applySpotifySnapshot(nil)
+                AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotifyWebAPI)
                 return 4.0
             }
 
@@ -413,7 +435,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             }
 
             guard let item = playResp.item, let title = item.name, !title.isEmpty else {
-                AppleMusicMonitor.shared.applySpotifySnapshot(nil)
+                AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotifyWebAPI)
                 return 4.0
             }
 
@@ -427,15 +449,16 @@ public final class SpotifyService: NSObject, ObservableObject {
 
             var artworkData: Data? = nil
             if let imgUrlString = imageUrl {
-                if let cached = artworkCache[imgUrlString] {
-                    artworkData = cached
+                let cacheKey = imgUrlString as NSString
+                if let cached = artworkCache.object(forKey: cacheKey) {
+                    artworkData = cached as Data
                 } else if let imgUrl = URL(string: imgUrlString) {
                     // 非同步抓取封面，抓取完成後補全快照
                     Task { [weak self] in
                         guard let self = self else { return }
                         if let (imgBytes, _) = try? await URLSession.shared.data(from: imgUrl) {
                             await MainActor.run {
-                                self.artworkCache[imgUrlString] = imgBytes
+                                self.artworkCache.setObject(imgBytes as NSData, forKey: cacheKey)
                                 AppleMusicMonitor.shared.updateArtworkIfCurrent(trackTitle: title, artist: artist, artworkData: imgBytes)
                             }
                         }
@@ -458,7 +481,7 @@ public final class SpotifyService: NSObject, ObservableObject {
                 progressMs: progressMs,
                 timestamp: CACurrentMediaTime()
             )
-            AppleMusicMonitor.shared.applySpotifySnapshot(snapshot)
+            AppleMusicMonitor.shared.applySpotifySnapshot(snapshot, from: .spotifyWebAPI)
 
             // 計算智慧自適應輪詢延遲：
             // 播放中且距結尾 < 3 秒為 1.0s；一般播放中 2.0s；暫停時 4.0s
@@ -535,6 +558,7 @@ public final class SpotifyService: NSObject, ObservableObject {
         appRemote?.disconnect()
         isAppRemoteConnected = false
         appRemoteStatusText = String(localized: "未連線")
+        AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotifyAppRemote)
     }
 
     public func seekAppRemote(toMs: Int) {
@@ -592,13 +616,14 @@ public final class SpotifyService: NSObject, ObservableObject {
         let isPlaying = !playerState.isPaused
         let trackUri = track.uri
 
-        var artworkData: Data? = artworkCache[trackUri]
+        let trackKey = trackUri as NSString
+        var artworkData: Data? = artworkCache.object(forKey: trackKey) as Data?
         if artworkData == nil {
             appRemote?.imageAPI?.fetchImage(forItem: track, with: CGSize(width: 120, height: 120)) { [weak self] result, _ in
                 guard let self = self, let image = result as? UIImage, let data = image.pngData() else { return }
                 Task { @MainActor [weak self] in
                     guard let self = self else { return }
-                    self.artworkCache[trackUri] = data
+                    self.artworkCache.setObject(data as NSData, forKey: trackKey)
                     AppleMusicMonitor.shared.updateArtworkIfCurrent(trackTitle: title, artist: artist, artworkData: data)
                 }
             }
@@ -619,7 +644,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             progressMs: positionMs,
             timestamp: CACurrentMediaTime()
         )
-        AppleMusicMonitor.shared.applySpotifySnapshot(snapshot)
+        AppleMusicMonitor.shared.applySpotifySnapshot(snapshot, from: .spotifyAppRemote)
     }
 }
 
@@ -657,6 +682,10 @@ extension SpotifyService: SPTAppRemotePlayerStateDelegate {
 extension SpotifyService: ASWebAuthenticationPresentationContextProviding {
     public func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        if let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }),
+           let window = activeScene.windows.first(where: { $0.isKeyWindow }) ?? activeScene.windows.first {
+            return window
+        }
         if let window = scenes.flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) {
             return window
         }

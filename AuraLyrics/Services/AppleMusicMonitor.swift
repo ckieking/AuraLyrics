@@ -46,6 +46,7 @@ public final class AppleMusicMonitor: ObservableObject {
     private var lastPersistentID: MPMediaEntityPersistentID = 0
     private var lastPlaybackStoreID: String = ""
     private var lastPlaybackTimeSec: TimeInterval = 0.0
+    private var lastUserSeekTimestamp: CFTimeInterval = 0.0
     private var lyricsFetchTask: Task<Void, Never>? = nil
 
     private init() {
@@ -111,8 +112,6 @@ public final class AppleMusicMonitor: ObservableObject {
                     self.musicPlayer.beginGeneratingPlaybackNotifications()
                     self.handleTrackChanged(force: true)
                     self.handlePlaybackStateChanged()
-                } else if self.playbackSource == .spotifyWebAPI {
-                    SpotifyService.shared.triggerImmediateWebAPIPoll()
                 }
             }
         }
@@ -155,6 +154,7 @@ public final class AppleMusicMonitor: ObservableObject {
     private func resetTrackState() {
         lyricsFetchTask?.cancel()
         lyricsFetchTask = nil
+        isLoadingLyrics = false
         currentTrack = .placeholder
         currentLyrics = .empty
         currentLineIndex = nil
@@ -269,6 +269,7 @@ public final class AppleMusicMonitor: ObservableObject {
         lyricsFetchTask = Task { [weak self] in
             guard let self = self else { return }
             self.isLoadingLyrics = true
+            defer { self.isLoadingLyrics = false }
             let fetched = await LyricsProviderService.shared.fetchLyrics(track: newTrack)
             guard !Task.isCancelled else { return }
             if let fetched = fetched {
@@ -287,7 +288,6 @@ public final class AppleMusicMonitor: ObservableObject {
                 self.currentLyrics = SyncedLyrics.empty
             }
             self.refreshCurrentLineIndex(forceSync: true)
-            self.isLoadingLyrics = false
         }
     }
 
@@ -552,9 +552,12 @@ public final class AppleMusicMonitor: ObservableObject {
         let targetMs = max(0, rawMs)
         let targetSec = Double(targetMs) / 1000.0
 
+        let now = CACurrentMediaTime()
+        lastUserSeekTimestamp = now
+
         currentPlaybackTimeSec = targetSec
         anchorPlaybackTimeSec = targetSec
-        anchorMediaTime = CACurrentMediaTime()
+        anchorMediaTime = now
         lastPlaybackTimeSec = targetSec
         if currentTrack.duration > 0 {
             playbackProgress = min(max(targetSec / currentTrack.duration, 0.0), 1.0)
@@ -572,8 +575,8 @@ public final class AppleMusicMonitor: ObservableObject {
     }
 
     // MARK: - Spotify 外部快照更新接收
-    public func applySpotifySnapshot(_ snapshot: SpotifyTrackSnapshot?) {
-        guard playbackSource != .appleMusic else { return }
+    public func applySpotifySnapshot(_ snapshot: SpotifyTrackSnapshot?, from source: PlaybackSource) {
+        guard playbackSource == source else { return }
 
         guard let snapshot = snapshot else {
             if currentTrack.title != TrackInfo.placeholder.title {
@@ -603,6 +606,7 @@ public final class AppleMusicMonitor: ObservableObject {
             lyricsFetchTask = Task { [weak self] in
                 guard let self = self else { return }
                 self.isLoadingLyrics = true
+                defer { self.isLoadingLyrics = false }
                 let fetched = await LyricsProviderService.shared.fetchLyrics(track: newTrack)
                 guard !Task.isCancelled else { return }
                 if let fetched = fetched {
@@ -611,7 +615,6 @@ public final class AppleMusicMonitor: ObservableObject {
                     self.currentLyrics = .empty
                 }
                 self.refreshCurrentLineIndex(forceSync: true)
-                self.isLoadingLyrics = false
             }
         } else {
             // 同首歌屬性補全
@@ -628,19 +631,22 @@ public final class AppleMusicMonitor: ObservableObject {
 
             let wasPlaying = self.isPlaying
             self.isPlaying = snapshot.isPlaying
+            let isRecentlySeeked = (now - lastUserSeekTimestamp) < 1.8
 
             if snapshot.isPlaying {
                 let predictedSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
                 let drift = abs(reportedSec - predictedSec)
-                if drift > 1.2 || !wasPlaying {
+                if (drift > 1.2 && !isRecentlySeeked) || !wasPlaying {
                     anchorPlaybackTimeSec = reportedSec
                     anchorMediaTime = now
                     currentPlaybackTimeSec = reportedSec
                 }
             } else {
-                anchorPlaybackTimeSec = reportedSec
-                anchorMediaTime = now
-                currentPlaybackTimeSec = reportedSec
+                if !isRecentlySeeked {
+                    anchorPlaybackTimeSec = reportedSec
+                    anchorMediaTime = now
+                    currentPlaybackTimeSec = reportedSec
+                }
             }
 
             if wasPlaying != snapshot.isPlaying {
@@ -655,6 +661,7 @@ public final class AppleMusicMonitor: ObservableObject {
     }
 
     public func updateArtworkIfCurrent(trackTitle: String, artist: String, artworkData: Data) {
+        guard playbackSource != .appleMusic else { return }
         if currentTrack.title == trackTitle && currentTrack.artist == artist {
             var updated = currentTrack
             updated.artworkData = artworkData
