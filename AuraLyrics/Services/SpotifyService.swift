@@ -117,10 +117,10 @@ public final class SpotifyService: NSObject, ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
                 // App Remote 進入背景時中斷連線避免無謂耗電
-                if AppleMusicMonitor.shared.playbackSource == .spotifyAppRemote,
-                   let remote = self.appRemote,
-                   remote.isConnected {
-                    remote.disconnect()
+                if AppleMusicMonitor.shared.playbackSource == .spotifyAppRemote {
+                    if let remote = self.appRemote, remote.isConnected {
+                        remote.disconnect()
+                    }
                 } else if AppleMusicMonitor.shared.playbackSource == .spotifyWebAPI {
                     self.stopWebAPIPolling()
                 }
@@ -332,6 +332,10 @@ public final class SpotifyService: NSObject, ObservableObject {
 
     private func refreshAccessToken() async throws -> String {
         guard let refreshToken = getStoredRefreshToken() else {
+            clearTokens()
+            isWebAPILoggedIn = false
+            stopWebAPIPolling()
+            AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotifyWebAPI)
             throw SpotifyServiceError.notAuthenticated
         }
 
@@ -357,6 +361,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             clearTokens()
             isWebAPILoggedIn = false
             stopWebAPIPolling()
+            AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotifyWebAPI)
             throw SpotifyServiceError.tokenRefreshFailed
         }
         let tokenResp = try JSONDecoder().decode(SpotifyTokenResponse.self, data: data)
@@ -686,7 +691,7 @@ extension SpotifyService: ASWebAuthenticationPresentationContextProviding {
            let window = activeScene.windows.first(where: { $0.isKeyWindow }) ?? activeScene.windows.first {
             return window
         }
-        if let window = scenes.flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) {
+        if let window = scenes.flatMap({ $0.windows }).first(where: { $0.isKeyWindow }) ?? scenes.flatMap({ $0.windows }).first {
             return window
         }
         return ASPresentationAnchor()

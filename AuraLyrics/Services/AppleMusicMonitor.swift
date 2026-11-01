@@ -46,7 +46,7 @@ public final class AppleMusicMonitor: ObservableObject {
     private var lastPersistentID: MPMediaEntityPersistentID = 0
     private var lastPlaybackStoreID: String = ""
     private var lastPlaybackTimeSec: TimeInterval = 0.0
-    private var lastUserSeekTimestamp: CFTimeInterval = 0.0
+    private var lastUserSeekTimestamp: CFTimeInterval = -100.0
     private var lyricsFetchTask: Task<Void, Never>? = nil
 
     private init() {
@@ -206,6 +206,7 @@ public final class AppleMusicMonitor: ObservableObject {
 
             lyricsFetchTask?.cancel()
             lyricsFetchTask = nil
+            isLoadingLyrics = false
             currentTrack = .placeholder
             currentLyrics = .empty
             currentLineIndex = nil
@@ -636,7 +637,7 @@ public final class AppleMusicMonitor: ObservableObject {
             if snapshot.isPlaying {
                 let predictedSec = anchorPlaybackTimeSec + max(0, now - anchorMediaTime)
                 let drift = abs(reportedSec - predictedSec)
-                if (drift > 1.2 && !isRecentlySeeked) || !wasPlaying {
+                if !isRecentlySeeked && (drift > 1.2 || !wasPlaying) {
                     anchorPlaybackTimeSec = reportedSec
                     anchorMediaTime = now
                     currentPlaybackTimeSec = reportedSec
