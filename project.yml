@@ -38,6 +38,7 @@ targets:
     dependencies:
       - target: AuraLyricsWidget
       - package: SpotifyiOS
+        product: SpotifyiOS
 
   AuraLyricsWidget:
     type: app-extension

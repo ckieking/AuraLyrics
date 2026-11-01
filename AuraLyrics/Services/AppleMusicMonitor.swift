@@ -111,6 +111,8 @@ public final class AppleMusicMonitor: ObservableObject {
                     self.musicPlayer.beginGeneratingPlaybackNotifications()
                     self.handleTrackChanged(force: true)
                     self.handlePlaybackStateChanged()
+                } else if self.playbackSource == .spotifyWebAPI {
+                    SpotifyService.shared.triggerImmediateWebAPIPoll()
                 }
             }
         }
@@ -647,7 +649,7 @@ public final class AppleMusicMonitor: ObservableObject {
                 } else {
                     LiveActivityLyricsEngine.shared.handlePlaybackPaused()
                 }
-                syncExternalEngines()
+                refreshCurrentLineIndex(forceSync: true)
             }
         }
     }

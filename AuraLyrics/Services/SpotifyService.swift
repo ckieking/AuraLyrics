@@ -71,6 +71,7 @@ public final class SpotifyService: NSObject, ObservableObject {
     private let kAccessToken = "spotify_access_token"
     private let kRefreshToken = "spotify_refresh_token"
     private let kTokenExpiration = "spotify_token_expiration"
+    private let kAppRemoteAccessToken = "spotify_app_remote_token"
 
     override private init() {
         self.clientId = UserDefaults.standard.string(forKey: "spotify_client_id") ?? ""
@@ -88,12 +89,16 @@ public final class SpotifyService: NSObject, ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                // 若處於 App Remote 模式且有 Token 且尚未連線，前景時主動連線
-                if AppleMusicMonitor.shared.playbackSource == .spotifyAppRemote,
-                   let remote = self.appRemote,
-                   !remote.isConnected,
-                   remote.connectionParameters.accessToken != nil {
-                    remote.connect()
+                if AppleMusicMonitor.shared.playbackSource == .spotifyAppRemote {
+                    if let remote = self.appRemote {
+                        if !remote.isConnected && remote.connectionParameters.accessToken != nil {
+                            remote.connect()
+                        }
+                    } else {
+                        self.connectAppRemote(forceReauth: false)
+                    }
+                } else if AppleMusicMonitor.shared.playbackSource == .spotifyWebAPI {
+                    self.triggerImmediateWebAPIPoll()
                 }
             }
         }
@@ -127,7 +132,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             }
         case .spotifyAppRemote:
             stopWebAPIPolling()
-            connectAppRemote()
+            connectAppRemote(forceReauth: false)
         }
     }
 
@@ -140,9 +145,19 @@ public final class SpotifyService: NSObject, ObservableObject {
     public func handleOpenURL(_ url: URL) {
         guard url.scheme == "auralyrics" else { return }
 
-        // 1. App Remote 授權回傳 (含 Access Token 或錯誤)
+        // 1. Web API OAuth PKCE 回呼容錯處理
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           components.queryItems?.contains(where: { $0.name == "code" }) == true {
+            Task { @MainActor [weak self] in
+                await self?.exchangeCodeForToken(url: url)
+            }
+            return
+        }
+
+        // 2. App Remote 授權回傳 (含 Access Token 或錯誤)
         if let remote = appRemote, let params = remote.authorizationParameters(from: url) {
             if let accessToken = params[SPTAppRemoteAccessTokenKey] {
+                UserDefaults.standard.set(accessToken, forKey: kAppRemoteAccessToken)
                 remote.connectionParameters.accessToken = accessToken
                 remote.connect()
                 appRemoteStatusText = String(localized: "正在連線...")
@@ -243,7 +258,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             URLQueryItem(name: "client_id", value: cleanId),
             URLQueryItem(name: "code_verifier", value: verifier)
         ]
-        request.httpBody = bodyComponents.query?.data(using: .utf8)
+        request.httpBody = bodyComponents.percentEncodedQuery?.data(using: .utf8)
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -316,7 +331,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             URLQueryItem(name: "refresh_token", value: refreshToken),
             URLQueryItem(name: "client_id", value: cleanId)
         ]
-        request.httpBody = bodyComponents.query?.data(using: .utf8)
+        request.httpBody = bodyComponents.percentEncodedQuery?.data(using: .utf8)
 
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
@@ -345,6 +360,14 @@ public final class SpotifyService: NSObject, ObservableObject {
     private func stopWebAPIPolling() {
         webAPIPollingTask?.cancel()
         webAPIPollingTask = nil
+    }
+
+    /// App 返回前景時立即主動輪詢一次
+    public func triggerImmediateWebAPIPoll() {
+        guard isWebAPILoggedIn else { return }
+        Task { [weak self] in
+            _ = await self?.fetchCurrentlyPlayingWebAPI()
+        }
     }
 
     /// 請求 Spotify 播放狀態並回傳下次建議輪詢秒數
@@ -384,18 +407,23 @@ public final class SpotifyService: NSObject, ObservableObject {
             }
 
             let playResp = try JSONDecoder().decode(SpotifyCurrentlyPlayingResponse.self, data: data)
-            guard let item = playResp.item else {
+            if playResp.currently_playing_type == "ad" {
+                // 廣告插播中：保持現有畫面並以 4.0 秒稍後重試，避免清空狀態
+                return 4.0
+            }
+
+            guard let item = playResp.item, let title = item.name, !title.isEmpty else {
                 AppleMusicMonitor.shared.applySpotifySnapshot(nil)
                 return 4.0
             }
 
-            let title = item.name
-            let artist = item.artists.map { $0.name }.joined(separator: ", ")
-            let album = item.album.name
-            let durationSec = Double(item.duration_ms) / 1000.0
+            let artist = item.artists?.map { $0.name }.joined(separator: ", ") ?? ""
+            let album = item.album?.name ?? ""
+            let durationMs = item.duration_ms ?? 0
+            let durationSec = Double(durationMs) / 1000.0
             let progressMs = playResp.progress_ms ?? 0
             let isPlaying = playResp.is_playing
-            let imageUrl = item.album.images?.first?.url
+            let imageUrl = item.album?.images?.first?.url
 
             var artworkData: Data? = nil
             if let imgUrlString = imageUrl {
@@ -435,7 +463,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             // 計算智慧自適應輪詢延遲：
             // 播放中且距結尾 < 3 秒為 1.0s；一般播放中 2.0s；暫停時 4.0s
             if isPlaying {
-                let remainingMs = item.duration_ms - progressMs
+                let remainingMs = durationMs - progressMs
                 if remainingMs > 0 && remainingMs <= 3000 {
                     return 1.0
                 }
@@ -470,7 +498,7 @@ public final class SpotifyService: NSObject, ObservableObject {
     // MARK: - 模式 2: Spotify App Remote (本機 SDK 即時 IPC 通訊)
     // MARK: - =========================================================
 
-    public func connectAppRemote() {
+    public func connectAppRemote(forceReauth: Bool = false) {
         let cleanId = clientId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !cleanId.isEmpty else {
             appRemoteStatusText = String(localized: "請先填入 Spotify Client ID")
@@ -485,10 +513,20 @@ public final class SpotifyService: NSObject, ObservableObject {
         remote.delegate = self
         self.appRemote = remote
 
+        // 若先前已取得 App Remote Access Token 且未要求強制重驗證，直接連線
+        if !forceReauth, let savedToken = UserDefaults.standard.string(forKey: kAppRemoteAccessToken), !savedToken.isEmpty {
+            remote.connectionParameters.accessToken = savedToken
+            appRemoteStatusText = String(localized: "正在連線...")
+            remote.connect()
+            return
+        }
+
         appRemoteStatusText = String(localized: "正在連線本機 Spotify...")
         remote.authorizeAndPlayURI("") { [weak self] success in
-            if !success {
-                self?.appRemoteStatusText = String(localized: "無法喚醒 Spotify App，請確認已安裝")
+            Task { @MainActor [weak self] in
+                if !success {
+                    self?.appRemoteStatusText = String(localized: "無法喚醒 Spotify App，請確認已安裝")
+                }
             }
         }
     }
@@ -511,22 +549,32 @@ public final class SpotifyService: NSObject, ObservableObject {
     fileprivate func handleEstablishConnection(_ remote: SPTAppRemote) {
         isAppRemoteConnected = true
         appRemoteStatusText = String(localized: "已連線")
+        if let token = remote.connectionParameters.accessToken, !token.isEmpty {
+            UserDefaults.standard.set(token, forKey: kAppRemoteAccessToken)
+        }
         remote.playerAPI?.delegate = self
         remote.playerAPI?.subscribe(toPlayerState: { [weak self] _, error in
-            if let error = error {
-                self?.appRemoteStatusText = error.localizedDescription
+            Task { @MainActor [weak self] in
+                if let error = error {
+                    self?.appRemoteStatusText = error.localizedDescription
+                }
             }
         })
         remote.playerAPI?.getPlayerState { [weak self] result, error in
-            if let state = result as? SPTAppRemotePlayerState {
-                self?.handleAppRemotePlayerState(state)
+            Task { @MainActor [weak self] in
+                if let state = result as? SPTAppRemotePlayerState {
+                    self?.handleAppRemotePlayerState(state)
+                }
             }
         }
     }
 
     fileprivate func handleConnectionFailed(_ error: Error?) {
         isAppRemoteConnected = false
-        appRemoteStatusText = error?.localizedDescription ?? String(localized: "連線失敗")
+        let desc = error?.localizedDescription ?? String(localized: "連線失敗")
+        appRemoteStatusText = desc
+        // 若因 Token 失效而連線失敗，清空儲存的 Token 以便下次連線時重新喚醒授權
+        UserDefaults.standard.removeObject(forKey: kAppRemoteAccessToken)
     }
 
     fileprivate func handleDisconnected(_ error: Error?) {
@@ -628,15 +676,16 @@ private struct SpotifyTokenResponse: Codable {
 private struct SpotifyCurrentlyPlayingResponse: Codable {
     let is_playing: Bool
     let progress_ms: Int?
+    let currently_playing_type: String?
     let item: SpotifyTrackItem?
 }
 
 private struct SpotifyTrackItem: Codable {
-    let name: String
-    let duration_ms: Int
-    let artists: [SpotifyArtistItem]
-    let album: SpotifyAlbumItem
-    let uri: String
+    let name: String?
+    let duration_ms: Int?
+    let artists: [SpotifyArtistItem]?
+    let album: SpotifyAlbumItem?
+    let uri: String?
 }
 
 private struct SpotifyArtistItem: Codable {
