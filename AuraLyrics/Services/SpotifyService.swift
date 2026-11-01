@@ -65,6 +65,8 @@ public final class SpotifyService: NSObject, ObservableObject {
     private var backgroundWebView: WKWebView?
     private var tokenContinuation: CheckedContinuation<String, Error>?
     private var refreshTimeoutItem: DispatchWorkItem?
+    private var isInBackground: Bool = false
+    private var cookieDebounceTask: Task<Void, Never>?
 
     private let artworkCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
@@ -112,6 +114,7 @@ public final class SpotifyService: NSObject, ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                self.isInBackground = false
                 if AppleMusicMonitor.shared.playbackSource == .spotify && self.isLoggedIn {
                     self.startWebAPIPolling()
                 }
@@ -125,11 +128,22 @@ public final class SpotifyService: NSObject, ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                self.isInBackground = true
                 if AppleMusicMonitor.shared.playbackSource == .spotify {
-                    self.stopWebAPIPolling()
+                    if !self.isBackgroundSyncActive {
+                        self.stopWebAPIPolling()
+                    }
                 }
             }
         }
+    }
+
+    private var isBackgroundSyncActive: Bool {
+        PiPLyricsEngine.shared.isPiPActive ||
+        PiPLyricsEngine.shared.isPiPEnabled ||
+        LiveActivityLyricsEngine.shared.isActivityActive ||
+        LiveActivityLyricsEngine.shared.isEnabled ||
+        BackgroundKeepAliveManager.shared.isRunning
     }
 
     // MARK: - 服務啟動與停止中樞
@@ -252,22 +266,31 @@ public final class SpotifyService: NSObject, ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 15.0, execute: timeoutItem)
 
             let config = Self.createWebViewConfiguration(scriptHandler: self)
-            let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 375, height: 667), configuration: config)
+            let webView = WKWebView(frame: CGRect(x: -1000, y: -1000, width: 1, height: 1), configuration: config)
+            webView.alpha = 0.01
             webView.customUserAgent = Self.desktopUserAgent
             webView.navigationDelegate = self
             self.backgroundWebView = webView
 
-            if let window = UIApplication.shared.connectedScenes
+            let candidateWindow = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
                 .flatMap({ $0.windows })
-                .first(where: { $0.isKeyWindow }) {
-                webView.isHidden = true
+                .first(where: { $0.isKeyWindow })
+                ?? UIApplication.shared.connectedScenes
+                    .compactMap({ $0 as? UIWindowScene })
+                    .flatMap({ $0.windows })
+                    .first
+            if let window = candidateWindow {
                 window.addSubview(webView)
             }
 
             if let url = URL(string: "https://open.spotify.com/") {
                 webView.load(URLRequest(url: url))
             } else {
+                self.refreshTimeoutItem?.cancel()
+                self.refreshTimeoutItem = nil
+                self.tokenContinuation = nil
+                self.cleanupBackgroundWebView()
                 continuation.resume(throwing: SpotifyServiceError.tokenRefreshFailed)
             }
         }
@@ -291,6 +314,9 @@ public final class SpotifyService: NSObject, ObservableObject {
         artworkCache.removeAllObjects()
         AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
 
+        cookieDebounceTask?.cancel()
+        cookieDebounceTask = nil
+
         refreshTimeoutItem?.cancel()
         refreshTimeoutItem = nil
         refreshTask?.cancel()
@@ -304,13 +330,18 @@ public final class SpotifyService: NSObject, ObservableObject {
         let cookieStore = WKWebsiteDataStore.default().httpCookieStore
         cookieStore.getAllCookies { cookies in
             for cookie in cookies {
-                if cookie.domain.contains("spotify.com") {
+                if cookie.domain.localizedCaseInsensitiveContains("spotify") {
                     cookieStore.delete(cookie)
                 }
             }
         }
         let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
-        WKWebsiteDataStore.default().removeData(ofTypes: dataTypes, modifiedSince: Date(timeIntervalSince1970: 0)) {}
+        WKWebsiteDataStore.default().fetchDataRecords(ofTypes: dataTypes) { records in
+            let spotifyRecords = records.filter { record in
+                record.displayName.localizedCaseInsensitiveContains("spotify")
+            }
+            WKWebsiteDataStore.default().removeData(ofTypes: dataTypes, for: spotifyRecords) {}
+        }
     }
 
     public func logoutWebAPI() {
@@ -323,6 +354,9 @@ public final class SpotifyService: NSObject, ObservableObject {
         webAPIPollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self = self, self.isLoggedIn else { break }
+                if self.isInBackground && !self.isBackgroundSyncActive {
+                    break
+                }
                 let nextDelay = await self.fetchCurrentlyPlayingWebAPI()
                 guard !Task.isCancelled, self.isLoggedIn else { break }
                 try? await Task.sleep(nanoseconds: UInt64(nextDelay * 1_000_000_000))
@@ -348,12 +382,13 @@ public final class SpotifyService: NSObject, ObservableObject {
     }
 
     private func fetchCurrentlyPlayingWebAPI() async -> TimeInterval {
+        let defaultDelay = self.isInBackground ? 6.0 : 4.0
         guard let token = try? await getValidAccessToken() else {
-            return 4.0
+            return defaultDelay
         }
 
         guard let url = URL(string: "https://api.spotify.com/v1/me/player/currently-playing") else {
-            return 4.0
+            return defaultDelay
         }
 
         var request = URLRequest(url: url)
@@ -363,12 +398,12 @@ public final class SpotifyService: NSObject, ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
-                return 4.0
+                return defaultDelay
             }
 
             if httpResponse.statusCode == 204 {
                 AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
-                return 4.0
+                return defaultDelay
             }
 
             if httpResponse.statusCode == 401 {
@@ -377,18 +412,24 @@ public final class SpotifyService: NSObject, ObservableObject {
                 return 2.0
             }
 
+            if httpResponse.statusCode == 429 {
+                let retryAfterSec = httpResponse.value(forHTTPHeaderField: "Retry-After")
+                    .flatMap { Double($0) } ?? (self.isInBackground ? 10.0 : 5.0)
+                return max(1.0, retryAfterSec)
+            }
+
             guard httpResponse.statusCode == 200 else {
-                return 4.0
+                return defaultDelay
             }
 
             let playResp = try JSONDecoder().decode(SpotifyCurrentlyPlayingResponse.self, data: data)
             if playResp.currently_playing_type == "ad" {
-                return 4.0
+                return defaultDelay
             }
 
             guard let item = playResp.item, let title = item.name, !title.isEmpty else {
                 AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
-                return 4.0
+                return defaultDelay
             }
 
             let artist = item.artists?.map { $0.name }.joined(separator: ", ") ?? ""
@@ -436,15 +477,22 @@ public final class SpotifyService: NSObject, ObservableObject {
 
             if isPlaying {
                 let remainingMs = durationMs - progressMs
-                if remainingMs > 0 && remainingMs <= 3000 {
-                    return 1.0
+                if self.isInBackground {
+                    if remainingMs > 0 && remainingMs <= 3000 {
+                        return 2.0
+                    }
+                    return 6.0
+                } else {
+                    if remainingMs > 0 && remainingMs <= 3000 {
+                        return 1.0
+                    }
+                    return 2.0
                 }
-                return 2.0
             } else {
-                return 4.0
+                return defaultDelay
             }
         } catch {
-            return 4.0
+            return defaultDelay
         }
     }
 
@@ -474,6 +522,12 @@ public final class SpotifyService: NSObject, ObservableObject {
         if (window.__auraLyricsInjected) return;
         window.__auraLyricsInjected = true;
 
+        function isRelevantUrl(url) {
+            if (!url || typeof url !== 'string') return false;
+            const lower = url.toLowerCase();
+            return lower.includes('token') || lower.includes('session') || lower.includes('config');
+        }
+
         function notifyToken(token, expirationMs, isAnon) {
             if (!token || typeof token !== 'string') return;
             if (isAnon === true) return;
@@ -488,10 +542,9 @@ public final class SpotifyService: NSObject, ObservableObject {
 
         function checkResponse(url, text) {
             if (!text || typeof text !== 'string') return;
-            if (!text.includes('access') && !(url && (url.includes('token') || url.includes('session')))) return;
             try {
                 const data = JSON.parse(text);
-                const token = data.accessToken || data.access_token || (data.token && data.token.accessToken);
+                const token = data.accessToken || data.access_token || (data.token && data.token.accessToken) || (data.session && data.session.accessToken);
                 const exp = data.accessTokenExpirationTimestampMs || (data.expires_in ? Date.now() + data.expires_in * 1000 : 0);
                 const isAnon = (data.isAnonymous === true) || (data.is_anonymous === true);
                 if (token && !isAnon) {
@@ -505,9 +558,11 @@ public final class SpotifyService: NSObject, ObservableObject {
             window.fetch = async function(...args) {
                 const response = await origFetch.apply(this, args);
                 try {
-                    const clone = response.clone();
-                    const url = response.url || (typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : ''));
-                    clone.text().then(text => checkResponse(url, text)).catch(() => {});
+                    const rawUrl = response.url || (typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : ''));
+                    if (isRelevantUrl(rawUrl)) {
+                        const clone = response.clone();
+                        clone.text().then(text => checkResponse(rawUrl, text)).catch(() => {});
+                    }
                 } catch(e) {}
                 return response;
             };
@@ -516,14 +571,16 @@ public final class SpotifyService: NSObject, ObservableObject {
         const origOpen = XMLHttpRequest.prototype.open;
         const origSend = XMLHttpRequest.prototype.send;
         XMLHttpRequest.prototype.open = function(method, url) {
-            this._auraUrl = url;
+            this._auraUrl = (typeof url === 'string') ? url : (url && url.href ? url.href : String(url || ''));
             return origOpen.apply(this, arguments);
         };
         XMLHttpRequest.prototype.send = function() {
             this.addEventListener('load', function() {
                 try {
                     const resolvedUrl = this.responseURL || this._auraUrl;
-                    checkResponse(resolvedUrl, this.responseText);
+                    if (isRelevantUrl(resolvedUrl)) {
+                        checkResponse(resolvedUrl, this.responseText);
+                    }
                 } catch(e) {}
             });
             return origSend.apply(this, arguments);
@@ -537,7 +594,7 @@ public final class SpotifyService: NSObject, ObservableObject {
                     if (el && el.textContent) {
                         try {
                             const data = JSON.parse(el.textContent);
-                            const token = data.accessToken || data.access_token || (data.token && data.token.accessToken);
+                            const token = data.accessToken || data.access_token || (data.token && data.token.accessToken) || (data.session && data.session.accessToken);
                             const exp = data.accessTokenExpirationTimestampMs || (data.expires_in ? Date.now() + data.expires_in * 1000 : 0);
                             const isAnon = (data.isAnonymous === true) || (data.is_anonymous === true);
                             if (token && !isAnon) {
@@ -610,7 +667,13 @@ extension SpotifyService: WKScriptMessageHandler {
 extension SpotifyService: WKHTTPCookieStoreObserver {
     nonisolated public func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
         Task { @MainActor [weak self] in
-            await self?.handleCookiesDidChange()
+            guard let self = self else { return }
+            self.cookieDebounceTask?.cancel()
+            self.cookieDebounceTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                guard !Task.isCancelled, let self = self else { return }
+                await self.handleCookiesDidChange()
+            }
         }
     }
 
@@ -643,16 +706,41 @@ extension SpotifyService: WKNavigationDelegate {
                 decisionHandler(.cancel)
                 self.refreshTimeoutItem?.cancel()
                 self.refreshTimeoutItem = nil
+                cleanupBackgroundWebView()
+                logout()
                 if let cont = self.tokenContinuation {
                     self.tokenContinuation = nil
-                    cleanupBackgroundWebView()
-                    logout()
                     cont.resume(throwing: SpotifyServiceError.notAuthenticated)
                 }
                 return
             }
         }
         decisionHandler(.allow)
+    }
+
+    public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        if webView == backgroundWebView {
+            handleBackgroundWebViewFailure(error: error)
+        }
+    }
+
+    public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        if webView == backgroundWebView {
+            handleBackgroundWebViewFailure(error: error)
+        }
+    }
+
+    private func handleBackgroundWebViewFailure(error: Error) {
+        if (error as? URLError)?.code == .cancelled || (error as NSError).code == NSURLErrorCancelled {
+            return
+        }
+        self.refreshTimeoutItem?.cancel()
+        self.refreshTimeoutItem = nil
+        cleanupBackgroundWebView()
+        if let cont = self.tokenContinuation {
+            self.tokenContinuation = nil
+            cont.resume(throwing: error)
+        }
     }
 }
 
@@ -740,11 +828,8 @@ public struct SpotifyWebViewRepresentable: UIViewRepresentable {
             self.lastReloadTrigger = parent.reloadTrigger
         }
 
-        // 支援 window.open 或 target="_blank" 彈窗直接在當前 WebView 內導航（支援 Apple / Google 社交登入流程）
+        // 支援 window.open 或 target="_blank" 彈窗交由 decidePolicyFor 在當前 WebView 內導航（避免重覆載入）
         public func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
-            if navigationAction.targetFrame == nil {
-                webView.load(navigationAction.request)
-            }
             return nil
         }
 
@@ -794,15 +879,15 @@ public struct SpotifyWebViewRepresentable: UIViewRepresentable {
         webView.uiDelegate = context.coordinator
         context.coordinator.webView = webView
 
-        context.coordinator.progressObservation = webView.observe(\.estimatedProgress, options: [.new]) { wv, _ in
+        context.coordinator.progressObservation = webView.observe(\.estimatedProgress, options: [.new]) { [weak coordinator = context.coordinator] wv, _ in
             DispatchQueue.main.async {
-                self.progress = wv.estimatedProgress
+                coordinator?.parent.progress = wv.estimatedProgress
             }
         }
 
-        context.coordinator.loadingObservation = webView.observe(\.isLoading, options: [.new]) { wv, _ in
+        context.coordinator.loadingObservation = webView.observe(\.isLoading, options: [.new]) { [weak coordinator = context.coordinator] wv, _ in
             DispatchQueue.main.async {
-                self.isLoading = wv.isLoading
+                coordinator?.parent.isLoading = wv.isLoading
             }
         }
 
@@ -814,10 +899,23 @@ public struct SpotifyWebViewRepresentable: UIViewRepresentable {
     }
 
     public func updateUIView(_ uiView: WKWebView, context: Context) {
+        context.coordinator.parent = self
         if context.coordinator.lastReloadTrigger != reloadTrigger {
             context.coordinator.lastReloadTrigger = reloadTrigger
             uiView.reload()
         }
+    }
+
+    public static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
+        uiView.stopLoading()
+        uiView.navigationDelegate = nil
+        uiView.uiDelegate = nil
+        coordinator.progressObservation?.invalidate()
+        coordinator.progressObservation = nil
+        coordinator.loadingObservation?.invalidate()
+        coordinator.loadingObservation = nil
+        uiView.configuration.userContentController.removeScriptMessageHandler(forName: "spotifyTokenHandler")
+        coordinator.webView = nil
     }
 }
 

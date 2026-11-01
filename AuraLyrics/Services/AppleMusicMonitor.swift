@@ -63,7 +63,9 @@ public final class AppleMusicMonitor: ObservableObject {
 
     // MARK: - 系統通知與生命週期設定
     private func setupNotifications() {
-        musicPlayer.beginGeneratingPlaybackNotifications()
+        if playbackSource == .appleMusic {
+            musicPlayer.beginGeneratingPlaybackNotifications()
+        }
 
         NotificationCenter.default.addObserver(
             forName: .MPMusicPlayerControllerNowPlayingItemDidChange,
@@ -201,6 +203,7 @@ public final class AppleMusicMonitor: ObservableObject {
 
     // MARK: - 曲目變更處理 (支援強制刷新與即時清空舊歌詞)
     private func handleTrackChanged(force: Bool = false) {
+        guard playbackSource == .appleMusic else { return }
         guard let nowPlaying = musicPlayer.nowPlayingItem else {
             // 背景下若 IPC 讀取為 nil，維持當前歌曲與歌詞，絕不誤清空
             if isInBackground { return }
@@ -294,6 +297,7 @@ public final class AppleMusicMonitor: ObservableObject {
     }
 
     private func handlePlaybackStateChanged() {
+        guard playbackSource == .appleMusic else { return }
         let newIsPlaying = (musicPlayer.playbackState == .playing)
         if isPlaying != newIsPlaying {
             isPlaying = newIsPlaying

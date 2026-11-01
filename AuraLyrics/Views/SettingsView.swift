@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
     @State private var showSpotifyLoginSheet = false
+    @State private var showLogoutConfirmation = false
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
@@ -51,7 +52,7 @@ struct SettingsView: View {
                         if spotifyService.isLoggedIn {
                             Button(role: .destructive) {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                spotifyService.logout()
+                                showLogoutConfirmation = true
                             } label: {
                                 HStack {
                                     Image(systemName: "rectangle.portrait.and.arrow.right")
@@ -79,9 +80,7 @@ struct SettingsView: View {
                         Text("Spotify 雲端同步模式：支援免費與 Premium 會員，透過內置網頁登入後即可自動同步播放狀態與歌詞。")
                     }
                 }
-                .sheet(isPresented: $showSpotifyLoginSheet) {
-                    SpotifyWebLoginSheet()
-                }
+
                 // MARK: - 子母畫面 (PiP) 實時預覽與開關
                 Section {
                     // 1:1 實時 PiP 預覽視窗卡
@@ -358,6 +357,21 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("設定")
+            .sheet(isPresented: $showSpotifyLoginSheet) {
+                SpotifyWebLoginSheet()
+            }
+            .confirmationDialog(
+                "確定要登出 Spotify 帳號嗎？",
+                isPresented: $showLogoutConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("登出", role: .destructive) {
+                    spotifyService.logout()
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("登出後將清除 Spotify 登入憑證與網頁 Cookie，若要繼續同步請重新登入。")
+            }
             .alert("確定清除所有歌詞快取？", isPresented: $showResetCacheAlert) {
                 Button("取消", role: .cancel) {}
                 Button("確定", role: .destructive) {
