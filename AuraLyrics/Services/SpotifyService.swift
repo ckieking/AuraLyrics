@@ -231,6 +231,7 @@ public final class SpotifyService: NSObject, ObservableObject {
 
     // MARK: - 憑證捕獲與背景靜默續期
     public func handleCapturedToken(token: String, expirationMs: Double) {
+        let isNewToken = (getStoredAccessToken() != token)
         saveToken(token: token, expirationMs: expirationMs)
         self.hasCapturedToken = true
         self.isLoggedIn = true
@@ -245,8 +246,10 @@ public final class SpotifyService: NSObject, ObservableObject {
         }
 
         if AppleMusicMonitor.shared.playbackSource == .spotify {
-            startWebAPIPolling()
-            triggerImmediateWebAPIPoll()
+            if isNewToken || webAPIPollingTask == nil {
+                startWebAPIPolling()
+                triggerImmediateWebAPIPoll()
+            }
         }
     }
 
@@ -447,6 +450,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             let playResp = try JSONDecoder().decode(SpotifyCurrentlyPlayingResponse.self, from: data)
             if playResp.currently_playing_type == "ad" {
                 self.playerStatusText = String(localized: "正在播放廣告")
+                AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
                 return defaultDelay
             }
 
@@ -545,6 +549,7 @@ public final class SpotifyService: NSObject, ObservableObject {
     // MARK: - WebKit 腳本注入與配置建置
     public static let tokenInterceptorScript = """
     (function() {
+        if (window !== window.top) return;
         if (window.__auraLyricsInjected) return;
         window.__auraLyricsInjected = true;
 
@@ -709,7 +714,7 @@ public final class SpotifyService: NSObject, ObservableObject {
         let userScript = WKUserScript(
             source: tokenInterceptorScript,
             injectionTime: .atDocumentStart,
-            forMainFrameOnly: false
+            forMainFrameOnly: true
         )
 
         let contentController = WKUserContentController()
@@ -789,14 +794,7 @@ extension SpotifyService: WKNavigationDelegate {
         if webView == backgroundWebView, let url = navigationAction.request.url {
             if url.path.contains("/login") || url.host == "accounts.spotify.com" {
                 decisionHandler(.cancel)
-                self.refreshTimeoutItem?.cancel()
-                self.refreshTimeoutItem = nil
-                cleanupBackgroundWebView()
                 logout()
-                if let cont = self.tokenContinuation {
-                    self.tokenContinuation = nil
-                    cont.resume(throwing: SpotifyServiceError.notAuthenticated)
-                }
                 return
             }
         }
@@ -924,7 +922,7 @@ public struct SpotifyWebLoginSheet: View {
                     }
                 }
             }
-            .onChange(of: spotifyService.hasCapturedToken) { captured in
+            .onChange(of: spotifyService.hasCapturedToken) { _, captured in
                 if captured {
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                     dismiss()
