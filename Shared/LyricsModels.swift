@@ -117,6 +117,8 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
     public var offsetMs: Int
     /// 來源標記（如 "LRCLIB" 或 "NetEase" 或 "Local"）
     public var source: String
+    /// 目前翻譯所對應之目標語言識別碼（如 "zh-Hant", "en", "ja"）
+    public var translationTargetLanguage: String?
 
     public init(
         trackTitle: String,
@@ -124,7 +126,8 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         lines: [LyricLine],
         credits: [String] = [],
         offsetMs: Int = 0,
-        source: String = "Unknown"
+        source: String = "Unknown",
+        translationTargetLanguage: String? = nil
     ) {
         self.trackTitle = trackTitle
         self.artistName = artistName
@@ -132,10 +135,11 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         self.credits = credits
         self.offsetMs = offsetMs
         self.source = source
+        self.translationTargetLanguage = translationTargetLanguage
     }
 
     enum CodingKeys: String, CodingKey {
-        case trackTitle, artistName, lines, credits, offsetMs, source
+        case trackTitle, artistName, lines, credits, offsetMs, source, translationTargetLanguage
     }
 
     public init(from decoder: Decoder) throws {
@@ -146,6 +150,7 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         self.credits = try container.decodeIfPresent([String].self, forKey: .credits) ?? []
         self.offsetMs = try container.decode(Int.self, forKey: .offsetMs)
         self.source = try container.decode(String.self, forKey: .source)
+        self.translationTargetLanguage = try container.decodeIfPresent(String.self, forKey: .translationTargetLanguage)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -156,6 +161,7 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         try container.encode(credits, forKey: .credits)
         try container.encode(offsetMs, forKey: .offsetMs)
         try container.encode(source, forKey: .source)
+        try container.encodeIfPresent(translationTargetLanguage, forKey: .translationTargetLanguage)
     }
 
     public static let empty = SyncedLyrics(
@@ -171,6 +177,16 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
     public var hasSyllables: Bool {
         lines.contains { line in
             if let syllables = line.syllables, !syllables.isEmpty {
+                return true
+            }
+            return false
+        }
+    }
+
+    /// 是否包含有效的雙語翻譯資料
+    public var hasTranslation: Bool {
+        lines.contains { line in
+            if let trans = line.translation, !trans.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 return true
             }
             return false
