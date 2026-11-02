@@ -69,6 +69,9 @@ public final class SpotifyService: NSObject, ObservableObject {
     private var refreshTimeoutItem: DispatchWorkItem?
     private var isInBackground: Bool = false
     private var cookieDebounceTask: Task<Void, Never>?
+    private var isFetchingCurrentlyPlaying: Bool = false
+    private var rateLimitCooldownUntil: Date? = nil
+    private var consecutive429Count: Int = 0
 
     private let artworkCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
@@ -328,6 +331,9 @@ public final class SpotifyService: NSObject, ObservableObject {
         playerStatusText = String(localized: "未登入")
         artworkCache.removeAllObjects()
         AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
+        isFetchingCurrentlyPlaying = false
+        rateLimitCooldownUntil = nil
+        consecutive429Count = 0
 
         cookieDebounceTask?.cancel()
         cookieDebounceTask = nil
@@ -391,13 +397,37 @@ public final class SpotifyService: NSObject, ObservableObject {
 
     public func triggerImmediateWebAPIPoll() {
         guard isLoggedIn else { return }
+        if let cooldownDate = rateLimitCooldownUntil, cooldownDate.timeIntervalSinceNow > 0 {
+            return
+        }
+        guard !isFetchingCurrentlyPlaying else { return }
         Task { [weak self] in
             _ = await self?.fetchCurrentlyPlayingWebAPI()
         }
     }
 
     private func fetchCurrentlyPlayingWebAPI() async -> TimeInterval {
-        let defaultDelay = self.isInBackground ? 6.0 : 4.0
+        let defaultDelay: TimeInterval = self.isInBackground ? 10.0 : 5.0
+
+        // 併發防禦：防止多個非同步 Task 重複發送請求
+        guard !isFetchingCurrentlyPlaying else {
+            return defaultDelay
+        }
+        isFetchingCurrentlyPlaying = true
+        defer { isFetchingCurrentlyPlaying = false }
+
+        // 429 冷卻防禦：若在冷卻期內，絕不向伺服器發送任何請求，避免 Spotify 延長懲罰
+        if let cooldownDate = rateLimitCooldownUntil {
+            let remainingCooldown = cooldownDate.timeIntervalSinceNow
+            if remainingCooldown > 0 {
+                let remainingSec = Int(ceil(remainingCooldown))
+                self.playerStatusText = String(localized: "請求頻繁冷卻中（\(remainingSec) 秒後重試）")
+                return max(2.0, remainingCooldown)
+            } else {
+                rateLimitCooldownUntil = nil
+            }
+        }
+
         guard let token = try? await getValidAccessToken() else {
             if self.isLoggedIn {
                 self.playerStatusText = String(localized: "等待播放授權...")
@@ -423,29 +453,42 @@ public final class SpotifyService: NSObject, ObservableObject {
             }
 
             if httpResponse.statusCode == 204 {
+                consecutive429Count = 0
+                rateLimitCooldownUntil = nil
                 self.playerStatusText = String(localized: "目前未在任何裝置播放音樂")
                 AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
-                return defaultDelay
+                return self.isInBackground ? 12.0 : 6.0
             }
 
             if httpResponse.statusCode == 401 {
                 self.playerStatusText = String(localized: "授權過期，正在重新整理...")
                 clearTokens()
                 _ = try? await getValidAccessToken()
-                return 2.0
+                return 5.0
             }
 
             if httpResponse.statusCode == 429 {
-                self.playerStatusText = String(localized: "請求過於頻繁 (429)")
+                consecutive429Count += 1
                 let retryAfterSec = httpResponse.value(forHTTPHeaderField: "Retry-After")
-                    .flatMap { Double($0) } ?? (self.isInBackground ? 10.0 : 5.0)
-                return max(1.0, retryAfterSec)
+                    .flatMap { Double($0) }
+                // 若 Spotify 有回傳 Retry-After 則以其為準，若無則依連續次數指數退避（30s, 60s, 120s）
+                let backoffBase = Double(min(30 * consecutive429Count, 120))
+                let cooldownDuration = max(backoffBase, retryAfterSec ?? 30.0)
+                rateLimitCooldownUntil = Date().addingTimeInterval(cooldownDuration)
+
+                let cdInt = Int(cooldownDuration)
+                self.playerStatusText = String(localized: "請求過於頻繁 (429)，冷卻中（\(cdInt) 秒）")
+                return cooldownDuration
             }
 
             guard httpResponse.statusCode == 200 else {
                 self.playerStatusText = String(localized: "連線狀態碼：\(httpResponse.statusCode)")
                 return defaultDelay
             }
+
+            // 成功請求，重置 429 連續計數與冷卻
+            consecutive429Count = 0
+            rateLimitCooldownUntil = nil
 
             let playResp = try JSONDecoder().decode(SpotifyCurrentlyPlayingResponse.self, from: data)
             if playResp.currently_playing_type == "ad" {
@@ -457,7 +500,7 @@ public final class SpotifyService: NSObject, ObservableObject {
             guard let item = playResp.item, let title = item.name, !title.isEmpty else {
                 self.playerStatusText = String(localized: "目前未在任何裝置播放音樂")
                 AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
-                return defaultDelay
+                return self.isInBackground ? 12.0 : 6.0
             }
 
             let artist = item.artists?.map { $0.name }.joined(separator: ", ") ?? ""
@@ -508,18 +551,18 @@ public final class SpotifyService: NSObject, ObservableObject {
             if isPlaying {
                 let remainingMs = durationMs - progressMs
                 if self.isInBackground {
-                    if remainingMs > 0 && remainingMs <= 3000 {
-                        return 2.0
+                    if remainingMs > 0 && remainingMs <= 4000 {
+                        return 4.0
                     }
-                    return 6.0
+                    return 8.0
                 } else {
-                    if remainingMs > 0 && remainingMs <= 3000 {
-                        return 1.0
+                    if remainingMs > 0 && remainingMs <= 4000 {
+                        return 3.0
                     }
-                    return 2.0
+                    return 5.0
                 }
             } else {
-                return defaultDelay
+                return self.isInBackground ? 10.0 : 6.0
             }
         } catch {
             return defaultDelay
@@ -553,9 +596,12 @@ public final class SpotifyService: NSObject, ObservableObject {
         if (window.__auraLyricsInjected) return;
         window.__auraLyricsInjected = true;
 
+        var hasCapturedAnyToken = false;
+
         function notifyToken(token, expirationMs, isAnon) {
             if (!token || typeof token !== 'string') return;
             if (isAnon === true) return;
+            hasCapturedAnyToken = true;
             try {
                 window.webkit.messageHandlers.spotifyTokenHandler.postMessage({
                     accessToken: token,
@@ -605,6 +651,7 @@ public final class SpotifyService: NSObject, ObservableObject {
         }
 
         function probeAccessToken() {
+            if (hasCapturedAnyToken) return;
             try {
                 fetch('https://open.spotify.com/get_access_token?reason=transport&productType=web_player', {
                     credentials: 'include'
@@ -672,6 +719,7 @@ public final class SpotifyService: NSObject, ObservableObject {
         };
 
         function scanDOM() {
+            if (hasCapturedAnyToken) return;
             try {
                 const ids = ['session', 'config', 'initial-state', 'appServerConfig'];
                 for (const id of ids) {
