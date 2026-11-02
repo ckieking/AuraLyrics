@@ -49,7 +49,34 @@ struct SettingsView: View {
                             .font(.subheadline)
                         }
 
+                        HStack {
+                            Label {
+                                Text("播放狀態")
+                            } icon: {
+                                Image(systemName: "music.note")
+                                    .foregroundColor(.pink)
+                            }
+                            Spacer()
+                            Text(spotifyService.playerStatusText)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.trailing)
+                        }
+
                         if spotifyService.isLoggedIn {
+                            if !spotifyService.hasCapturedToken {
+                                Button {
+                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                    showSpotifyLoginSheet = true
+                                } label: {
+                                    HStack {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                        Text("重新取得播放授權")
+                                    }
+                                    .foregroundColor(.orange)
+                                }
+                            }
+
                             Button(role: .destructive) {
                                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                 showLogoutConfirmation = true
