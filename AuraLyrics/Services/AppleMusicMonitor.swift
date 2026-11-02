@@ -423,18 +423,17 @@ public final class AppleMusicMonitor: ObservableObject {
 
         if let index = currentLineIndex, currentLyrics.lines.indices.contains(index) {
             let current = currentLyrics.lines[index]
+            let nextLineText = (index + 1 < currentLyrics.lines.count) ? currentLyrics.lines[index + 1].text : nil
             var secondaryText: String? = nil
             if showTranslation, let trans = current.translation, !trans.isEmpty {
                 secondaryText = trans
-            } else if index + 1 < currentLyrics.lines.count {
-                secondaryText = currentLyrics.lines[index + 1].text
+            } else {
+                secondaryText = nextLineText
             }
-
-            let nextLineText = (index + 1 < currentLyrics.lines.count) ? currentLyrics.lines[index + 1].text : nil
 
             PiPLyricsEngine.shared.updateLyrics(
                 line: current.text,
-                secondaryLine: nextLineText,
+                secondaryLine: secondaryText,
                 progress: playbackProgress
             )
             LiveActivityLyricsEngine.shared.updateLyrics(
@@ -506,5 +505,12 @@ public final class AppleMusicMonitor: ObservableObject {
     public func applyCustomLyrics(_ lyrics: SyncedLyrics) {
         currentLyrics = lyrics
         refreshCurrentLineIndex(forceSync: true)
+    }
+
+    // MARK: - 套用離線翻譯後歌詞（平滑更新，不中斷滾動追蹤）
+    public func applyTranslatedLyrics(_ lyrics: SyncedLyrics) {
+        guard lyrics.trackTitle == currentTrack.title && lyrics.artistName == currentTrack.artist else { return }
+        currentLyrics = lyrics
+        syncExternalEngines()
     }
 }

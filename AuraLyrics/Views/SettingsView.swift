@@ -9,9 +9,11 @@ struct SettingsView: View {
     @ObservedObject var pipVM = PiPLyricsViewModel.shared
     @ObservedObject var musicMonitor = AppleMusicMonitor.shared
     @ObservedObject var lyricsProvider = LyricsProviderService.shared
+    @ObservedObject var translationService = LyricsTranslationService.shared
 
     @State private var showResetCacheAlert = false
     @State private var cacheClearedToast = false
+    @AppStorage("showBilingualLyrics") private var showTranslation = true
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
@@ -77,6 +79,26 @@ struct SettingsView: View {
                     Text("歌詞來源")
                 } footer: {
                     Text("可自訂 Musixmatch、網易雲音樂、LRCLIB 與 PetitLyrics 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。")
+                }
+
+                // MARK: - 雙語歌詞與離線翻譯
+                Section {
+                    Toggle("顯示雙語歌詞", isOn: $showTranslation)
+                        .onChange(of: showTranslation) { _, _ in
+                            musicMonitor.syncExternalEngines()
+                        }
+
+                    if showTranslation {
+                        Picker("目標翻譯語言", selection: $translationService.currentTargetLanguage) {
+                            ForEach(translationService.availableLanguages) { lang in
+                                Text(lang.displayName).tag(lang.identifier)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("雙語歌詞與翻譯")
+                } footer: {
+                    Text("採用 iOS 原生離線神經網路翻譯，免連線且保護隱私。歌詞原文若與目標語言同語系將自動略過重複翻譯；華語簡體歌詞將自動轉換為繁體中文。")
                 }
 
                 // MARK: - 歌詞視覺效果

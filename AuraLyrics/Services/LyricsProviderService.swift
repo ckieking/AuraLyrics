@@ -383,6 +383,7 @@ public final class LyricsProviderService: ObservableObject {
                     var toSave = result
                     toSave.trackTitle = cleanTitle
                     toSave.artistName = cleanArtist
+                    toSave = await normalizeHantLyricsIfNeeded(toSave)
                     saveLyricsToCache(toSave)
                     return toSave
                 }
@@ -391,13 +392,34 @@ public final class LyricsProviderService: ObservableObject {
                 var toSave = result
                 toSave.trackTitle = cleanTitle
                 toSave.artistName = cleanArtist
+                toSave = await normalizeHantLyricsIfNeeded(toSave)
                 saveLyricsToCache(toSave)
                 return toSave
             }
         }
 
         // 5. 若所有啟用順位皆未滿足，回退至既有快取
-        return cached
+        if let cached = cached {
+            return await normalizeHantLyricsIfNeeded(cached)
+        }
+        return nil
+    }
+
+    /// 當目標語言為繁體中文且歌詞為簡體中文華語歌時，將原文轉為繁體並清除多餘的重複翻譯行
+    private func normalizeHantLyricsIfNeeded(_ lyrics: SyncedLyrics) async -> SyncedLyrics {
+        let currentTarget = await MainActor.run { LyricsTranslationService.shared.currentTargetLanguage }
+        if LyricsTranslationService.isTargetHantAndLyricsSimplified(lyrics: lyrics, targetLanguageId: currentTarget) {
+            var converted = LyricsTranslationService.convertLyricsToTraditional(lyrics)
+            // 原文已轉為繁體，同語系不顯示翻譯副行
+            converted.lines = converted.lines.map { line in
+                var copy = line
+                copy.translation = nil
+                return copy
+            }
+            converted.translationTargetLanguage = "zh-Hant"
+            return converted
+        }
+        return lyrics
     }
 
     // MARK: - 手動搜尋跨庫歌詞（Structured Concurrency 並行請求，不污染快取直到使用者點選）
@@ -993,9 +1015,28 @@ public final class LyricsProviderService: ObservableObject {
             guard !cleanLines.isEmpty else { return nil }
 
             var finalLines = cleanLines
+            var transTargetLang: String? = nil
+
+            let currentTarget = await MainActor.run { LyricsTranslationService.shared.currentTargetLanguage }
+            let isTargetHant = currentTarget.lowercased().hasPrefix("zh-hant") || currentTarget.lowercased().hasPrefix("zh-tw")
+            let isTargetHans = currentTarget.lowercased().hasPrefix("zh-hans") || currentTarget.lowercased() == "zh-cn"
+
             if let rawTrans = lyricDecoded.tlyric?.lyric, !rawTrans.isEmpty {
-                let transLines = LRCParser.shared.parse(lrcContent: rawTrans)
-                finalLines = LRCParser.shared.mergeTranslations(original: cleanLines, translation: transLines)
+                if isTargetHant {
+                    let transLines = LRCParser.shared.parse(lrcContent: rawTrans)
+                    let hantTransLines = transLines.map { line in
+                        var copy = line
+                        copy.text = LyricsTranslationService.convertSimplifiedToTraditional(line.text)
+                        return copy
+                    }
+                    finalLines = LRCParser.shared.mergeTranslations(original: cleanLines, translation: hantTransLines)
+                    transTargetLang = "zh-Hant"
+                } else if isTargetHans {
+                    let transLines = LRCParser.shared.parse(lrcContent: rawTrans)
+                    finalLines = LRCParser.shared.mergeTranslations(original: cleanLines, translation: transLines)
+                    transTargetLang = "zh-Hans"
+                }
+                // 若目標語言為其他語言（如 en/ja），不套用中文 tlyric，留待 TranslationSession 批次翻譯
             }
 
             let resolvedTitle = songItem.song.name.isEmpty ? targetTitle : songItem.song.name
@@ -1007,7 +1048,8 @@ public final class LyricsProviderService: ObservableObject {
                 lines: finalLines,
                 credits: credits,
                 offsetMs: 0,
-                source: "NetEase"
+                source: "NetEase",
+                translationTargetLanguage: transTargetLang
             )
         } catch {
             print("[LyricsProvider] 網易雲歌詞解析失敗: \(error.localizedDescription)")

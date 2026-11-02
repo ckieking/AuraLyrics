@@ -194,10 +194,13 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
     private func syncCurrentLyricsToViewModel() {
         let monitor = AppleMusicMonitor.shared
+        let showTranslation = UserDefaults.standard.object(forKey: "showBilingualLyrics") as? Bool ?? true
+
         if let index = monitor.currentLineIndex, monitor.currentLyrics.lines.indices.contains(index) {
             let current = monitor.currentLyrics.lines[index]
             let nextLineText = (index + 1 < monitor.currentLyrics.lines.count) ? monitor.currentLyrics.lines[index + 1].text : nil
-            updateLyrics(line: current.text, secondaryLine: nextLineText, progress: monitor.playbackProgress)
+            let secondary = (showTranslation && current.translation?.isEmpty == false) ? current.translation : nextLineText
+            updateLyrics(line: current.text, secondaryLine: secondary, progress: monitor.playbackProgress)
         } else if monitor.currentTrack.title != TrackInfo.placeholder.title {
             let firstLine = monitor.currentLyrics.lines.first?.text
             updateLyrics(line: monitor.currentTrack.title, secondaryLine: firstLine ?? (monitor.currentTrack.artist.isEmpty ? nil : monitor.currentTrack.artist), progress: monitor.playbackProgress)

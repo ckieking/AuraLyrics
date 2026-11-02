@@ -1,6 +1,7 @@
 import SwiftUI
 import MediaPlayer
 import UIKit
+import Translation
 
 /// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + 右上角獨立放大 Liquid Glass 雙圓鈕）
 struct NowPlayingView: View {
@@ -8,6 +9,7 @@ struct NowPlayingView: View {
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
     @ObservedObject var pipEngine = PiPLyricsEngine.shared
     @ObservedObject var liveActivityEngine = LiveActivityLyricsEngine.shared
+    @ObservedObject var translationService = LyricsTranslationService.shared
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -19,6 +21,9 @@ struct NowPlayingView: View {
     @AppStorage("showBilingualLyrics") private var showTranslation = true
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
+
+    /// Translation 框架會話設定觸發器（變更時觸發 translationTask）
+    @State private var translationConfig: TranslationSession.Configuration? = nil
 
     /// 零重繪之可視行索引與滾動狀態追蹤器（參考型別，不觸發全視圖 body 刷新）
     @State private var tracker = ViewportTracker()
@@ -74,8 +79,58 @@ struct NowPlayingView: View {
                     }
                 }
             }
-            .onChange(of: showTranslation) { _, _ in
+            .onChange(of: showTranslation) { _, isEnabled in
                 monitor.syncExternalEngines()
+                if isEnabled {
+                    checkAndTriggerTranslation()
+                }
+            }
+            .onChange(of: monitor.currentLyrics.id) { _, _ in
+                checkAndTriggerTranslation()
+            }
+            .onChange(of: translationService.currentTargetLanguage) { _, _ in
+                checkAndTriggerTranslation(forceTargetLanguageChange: true)
+            }
+            .translationTask(translationConfig) { session in
+                let targetId = translationService.currentTargetLanguage
+                let lyrics = monitor.currentLyrics
+                if let translated = await LyricsTranslationService.translateLyrics(lyrics, using: session, targetLanguageId: targetId) {
+                    monitor.applyTranslatedLyrics(translated)
+                }
+            }
+        }
+    }
+
+    /// 檢查當前歌詞是否需要翻譯並觸發 TranslationSession
+    private func checkAndTriggerTranslation(forceTargetLanguageChange: Bool = false) {
+        guard showTranslation else { return }
+        let lyrics = monitor.currentLyrics
+        guard !lyrics.lines.isEmpty else { return }
+
+        let targetId = translationService.currentTargetLanguage
+
+        // 若原文與目標語言同語系，若為繁中配簡中則進行簡轉繁，否則略過翻譯
+        if LyricsTranslationService.isSameLanguage(lyrics: lyrics, targetLanguageId: targetId) {
+            if LyricsTranslationService.isTargetHantAndLyricsSimplified(lyrics: lyrics, targetLanguageId: targetId) {
+                var converted = LyricsTranslationService.convertLyricsToTraditional(lyrics)
+                converted.lines = converted.lines.map { line in
+                    var copy = line
+                    copy.translation = nil
+                    return copy
+                }
+                converted.translationTargetLanguage = "zh-Hant"
+                LyricsProviderService.shared.saveLyricsToCache(converted)
+                monitor.applyTranslatedLyrics(converted)
+            }
+            return
+        }
+
+        if forceTargetLanguageChange || LyricsTranslationService.shouldTranslate(lyrics: lyrics, targetLanguageId: targetId) {
+            let targetLocale = Locale.Language(identifier: targetId)
+            if translationConfig?.target != targetLocale {
+                translationConfig = .init(target: targetLocale)
+            } else {
+                translationConfig?.invalidate()
             }
         }
     }
@@ -110,6 +165,22 @@ struct NowPlayingView: View {
             // 雙語歌詞選項
             Toggle(isOn: $showTranslation) {
                 Text("雙語歌詞")
+            }
+
+            // 翻譯目標語言子選單（排序：系統語言第一、App 語言第二）
+            if showTranslation && !translationService.availableLanguages.isEmpty {
+                Menu {
+                    Picker("翻譯語言", selection: $translationService.currentTargetLanguage) {
+                        ForEach(translationService.availableLanguages) { lang in
+                            Text(lang.displayName).tag(lang.identifier)
+                        }
+                    }
+                } label: {
+                    Label(
+                        String(format: String(localized: "翻譯語言：%@"), currentLanguageDisplayName),
+                        systemImage: "character.bubble"
+                    )
+                }
             }
 
             // 即時動態與動態島開關（在非 LiveContainer 環境下提供，雙向同步設定）
@@ -153,6 +224,11 @@ struct NowPlayingView: View {
         }
         .buttonStyle(LiquidSpringButtonStyle(scaleAmount: 0.90))
         .accessibilityLabel(String(localized: "更多歌詞操作選項"))
+    }
+
+    private var currentLanguageDisplayName: String {
+        let currentId = translationService.currentTargetLanguage
+        return translationService.availableLanguages.first(where: { $0.identifier == currentId })?.displayName ?? currentId
     }
 
     // MARK: - 沉浸式氛圍背景 (Apple Music 原生 Mesh 漸層，不受深淺模式影響，高對比度)
@@ -359,6 +435,7 @@ struct NowPlayingView: View {
             //當使用者重新將本頁面作為焦點頁面時（App 回到前景、分頁切回），強制定位到目前歌詞進度並恢復跟隨
             .onAppear {
                 updateCachedArtwork()
+                checkAndTriggerTranslation()
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 120_000_000)
                     guard !Task.isCancelled else { return }
