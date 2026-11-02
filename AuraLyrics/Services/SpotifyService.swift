@@ -72,6 +72,7 @@ public final class SpotifyService: NSObject, ObservableObject {
     private var isFetchingCurrentlyPlaying: Bool = false
     private var rateLimitCooldownUntil: Date? = nil
     private var consecutive429Count: Int = 0
+    private var countdownTimer: AnyCancellable?
 
     private let artworkCache: NSCache<NSString, NSData> = {
         let cache = NSCache<NSString, NSData>()
@@ -334,6 +335,8 @@ public final class SpotifyService: NSObject, ObservableObject {
         isFetchingCurrentlyPlaying = false
         rateLimitCooldownUntil = nil
         consecutive429Count = 0
+        countdownTimer?.cancel()
+        countdownTimer = nil
 
         cookieDebounceTask?.cancel()
         cookieDebounceTask = nil
@@ -406,6 +409,37 @@ public final class SpotifyService: NSObject, ObservableObject {
         }
     }
 
+    private func startCountdownTimer(until targetDate: Date, isQuotaExceeded: Bool) {
+        countdownTimer?.cancel()
+        let initialSec = Int(ceil(max(0, targetDate.timeIntervalSinceNow)))
+        if isQuotaExceeded {
+            self.playerStatusText = String(localized: "Spotify 配額受限 (QUOTA)，冷卻中（剩餘 \(initialSec) 秒）")
+        } else {
+            self.playerStatusText = String(localized: "請求過於頻繁 (429)，冷卻中（剩餘 \(initialSec) 秒）")
+        }
+
+        countdownTimer = Timer.publish(every: 1.0, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                let remaining = targetDate.timeIntervalSinceNow
+                if remaining > 0 {
+                    let sec = Int(ceil(remaining))
+                    if isQuotaExceeded {
+                        self.playerStatusText = String(localized: "Spotify 配額受限 (QUOTA)，冷卻中（剩餘 \(sec) 秒）")
+                    } else {
+                        self.playerStatusText = String(localized: "請求過於頻繁 (429)，冷卻中（剩餘 \(sec) 秒）")
+                    }
+                } else {
+                    self.countdownTimer?.cancel()
+                    self.countdownTimer = nil
+                    self.rateLimitCooldownUntil = nil
+                    self.playerStatusText = String(localized: "冷卻完成，正在重新連線...")
+                    self.triggerImmediateWebAPIPoll()
+                }
+            }
+    }
+
     private func fetchCurrentlyPlayingWebAPI() async -> TimeInterval {
         let defaultDelay: TimeInterval = self.isInBackground ? 10.0 : 5.0
 
@@ -420,11 +454,11 @@ public final class SpotifyService: NSObject, ObservableObject {
         if let cooldownDate = rateLimitCooldownUntil {
             let remainingCooldown = cooldownDate.timeIntervalSinceNow
             if remainingCooldown > 0 {
-                let remainingSec = Int(ceil(remainingCooldown))
-                self.playerStatusText = String(localized: "請求頻繁冷卻中（\(remainingSec) 秒後重試）")
                 return max(2.0, remainingCooldown)
             } else {
                 rateLimitCooldownUntil = nil
+                countdownTimer?.cancel()
+                countdownTimer = nil
             }
         }
 
@@ -444,6 +478,14 @@ public final class SpotifyService: NSObject, ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(Self.desktopUserAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("https://open.spotify.com", forHTTPHeaderField: "Origin")
+        request.setValue("https://open.spotify.com/", forHTTPHeaderField: "Referer")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7", forHTTPHeaderField: "Accept-Language")
+        request.setValue("empty", forHTTPHeaderField: "Sec-Fetch-Dest")
+        request.setValue("cors", forHTTPHeaderField: "Sec-Fetch-Mode")
+        request.setValue("same-site", forHTTPHeaderField: "Sec-Fetch-Site")
 
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -455,6 +497,8 @@ public final class SpotifyService: NSObject, ObservableObject {
             if httpResponse.statusCode == 204 {
                 consecutive429Count = 0
                 rateLimitCooldownUntil = nil
+                countdownTimer?.cancel()
+                countdownTimer = nil
                 self.playerStatusText = String(localized: "目前未在任何裝置播放音樂")
                 AppleMusicMonitor.shared.applySpotifySnapshot(nil, from: .spotify)
                 return self.isInBackground ? 12.0 : 6.0
@@ -471,13 +515,16 @@ public final class SpotifyService: NSObject, ObservableObject {
                 consecutive429Count += 1
                 let retryAfterSec = httpResponse.value(forHTTPHeaderField: "Retry-After")
                     .flatMap { Double($0) }
+                let responseBody = String(data: data, encoding: .utf8) ?? ""
+                let isQuotaExceeded = responseBody.contains("QUOTA_EXCEEDED")
+
                 // 若 Spotify 有回傳 Retry-After 則以其為準，若無則依連續次數指數退避（30s, 60s, 120s）
                 let backoffBase = Double(min(30 * consecutive429Count, 120))
                 let cooldownDuration = max(backoffBase, retryAfterSec ?? 30.0)
-                rateLimitCooldownUntil = Date().addingTimeInterval(cooldownDuration)
+                let cooldownTarget = Date().addingTimeInterval(cooldownDuration)
+                rateLimitCooldownUntil = cooldownTarget
 
-                let cdInt = Int(cooldownDuration)
-                self.playerStatusText = String(localized: "請求過於頻繁 (429)，冷卻中（\(cdInt) 秒）")
+                startCountdownTimer(until: cooldownTarget, isQuotaExceeded: isQuotaExceeded)
                 return cooldownDuration
             }
 
@@ -489,6 +536,8 @@ public final class SpotifyService: NSObject, ObservableObject {
             // 成功請求，重置 429 連續計數與冷卻
             consecutive429Count = 0
             rateLimitCooldownUntil = nil
+            countdownTimer?.cancel()
+            countdownTimer = nil
 
             let playResp = try JSONDecoder().decode(SpotifyCurrentlyPlayingResponse.self, from: data)
             if playResp.currently_playing_type == "ad" {
