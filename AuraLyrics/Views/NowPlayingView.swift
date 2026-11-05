@@ -365,7 +365,7 @@ struct NowPlayingView: View {
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
                             .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                             .blur(radius: isCurrent ? 0 : rowBlur)
-                            .transaction { $0.animation = nil }
+                            .animation(nil, value: rowBlur)
                         }
 
                         // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)
