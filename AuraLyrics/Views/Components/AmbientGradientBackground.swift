@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Apple Music 經典沉浸式動態多重徑向流光背景 (Ambient Radial Orbs Background)
+/// Apple Music 經典沉浸式動態多色網格漸層背景 (Ambient Mesh Gradient)
 /// 依據歌曲/專輯封面即時提取之主色與多個輔色，建構不受深淺主題干擾的深邃高對比流光舞台
 public struct AmbientGradientBackground: View {
     let palette: ArtworkPalette
@@ -9,7 +9,7 @@ public struct AmbientGradientBackground: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var animateOrbs: Bool = false
+    @State private var animateMesh: Bool = false
 
     public init(palette: ArtworkPalette, artworkImage: UIImage?) {
         self.palette = palette
@@ -37,8 +37,8 @@ public struct AmbientGradientBackground: View {
                             .opacity(0.32)
                     }
 
-                    // MARK: - 第三層：Apple Music 經典多重動態徑向極光光球 (零離屏模糊、天然衰減零接縫)
-                    radialOrbsView(size: size)
+                    // MARK: - 第三層：Apple Music 原生 3x3 MeshGradient 多焦點流光網格
+                    meshGradientView
                         .frame(width: size.width, height: size.height)
                         .clipped()
 
@@ -71,58 +71,35 @@ public struct AmbientGradientBackground: View {
         .animation(.easeInOut(duration: 0.8), value: palette)
         .onAppear {
             if !reduceMotion {
-                withAnimation(.easeInOut(duration: 8.0).repeatForever(autoreverses: true)) {
-                    animateOrbs = true
+                withAnimation(.easeInOut(duration: 7.0).repeatForever(autoreverses: true)) {
+                    animateMesh = true
                 }
             }
         }
     }
 
-    // MARK: - 多重動態徑向極光光斑（數學平滑衰減，0 離屏模糊，0 幾何摺痕）
-    @ViewBuilder
-    private func radialOrbsView(size: CGSize) -> some View {
-        let maxDim = max(max(size.width, size.height), 100)
+    // MARK: - iOS 18+ 原生 MeshGradient 3x3 網格
+    private var meshGradientView: some View {
+        let p1X: Float = animateMesh ? 0.42 : 0.58
+        let p1Y: Float = animateMesh ? 0.45 : 0.55
+        let p2X: Float = animateMesh ? 0.85 : 0.78
+        let p2Y: Float = animateMesh ? 0.20 : 0.28
 
-        ZStack {
-            // 光球 1：左上主色光斑（以 offset / scale 平滑物理呼吸）
-            RadialGradient(
-                colors: [palette.primary.opacity(0.85), palette.primary.opacity(0.0)],
-                center: .topLeading,
-                startRadius: 20,
-                endRadius: max(20, maxDim * 0.75)
-            )
-            .offset(x: animateOrbs ? maxDim * 0.12 : -maxDim * 0.05, y: animateOrbs ? maxDim * 0.08 : -maxDim * 0.04)
-            .scaleEffect(animateOrbs ? 1.08 : 0.95)
-
-            // 光球 2：右上/右側輔色光斑（橫向飄移呼吸）
-            RadialGradient(
-                colors: [palette.secondary.opacity(0.75), palette.secondary.opacity(0.0)],
-                center: .topTrailing,
-                startRadius: 30,
-                endRadius: max(30, maxDim * 0.70)
-            )
-            .offset(x: animateOrbs ? -maxDim * 0.08 : maxDim * 0.06, y: animateOrbs ? maxDim * 0.10 : 0)
-            .scaleEffect(animateOrbs ? 0.96 : 1.06)
-
-            // 光球 3：左下第三色（縱向對角擺動）
-            RadialGradient(
-                colors: [palette.tertiary.opacity(0.65), palette.tertiary.opacity(0.0)],
-                center: .bottomLeading,
-                startRadius: 20,
-                endRadius: max(20, maxDim * 0.65)
-            )
-            .offset(x: animateOrbs ? maxDim * 0.06 : 0, y: animateOrbs ? -maxDim * 0.10 : maxDim * 0.05)
-            .scaleEffect(animateOrbs ? 1.05 : 0.94)
-
-            // 光球 4：右下強調亮點（增添舞台深度）
-            RadialGradient(
-                colors: [palette.accent.opacity(0.55), palette.accent.opacity(0.0)],
-                center: .bottomTrailing,
-                startRadius: 10,
-                endRadius: max(10, maxDim * 0.60)
-            )
-            .offset(x: animateOrbs ? -maxDim * 0.05 : maxDim * 0.04, y: animateOrbs ? -maxDim * 0.06 : 0)
-            .scaleEffect(animateOrbs ? 0.92 : 1.08)
-        }
+        return MeshGradient(
+            width: 3,
+            height: 3,
+            points: [
+                SIMD2<Float>(0.0, 0.0), SIMD2<Float>(0.5, 0.0), SIMD2<Float>(1.0, 0.0),
+                SIMD2<Float>(0.0, 0.5), SIMD2<Float>(p1X, p1Y), SIMD2<Float>(p2X, p2Y),
+                SIMD2<Float>(0.0, 1.0), SIMD2<Float>(0.5, 1.0), SIMD2<Float>(1.0, 1.0)
+            ],
+            colors: [
+                palette.backgroundDark, palette.secondary, palette.primary,
+                palette.tertiary, palette.primary, palette.accent,
+                palette.backgroundDark, palette.primary, palette.backgroundDark
+            ]
+        )
+        .blur(radius: 20) // 輕微柔化網格交界處，創造如絲綢般平滑流光的奢華質感
+        .opacity(0.92)
     }
 }

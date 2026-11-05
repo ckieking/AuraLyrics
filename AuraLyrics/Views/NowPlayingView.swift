@@ -363,9 +363,8 @@ struct NowPlayingView: View {
                             .accessibilityElement(children: .combine)
                             .accessibilityLabel(line.text + (line.translation.map { String(format: String(localized: "，翻譯：%@"), $0) } ?? ""))
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
-                            .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                             .blur(radius: isCurrent ? 0 : rowBlur)
-                            .animation(nil, value: rowBlur)
+                            .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                         }
 
                         // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)
