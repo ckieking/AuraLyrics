@@ -28,6 +28,9 @@ struct NowPlayingView: View {
     /// 零重繪之可視行索引與滾動狀態追蹤器（參考型別，不觸發全視圖 body 刷新）
     @State private var tracker = ViewportTracker()
 
+    /// 焦點歌詞當前是否在螢幕可視範圍內（離屏時解除全螢幕模糊，保留清晰閱覽體驗）
+    @State private var isCurrentLineInViewport: Bool = true
+
     /// 快取解碼後之專輯封面圖，避免在 body 內高頻重複解碼 PNG
     @State private var cachedArtworkImage: UIImage? = nil
 
@@ -340,6 +343,7 @@ struct NowPlayingView: View {
                                 tracker.scrollIdleTask?.cancel()
                                 tracker.scrollIdleTask = nil
                                 tracker.isUserScrolling = false
+                                isCurrentLineInViewport = true
                                 if isUserScrolling {
                                     withAnimation(.easeInOut(duration: 0.35)) {
                                         isUserScrolling = false
@@ -406,7 +410,12 @@ struct NowPlayingView: View {
                         try? await Task.sleep(nanoseconds: 1_200_000_000)
                         guard !Task.isCancelled else { return }
                         tracker.isUserScrolling = false
-                        withAnimation(.easeInOut(duration: 0.35)) {
+                        let isVisible: Bool = {
+                            guard let current = monitor.currentLineIndex else { return true }
+                            return tracker.visibleIndices.contains(current) || current <= 1
+                        }()
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.35)) {
+                            isCurrentLineInViewport = isVisible
                             isUserScrolling = false
                         }
                     }
@@ -414,6 +423,7 @@ struct NowPlayingView: View {
             }
             //智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
+                checkCurrentLineVisibility()
                 guard let index = newIndex else { return }
                 let isVisible = tracker.visibleIndices.contains(index) || index <= 1
                 if isVisible && !tracker.isUserScrolling {
@@ -464,7 +474,7 @@ struct NowPlayingView: View {
 
     /// 依據與當前焦點行之距離，計算光學景深多階模糊半徑 (Progressive Optical Defocus Blur)
     private func defocusBlurRadius(for index: Int) -> CGFloat {
-        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, scenePhase == .active else {
+        guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, isCurrentLineInViewport, scenePhase == .active else {
             return 0.0
         }
         guard let current = monitor.currentLineIndex else {
@@ -498,8 +508,8 @@ struct NowPlayingView: View {
         guard enableLyricDefocusBlur else {
             return 0.50
         }
-        if isUserScrolling {
-            // 滑動時適度提升至便於閱讀的清晰度，但嚴格不超過當前播放行未唱到字元的基底亮度 (0.35)，維持視覺焦點
+        if !isCurrentLineInViewport || isUserScrolling {
+            // 離屏瀏覽或滑動時適度提升至便於閱讀的清晰度，但嚴格不超過當前播放行未唱到字元的基底亮度 (0.35)，維持視覺焦點
             return max(inactiveLyricOpacity, 0.32) <= 0.35 ? 0.32 : inactiveLyricOpacity
         }
         let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
@@ -528,7 +538,7 @@ struct NowPlayingView: View {
         guard enableLyricDefocusBlur else {
             return 0.55
         }
-        if isUserScrolling {
+        if !isCurrentLineInViewport || isUserScrolling {
             return max(inactiveLyricOpacity, 0.28) <= 0.35 ? 0.28 : inactiveLyricOpacity
         }
         let base = min(max(inactiveLyricOpacity * 1.15, 0.06), 0.65)
@@ -539,6 +549,26 @@ struct NowPlayingView: View {
             return min(0.22, max(0.14, base * 1.5))
         default:
             return base
+        }
+    }
+
+    /// 檢查焦點行是否在目前畫面可視範圍內（離屏時解除全螢幕模糊，保留清晰閱覽體驗）
+    private func checkCurrentLineVisibility(animated: Bool = true) {
+        guard let current = monitor.currentLineIndex else {
+            if !isCurrentLineInViewport {
+                isCurrentLineInViewport = true
+            }
+            return
+        }
+        let isVisible = tracker.visibleIndices.contains(current) || current <= 1
+        if isCurrentLineInViewport != isVisible {
+            if animated && !reduceMotion {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isCurrentLineInViewport = isVisible
+                }
+            } else {
+                isCurrentLineInViewport = isVisible
+            }
         }
     }
 
@@ -566,6 +596,7 @@ struct NowPlayingView: View {
         guard let currentIndex = monitor.currentLineIndex,
               monitor.currentLyrics.lines.indices.contains(currentIndex) else { return }
 
+        isCurrentLineInViewport = true
         if reduceMotion || !animated {
             proxy.scrollTo(currentIndex, anchor: .center)
         } else {
@@ -577,6 +608,7 @@ struct NowPlayingView: View {
 
     private func scrollToTop(proxy: ScrollViewProxy) {
         tracker.visibleIndices.removeAll()
+        isCurrentLineInViewport = true
         if reduceMotion {
             proxy.scrollTo("LyricsTopAnchor", anchor: .top)
         } else {
