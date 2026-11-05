@@ -216,6 +216,8 @@ private struct CharacterPieceView: View {
     let continuousFocus: Double
     let currentPlayMs: Int
 
+    private let glowWeightThreshold: Double = 0.04
+
     /// 單字元擦亮進度 0.0 ~ 1.0
     private var charProgress: Double {
         if currentPlayMs <= char.startMs { return 0.0 }
@@ -241,65 +243,73 @@ private struct CharacterPieceView: View {
             let g = gaussianWeight
             let p = charProgress
 
-            // 極細微 Y 軸微上浮 (Micro-Lift)
-            let liftY: CGFloat = {
-                if currentPlayMs < char.startMs {
-                    // 尚未唱到：隨周圍波及產生極其細微的預熱響應
-                    return -1.0 * g
-                } else if currentPlayMs >= char.endMs {
-                    // 唱完後：平穩維持 -0.8pt 微浮
-                    return -0.8
-                } else {
-                    // 正在發音：柔和微揚 -1.4pt
-                    let localWave = sin(p * .pi)
-                    return -0.8 - 0.6 * localWave
+            if g <= glowWeightThreshold && (p <= 0.0 || p >= 1.0) {
+                Text(char.text)
+                    .font(.system(size: 32, weight: .bold, design: .default))
+                    .foregroundColor(p >= 1.0 ? .white : Color.white.opacity(0.35))
+                    .offset(y: p >= 1.0 ? -0.8 : 0.0)
+                    .transaction { $0.animation = nil }
+            } else {
+                // 極細微 Y 軸微上浮 (Micro-Lift)
+                let liftY: CGFloat = {
+                    if currentPlayMs < char.startMs {
+                        // 尚未唱到：隨周圍波及產生極其細微的預熱響應
+                        return -1.0 * g
+                    } else if currentPlayMs >= char.endMs {
+                        // 唱完後：平穩維持 -0.8pt 微浮
+                        return -0.8
+                    } else {
+                        // 正在發音：柔和微揚 -1.4pt
+                        let localWave = sin(p * .pi)
+                        return -0.8 - 0.6 * localWave
+                    }
+                }()
+
+                ZStack(alignment: .leading) {
+                    // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 32pt 大字，35% 次級白）
+                    // 緊鄰字元泛起被環境散射照亮的柔和微光
+                    Text(char.text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(Color.white.opacity(0.35))
+                        .shadow(
+                            color: (g > glowWeightThreshold) ? Color.pink.opacity(0.40 * g) : Color.clear,
+                            radius: (g > glowWeightThreshold) ? 10 * g : 0,
+                            x: 0,
+                            y: 0
+                        )
+
+                    // 頂層：唱到的高亮純白發光文字
+                    // 向螢幕方向浮出的多層空間光暈：白核心 + 明亮立體粉紅光暈 + 外部空氣擴散層
+                    // 隨字元進度 p (0.0 ~ 1.0) 平滑淡入擦亮，純向量文字渲染，徹底杜絕白色色塊
+                    Text(char.text)
+                        .font(.system(size: 32, weight: .bold, design: .default))
+                        .foregroundColor(.white)
+                        // 第一層：緊貼文字的純白立體高光（Core Highlight）
+                        .shadow(
+                            color: (g > glowWeightThreshold) ? Color.white.opacity(0.65 * g) : .clear,
+                            radius: (g > glowWeightThreshold) ? 5 * g : 0,
+                            x: 0,
+                            y: 0
+                        )
+                        // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow，僅在唱到焦點時綻放，唱完後乾淨歸零避免光斑疊加）
+                        .shadow(
+                            color: (g > glowWeightThreshold) ? Color.pink.opacity(0.60 + 0.35 * g) : .clear,
+                            radius: (g > glowWeightThreshold) ? 14 + 8 * g : 0,
+                            x: 0,
+                            y: 0
+                        )
+                        // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
+                        .shadow(
+                            color: (g > glowWeightThreshold) ? Color.pink.opacity(0.35 * g) : .clear,
+                            radius: (g > glowWeightThreshold) ? 26 * g : 0,
+                            x: 0,
+                            y: 0
+                        )
+                        .opacity(min(1.0, max(0.0, p)))
                 }
-            }()
-
-            ZStack(alignment: .leading) {
-                // 底層：未唱到的暗色底襯（Apple 官方 SF Pro 32pt 大字，35% 次級白）
-                // 緊鄰字元泛起被環境散射照亮的柔和微光
-                Text(char.text)
-                    .font(.system(size: 32, weight: .bold, design: .default))
-                    .foregroundColor(Color.white.opacity(0.35))
-                    .shadow(
-                        color: (g > 0.04) ? Color.pink.opacity(0.40 * g) : Color.clear,
-                        radius: (g > 0.04) ? 10 * g : 0,
-                        x: 0,
-                        y: 0
-                    )
-
-                // 頂層：唱到的高亮純白發光文字
-                // 向螢幕方向浮出的多層空間光暈：白核心 + 明亮立體粉紅光暈 + 外部空氣擴散層
-                // 隨字元進度 p (0.0 ~ 1.0) 平滑淡入擦亮，純向量文字渲染，徹底杜絕白色色塊
-                Text(char.text)
-                    .font(.system(size: 32, weight: .bold, design: .default))
-                    .foregroundColor(.white)
-                    // 第一層：緊貼文字的純白立體高光（Core Highlight）
-                    .shadow(
-                        color: (g > 0.04) ? Color.white.opacity(0.65 * g) : .clear,
-                        radius: (g > 0.04) ? 5 * g : 0,
-                        x: 0,
-                        y: 0
-                    )
-                    // 第二層：向螢幕前方浮現的立體粉紅光暈（Depth Pop Glow，僅在唱到焦點時綻放，唱完後乾淨歸零避免光斑疊加）
-                    .shadow(
-                        color: (g > 0.04) ? Color.pink.opacity(0.60 + 0.35 * g) : .clear,
-                        radius: (g > 0.04) ? 14 + 8 * g : 0,
-                        x: 0,
-                        y: 0
-                    )
-                    // 第三層：空氣感大範圍環境散射暈光（Ambient Bloom）
-                    .shadow(
-                        color: (g > 0.04) ? Color.pink.opacity(0.35 * g) : .clear,
-                        radius: (g > 0.04) ? 26 * g : 0,
-                        x: 0,
-                        y: 0
-                    )
-                    .opacity(min(1.0, max(0.0, p)))
+                .offset(y: liftY)
+                .transaction { $0.animation = nil }
             }
-            .offset(y: liftY)
-            .transaction { $0.animation = nil }
         }
     }
 }
