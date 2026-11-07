@@ -65,22 +65,6 @@
         }
       }
     },
-    "採用 iOS 原生離線神經網路翻譯，免連線且保護隱私。歌詞原文若與目標語言同語系將自動略過重複翻譯；華語簡體歌詞將自動轉換為繁體中文。": {
-      "localizations": {
-        "zh-Hant": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "採用 iOS 原生離線神經網路翻譯，免連線且保護隱私。歌詞原文若與目標語言同語系將自動略過重複翻譯；華語簡體歌詞將自動轉換為繁體中文。"
-          }
-        },
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Powered by native on-device Apple neural translation without internet connection. Same-language lyrics skip redundant translations; Simplified Chinese lyrics are automatically converted to Traditional Chinese."
-          }
-        }
-      }
-    },
     "日語": {
       "localizations": {
         "zh-Hant": {
