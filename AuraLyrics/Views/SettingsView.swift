@@ -97,8 +97,6 @@ struct SettingsView: View {
                     }
                 } header: {
                     Text("雙語歌詞與翻譯")
-                } footer: {
-                    Text("採用 iOS 原生離線神經網路翻譯，免連線且保護隱私。歌詞原文若與目標語言同語系將自動略過重複翻譯；華語簡體歌詞將自動轉換為繁體中文。")
                 }
 
                 // MARK: - 歌詞視覺效果
