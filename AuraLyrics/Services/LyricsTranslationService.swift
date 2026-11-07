@@ -269,9 +269,7 @@ public final class LyricsTranslationService: ObservableObject {
 
             var updatedLines = lyrics.lines
             for idx in 0..<updatedLines.count {
-                if let trans = translationsByIndex[idx] {
-                    updatedLines[idx].translation = trans
-                }
+                updatedLines[idx].translation = translationsByIndex[idx]
             }
 
             var translatedLyrics = lyrics

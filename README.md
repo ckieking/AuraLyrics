@@ -20,8 +20,8 @@
 
 ### 1. In-App Lyrics Interface
 - **Apple Music Style Visuals**: Focuses on the currently playing line with background lines softly defocused, complemented by an immersive dynamic mesh gradient backdrop.
-- **Syllable-Level Dynamic Karaoke**: Supports NetEase Cloud Music (YRC/KRC), Musixmatch (Richsync), and LRCLIB (Enhanced LRC) syllable timelines with smooth character glow animations.
-- **Bilingual Lyrics**: Merged display of original lyrics and translations, toggleable in real time.
+- **Syllable-Level Dynamic Karaoke**: Supports NetEase Cloud Music (YRC/KRC), Musixmatch (Richsync), PetitLyrics (WSY), and LRCLIB (Enhanced LRC) syllable timelines with smooth character glow animations.
+- **Bilingual Lyrics & On-Device Translation**: Merged display of original lyrics and translations, powered by Apple's on-device Translation framework and smart Simplified/Traditional Chinese conversion.
 
 ### 2. Desktop & Cross-App Lyrics Display
 - **Picture-in-Picture (PiP) Floating Window**: Displays continuously updating lyrics in a native `AVPictureInPictureController` window when the app moves to background or switches to other apps.
@@ -29,7 +29,7 @@
 - **Dynamic Island & Live Activity**: Supports the Lock Screen and iPhone Dynamic Island (compact & expanded modes) for rapid glance at current lyrics (requires Widget support).
 
 ### 3. Multi-Source Integration & Customization
-- **Customizable Search Priority**: Integrates NetEase Cloud Music, Musixmatch, and LRCLIB. Freely adjust search order and independently toggle specific providers or word-sync/line-sync modes.
+- **Multi-Source Per-Language Search Priority**: Integrates NetEase Cloud Music, Musixmatch, PetitLyrics, and LRCLIB. Customize search priority profiles per language genre (Western / Mandarin & Asian / Japanese), and independently toggle specific providers or word-sync/line-sync modes.
 - **Manual Search & Timeline Calibration**: Search online and switch lyrics versions on the fly; manual offset adjustment (±0.1s) per song with persistent saving.
 - **Local Cache & Custom Import**: Offline caching with support for manually importing local `.lrc` files.
 
@@ -48,9 +48,9 @@ AuraLyrics includes runtime environment detection (`RuntimeEnvironmentDetector`)
 
 | Environment / Sideloading Tool | Dynamic Island / Lock Screen (`ActivityKit`) | Picture-in-Picture (`PiP`) | Description | Recommended Package |
 | :--- | :---: | :---: | :--- | :--- |
-| **LiveContainer** | ❌ (Guest apps do not support Extensions) | ✅ Supported | Automatically bypasses Extension calls and uses main app PiP engine | `AuraLyrics-0.9.0-beta.ipa` |
-| **SideStore / AltStore** | ✅ Supported (requires signing Extension Target) | ✅ Supported | Independent sideloaded environment supporting both Dynamic Island and PiP | `AuraLyrics-0.9.0-beta.ipa` |
-| **Personal Apple ID Sideload** | ⚠️ (Depends on signing tool's Extension support) | ✅ Supported | Standard PiP and background keep-alive available | `AuraLyrics-0.9.0-beta.ipa` |
+| **LiveContainer** | ❌ (Guest apps do not support Extensions) | ✅ Supported | Automatically bypasses Extension calls and uses main app PiP engine | `AuraLyrics-0.10.0-beta.ipa` |
+| **SideStore / AltStore** | ✅ Supported (requires signing Extension Target) | ✅ Supported | Independent sideloaded environment supporting both Dynamic Island and PiP | `AuraLyrics-0.10.0-beta.ipa` |
+| **Personal Apple ID Sideload** | ⚠️ (Depends on signing tool's Extension support) | ✅ Supported | Standard PiP and background keep-alive available | `AuraLyrics-0.10.0-beta.ipa` |
 
 ---
 
@@ -88,13 +88,13 @@ open AuraLyrics.xcodeproj
 ## Installation & Usage Guide
 
 ### Using with LiveContainer
-1. Download `AuraLyrics-0.9.0-beta.ipa`.
+1. Download `AuraLyrics-0.10.0-beta.ipa`.
 2. Open **LiveContainer** on your iPhone and import the IPA.
 3. In LiveContainer settings, ensure "Fix Background Audio" or background audio execution is enabled.
 4. Launch AuraLyrics; the app automatically detects the environment and enables PiP floating mode.
 
 ### Using with Sideloading Tools (SideStore / AltStore / TrollStore / Feather, etc.)
-1. Install `AuraLyrics-0.9.0-beta.ipa` using your preferred sideloading tool.
+1. Install `AuraLyrics-0.10.0-beta.ipa` using your preferred sideloading tool.
 2. Launch the app and grant the required "Media & Apple Music" permissions.
 3. While playing music, view lyrics via **Dynamic Island / Lock Screen Live Activity** or the **PiP Floating Window**.
 
@@ -117,6 +117,7 @@ open AuraLyrics.xcodeproj
 │   │   ├── BackgroundKeepAliveManager.swift # Smart background keep-alive manager
 │   │   ├── LRCParser.swift                  # LRC parsing & syllable timeline processing
 │   │   ├── LyricsProviderService.swift      # Multi-provider lyrics fetching & caching
+│   │   ├── LyricsTranslationService.swift   # On-device Apple Translation & text conversion
 │   │   └── RuntimeEnvironmentDetector.swift # Container & sideloading detection
 │   ├── Engines/
 │   │   ├── PiPLyricsEngine.swift            # AVPictureInPicture floating lyrics engine
