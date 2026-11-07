@@ -20,8 +20,8 @@
 
 ### 1. App 內歌詞介面
 - **Apple Music 風格視覺**：聚焦目前播放中的歌詞行，非焦點行自動模糊弱化，並具備動態漸層背景。
-- **逐字動態歌詞**：支援網易雲音樂 (YRC/KRC)、Musixmatch (Richsync) 與 LRCLIB (Enhanced LRC) 逐字時間軸，提供平滑逐字填色效果。
-- **雙語歌詞對照**：支援雙語翻譯合併顯示，可於介面隨時切換。
+- **逐字動態歌詞**：支援網易雲音樂 (YRC/KRC)、Musixmatch (Richsync)、PetitLyrics (WSY) 與 LRCLIB (Enhanced LRC) 逐字時間軸，提供平滑逐字填色效果。
+- **雙語歌詞對照與離線翻譯**：支援雙語翻譯合併顯示，整合 iOS 原生 Translation 框架本機離線多語系翻譯與繁簡中文智慧轉換。
 
 ### 2. 桌面與跨 App 歌詞顯示
 - **子母畫面 (PiP) 懸浮視窗**：將 App 退至背景或切換至其他應用時，透過原生 `AVPictureInPictureController` 持續懸浮顯示即時更新的歌詞。
@@ -29,7 +29,7 @@
 - **動態島與即時動態 (Live Activity)**：支援鎖定畫面與 iPhone 動態島（緊湊 / 展開模式），快速瀏覽當前播放段落（需系統 Widget 支援）。
 
 ### 3. 多來源整合與自訂設定
-- **多來源搜尋優先權**：整合網易雲音樂、Musixmatch 與 LRCLIB，可自由調整搜尋順序，並獨立啟用或停用個別來源與逐字 / 逐行模式。
+- **多來源分語系搜尋優先權**：整合網易雲音樂、Musixmatch、PetitLyrics 與 LRCLIB，支援依曲目語系（歐美預設 / 華語亞洲 / 日語）獨立調整搜尋順序，並可獨立啟用或停用個別來源與逐字 / 逐行模式。
 - **手動搜尋與時間軸校準**：支援即時線上搜尋與切換歌詞版本；針對個別歌曲提供 ±0.1 秒時間軸手動調整，系統會自動儲存個別偏好。
 - **本地快取與自訂匯入**：支援離線快取儲存，並提供手動匯入本機 `.lrc` 歌詞檔案功能。
 
@@ -48,9 +48,9 @@ AuraLyrics 具備環境偵測機制（`RuntimeEnvironmentDetector`），統一�
 
 | 環境 / 安裝方式 | 動態島 / 鎖定畫面 (`ActivityKit`) | 子母畫面懸浮歌詞 (`PiP`) | 機制說明 | 建議安裝包 |
 | :--- | :---: | :---: | :--- | :--- |
-| **LiveContainer** | ❌ (Guest App 未支援 Extension) | ✅ 支援 | 自動停用 Extension 呼叫並採用主程式 PiP 引擎 | `AuraLyrics-0.9.0-beta.ipa` |
-| **SideStore / AltStore** | ✅ 支援 (需一併簽名 Extension Target) | ✅ 支援 | 獨立側載環境，可同時啟用動態島與 PiP | `AuraLyrics-0.9.0-beta.ipa` |
-| **個人 Apple ID 側載** | ⚠️ (視簽名工具之 Extension 支援度而定) | ✅ 支援 | 可正常使用 PiP 與背景保活 | `AuraLyrics-0.9.0-beta.ipa` |
+| **LiveContainer** | ❌ (Guest App 未支援 Extension) | ✅ 支援 | 自動停用 Extension 呼叫並採用主程式 PiP 引擎 | `AuraLyrics-0.10.0-beta.ipa` |
+| **SideStore / AltStore** | ✅ 支援 (需一併簽名 Extension Target) | ✅ 支援 | 獨立側載環境，可同時啟用動態島與 PiP | `AuraLyrics-0.10.0-beta.ipa` |
+| **個人 Apple ID 側載** | ⚠️ (視簽名工具之 Extension 支援度而定) | ✅ 支援 | 可正常使用 PiP 與背景保活 | `AuraLyrics-0.10.0-beta.ipa` |
 
 ---
 
@@ -88,13 +88,13 @@ open AuraLyrics.xcodeproj
 ## 安裝與使用指南
 
 ### 在 LiveContainer 中使用
-1. 下載並取得 `AuraLyrics-0.9.0-beta.ipa`。
+1. 下載並取得 `AuraLyrics-0.10.0-beta.ipa`。
 2. 在 iPhone 上開啟 **LiveContainer**，匯入該 IPA。
 3. 進入 LiveContainer 設定，確保開啟「Fix Background Audio」或允許音訊背景執行。
 4. 啟動 AuraLyrics，App 會自動偵測環境並啟用 PiP 懸浮顯示。
 
 ### 側載工具（SideStore / AltStore / TrollStore / Feather 等）
-1. 使用側載工具安裝 `AuraLyrics-0.9.0-beta.ipa`。
+1. 使用側載工具安裝 `AuraLyrics-0.10.0-beta.ipa`。
 2. 啟動 App 並允許相關權限。
 3. 播放音樂時，可使用頂部 **動態島 / 鎖定畫面即時動態** 或 **PiP 懸浮視窗** 檢視歌詞。
 
@@ -116,6 +116,7 @@ open AuraLyrics.xcodeproj
 │   │   ├── BackgroundKeepAliveManager.swift # 智慧背景保活管理（低耗電定位 + 混音保活）
 │   │   ├── LRCParser.swift                  # LRC 解析與逐字時間軸處理
 │   │   ├── LyricsProviderService.swift      # 多歌詞源與快取
+│   │   ├── LyricsTranslationService.swift   # Apple Translation 離線翻譯與繁簡轉換
 │   │   └── RuntimeEnvironmentDetector.swift # 容器與側載環境自動偵測
 │   ├── Engines/
 │   │   ├── PiPLyricsEngine.swift            # AVPictureInPicture 子母畫面懸浮歌詞核心

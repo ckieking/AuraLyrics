@@ -336,7 +336,7 @@ public final class LyricsProviderService: ObservableObject {
 
         // 1. 若為使用者本地手動匯入，絕對優先採用
         if let cached = cached, cached.source == "Local" {
-            return cached
+            return await normalizeHantLyricsIfNeeded(cached)
         }
 
         let profile = detectLanguageProfile(for: track)
@@ -346,7 +346,7 @@ public final class LyricsProviderService: ObservableObject {
         if let cached = cached, cached.hasSyllables,
            let topPriority = activePriorities.first, topPriority.isWordSync,
            topPriority.source.rawValue.caseInsensitiveCompare(cached.source) == .orderedSame {
-            return cached
+            return await normalizeHantLyricsIfNeeded(cached)
         }
 
         // 3. 記憶體暫存各來源請求結果，確保在一次歌曲搜尋中各來源最多僅呼叫一次
