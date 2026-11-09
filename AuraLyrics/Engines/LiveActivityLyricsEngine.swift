@@ -14,6 +14,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
     private var currentContinuedTask: BGContinuedProcessingTask?
     private var isContinuedTaskRegistered: Bool = false
+    private var isSubmittingContinuedTask: Bool = false
     private var pendingForegroundSubmission: Bool = false
 
     // Monotonic Progress Guard state variables
@@ -73,6 +74,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     private var updateTask: Task<Void, Never>?
     private var pauseTimer: Timer?
     private var currentCachedArtworkPath: String?
+    private var currentCachedMicroArtworkData: Data?
 
     /// Returns whether the system interface style is currently light mode.
     private var isSystemLightMode: Bool {
@@ -157,7 +159,9 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         // Route to Channel B (BGContinuedProcessingTask) when running under LiveContainer.
         if shouldUseContinuedProcessing {
-            startContinuedProcessingTask(track: track, initialLine: initialLine, initialSecondary: initialSecondary)
+            if !isSubmittingContinuedTask {
+                startContinuedProcessingTask(track: track, initialLine: initialLine, initialSecondary: initialSecondary)
+            }
             return
         }
 
@@ -179,6 +183,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         let artworkPath = cacheArtwork(from: track.artworkData)
         self.currentCachedArtworkPath = artworkPath
+        let microArtwork = compressMicroArtwork(from: track.artworkData)
+        self.currentCachedMicroArtworkData = microArtwork
 
         let lineText: String
         if let initial = initialLine, !initial.isEmpty {
@@ -202,7 +208,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: true,
             progress: 0.0,
             artworkPath: artworkPath,
-            artworkData: track.artworkData,
+            artworkData: microArtwork,
             compactStyle: compactStyle.rawValue,
             isLightMode: isSystemLightMode
         )
@@ -266,6 +272,9 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             return
         }
 
+        // Guard against duplicate in-flight submission during 150ms tick loop.
+        guard !isSubmittingContinuedTask else { return }
+
         // Foreground submit guard: Apple requires first submission to occur while the app is active.
         if UIApplication.shared.applicationState != .active {
             self.pendingForegroundSubmission = true
@@ -279,6 +288,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             subtitle: secondaryText
         )
 
+        self.isSubmittingContinuedTask = true
         do {
             try BGTaskScheduler.shared.submit(request)
             self.pendingForegroundSubmission = false
@@ -289,6 +299,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             self.lastSentContinuedIsPlaying = true
             BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
         } catch {
+            self.isSubmittingContinuedTask = false
             self.lastErrorMessage = String(format: String(localized: "啟動免擴充動態島失敗: %@"), error.localizedDescription)
             self.isActivityActive = false
         }
@@ -297,19 +308,26 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     /// Handles launch callback from BGTaskScheduler for a continued processing task.
     private func handleContinuedProcessingTaskLaunch(_ task: BGContinuedProcessingTask) {
         task.expirationHandler = { [weak self] in
+            // Finding 5: Synchronously mark task completed as failed before the handler returns
+            // to satisfy iOS BGTask contract and prevent watchdog 0x8badf00d termination.
+            task.setTaskCompleted(success: false)
+
             Task { @MainActor [weak self] in
                 self?.handleContinuedTaskExpired(task)
             }
         }
 
+        self.isSubmittingContinuedTask = false
         self.currentContinuedTask = task
         self.isActivityActive = true
         self.lastErrorMessage = nil
 
-        // Initialize monotonic progress counters.
-        task.progress.totalUnitCount = monotonicBaseUnits + unitsPerTrack
-        task.progress.completedUnitCount = max(monotonicBaseUnits, lastReportedCompletedUnits)
-        lastReportedCompletedUnits = task.progress.completedUnitCount
+        // Initialize monotonic progress counters ensuring completed strictly < total.
+        let initialCompleted = max(monotonicBaseUnits, lastReportedCompletedUnits)
+        let initialTotal = max(monotonicBaseUnits + unitsPerTrack, initialCompleted + 1)
+        task.progress.totalUnitCount = initialTotal
+        task.progress.completedUnitCount = initialCompleted
+        lastReportedCompletedUnits = initialCompleted
 
         // Immediately apply current track state if available.
         let track = AppleMusicMonitor.shared.currentTrack
@@ -322,12 +340,12 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
     }
 
-    /// Handles system task expiration by marking incomplete and scheduling recovery.
+    /// Handles system task expiration by updating state and scheduling recovery.
     private func handleContinuedTaskExpired(_ task: BGContinuedProcessingTask) {
-        task.setTaskCompleted(success: false)
         if currentContinuedTask === task {
             currentContinuedTask = nil
         }
+        self.isSubmittingContinuedTask = false
         self.isActivityActive = false
         self.pendingForegroundSubmission = true
         BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
@@ -372,7 +390,20 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             resolvedSecondary = nil
         }
 
-        let artworkPath = currentCachedArtworkPath ?? cacheArtwork(from: track.artworkData)
+        let isTrackChanged = (lastSentState?.trackTitle != track.title || lastSentState?.artistName != track.artist)
+        let artworkPath: String?
+        let microArtwork: Data?
+        if isTrackChanged {
+            artworkPath = cacheArtwork(from: track.artworkData)
+            currentCachedArtworkPath = artworkPath
+            microArtwork = compressMicroArtwork(from: track.artworkData)
+            currentCachedMicroArtworkData = microArtwork
+        } else {
+            artworkPath = currentCachedArtworkPath ?? cacheArtwork(from: track.artworkData)
+            if currentCachedArtworkPath == nil { currentCachedArtworkPath = artworkPath }
+            microArtwork = currentCachedMicroArtworkData ?? compressMicroArtwork(from: track.artworkData)
+            if currentCachedMicroArtworkData == nil { currentCachedMicroArtworkData = microArtwork }
+        }
         let currentLight = isSystemLightMode
 
         // Skip redundant IPC updates if state payload is unchanged.
@@ -395,7 +426,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: isPlaying,
             progress: progress,
             artworkPath: artworkPath,
-            artworkData: track.artworkData,
+            artworkData: microArtwork,
             compactStyle: compactStyle.rawValue,
             isLightMode: currentLight
         )
@@ -422,7 +453,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         progress: Double
     ) {
         guard let task = currentContinuedTask else {
-            if isPlaying {
+            if isPlaying && !isSubmittingContinuedTask {
                 startContinuedProcessingTask(track: track, initialLine: line, initialSecondary: secondaryLine)
             }
             return
@@ -450,18 +481,25 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         // Monotonic Progress Guard: advance track unit counter and prevent backward progression.
         let trackKey = "\(track.title)_\(track.artist)"
-        if !lastTrackKey.isEmpty && lastTrackKey != trackKey {
-            // Track changed: shift monotonic base units upward without rewinding completed units.
+        let clampedProgress = min(max(progress, 0.0), 1.0)
+
+        // Loop detection: advance monotonicBaseUnits on track change or when single track repeats.
+        let isTrackChanged = !lastTrackKey.isEmpty && lastTrackKey != trackKey
+        let isTrackLoop = !isTrackChanged && clampedProgress < 0.1 && (lastReportedCompletedUnits - monotonicBaseUnits) > 80
+
+        if isTrackChanged || isTrackLoop {
+            // Track changed or repeated: shift monotonic base units upward without rewinding completed units.
             monotonicBaseUnits = max(lastReportedCompletedUnits, monotonicBaseUnits + unitsPerTrack)
         }
         lastTrackKey = trackKey
 
-        let clampedProgress = min(max(progress, 0.0), 1.0)
         let songProgressUnits = Int64(clampedProgress * Double(unitsPerTrack))
         let targetCompleted = monotonicBaseUnits + songProgressUnits
         let newCompleted = max(targetCompleted, lastReportedCompletedUnits)
 
-        task.progress.totalUnitCount = monotonicBaseUnits + unitsPerTrack
+        let targetTotal = monotonicBaseUnits + unitsPerTrack
+        let resolvedTotal = max(task.progress.totalUnitCount, max(targetTotal, newCompleted + 1))
+        task.progress.totalUnitCount = resolvedTotal
         task.progress.completedUnitCount = newCompleted
         lastReportedCompletedUnits = newCompleted
     }
@@ -473,11 +511,13 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         // Channel B: Nudge monotonic progress forward to prevent system reclamation.
         if let task = currentContinuedTask {
             let total = task.progress.totalUnitCount
-            if lastReportedCompletedUnits < total - 1 {
-                let bumped = lastReportedCompletedUnits + 1
-                task.progress.completedUnitCount = bumped
-                lastReportedCompletedUnits = bumped
+            if lastReportedCompletedUnits >= total - 1 {
+                // Dynamically expand totalUnitCount so progress can continue advancing monotonically.
+                task.progress.totalUnitCount = max(task.progress.totalUnitCount + unitsPerTrack, lastReportedCompletedUnits + unitsPerTrack)
             }
+            let bumped = lastReportedCompletedUnits + 1
+            task.progress.completedUnitCount = bumped
+            lastReportedCompletedUnits = bumped
             return
         }
 
@@ -574,7 +614,9 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         updateTask = nil
         lastSentState = nil
         currentCachedArtworkPath = nil
+        currentCachedMicroArtworkData = nil
         pendingForegroundSubmission = false
+        isSubmittingContinuedTask = false
 
         // Tear down Channel B continued processing task.
         if let task = currentContinuedTask {
@@ -642,6 +684,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
     // MARK: - Clean Up Orphaned Activities
     public func cleanUpOrphanedActivities() {
+        isSubmittingContinuedTask = false
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
         Task {
             for activity in Activity<LyricsActivityAttributes>.activities {
@@ -680,5 +723,43 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         } catch {
             return nil
         }
+    }
+
+    // MARK: - Micro Artwork Thumbnail Compression (< 1.5 KB)
+    /// Compresses artwork into an ultra-compact JPEG thumbnail (target size: 40x40, <= 1.5 KB)
+    /// to strictly comply with Apple's ActivityKit 4KB ContentState payload limit.
+    private func compressMicroArtwork(from data: Data?) -> Data? {
+        guard let data = data, let image = UIImage(data: data) else { return nil }
+
+        let targetSize = CGSize(width: 40, height: 40)
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let scaledImage = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: targetSize))
+        }
+
+        // Target: <= 1500 bytes (leaving > 2.5 KB payload headroom for lyrics text & metadata)
+        let maxAllowedBytes = 1500
+
+        // Pass 1: Standard micro compression (quality 0.5)
+        if let jpegData = scaledImage.jpegData(compressionQuality: 0.5), jpegData.count <= maxAllowedBytes {
+            return jpegData
+        }
+
+        // Pass 2: High compression (quality 0.3)
+        if let jpegData = scaledImage.jpegData(compressionQuality: 0.3), jpegData.count <= maxAllowedBytes {
+            return jpegData
+        }
+
+        // Pass 3: Ultra-compact downscale (32x32, quality 0.3) if image content is unusually complex
+        let minSize = CGSize(width: 32, height: 32)
+        let minRenderer = UIGraphicsImageRenderer(size: minSize)
+        let minImage = minRenderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: minSize))
+        }
+        if let fallbackData = minImage.jpegData(compressionQuality: 0.3), fallbackData.count <= maxAllowedBytes {
+            return fallbackData
+        }
+
+        return nil
     }
 }
