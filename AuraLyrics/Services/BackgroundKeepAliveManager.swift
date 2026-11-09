@@ -115,7 +115,8 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         let isPiPActive = PiPLyricsEngine.shared.isPiPEnabled || PiPLyricsEngine.shared.isPiPActive
 
         if isLiveActivityActive {
-            // Live Activity mode: disable AVAudioPlayer and use location updates + background tasks.
+            // Live Activity mode (ActivityKit or BGContinuedProcessingTask):
+            // Stop dither audio player to avoid audio session collision, and rely on location keep-alive and rolling background assertions.
             stopAudioPlayer()
             startLocationKeepAlive()
             ensureRollingBackgroundTask()
@@ -290,7 +291,7 @@ extension BackgroundKeepAliveManager: CLLocationManagerDelegate {
         Task { @MainActor in
             self.locationAuthorizationStatus = status
             if status == .authorizedWhenInUse || status == .authorizedAlways {
-                if LiveActivityLyricsEngine.shared.isEnabled {
+                if LiveActivityLyricsEngine.shared.isEnabled || LiveActivityLyricsEngine.shared.isActivityActive {
                     self.startLocationKeepAlive()
                 }
             }
