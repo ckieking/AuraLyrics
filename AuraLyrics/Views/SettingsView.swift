@@ -193,10 +193,10 @@ struct SettingsView: View {
                         .font(.subheadline)
                     }
 
-                    // Live Activities (ActivityKit)
+                    // Live Activities (ActivityKit / System Continued Processing Channel)
                     HStack {
                         Label {
-                            Text("即時動態 (ActivityKit)")
+                            Text("即時動態與動態島")
                         } icon: {
                             Image(systemName: "waveform")
                                 .foregroundColor(.pink)
@@ -205,7 +205,7 @@ struct SettingsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: envDetector.areLiveActivitiesAvailable ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
                                 .foregroundColor(envDetector.areLiveActivitiesAvailable ? .green : .orange)
-                            Text(envDetector.areLiveActivitiesAvailable ? String(localized: "支援") : String(localized: "受限或不支援"))
+                            Text(liveActivityStatusText)
                                 .fontWeight(.medium)
                                 .foregroundColor(envDetector.areLiveActivitiesAvailable ? .green : .orange)
                         }
@@ -252,7 +252,13 @@ struct SettingsView: View {
                 } header: {
                     Text("運行環境與相容性診斷")
                 } footer: {
-                    Text("若處於 LiveContainer 環境中，iOS 系統可能限制 WidgetKit / ActivityKit 擴展程序的註冊。")
+                    if envDetector.isLiveContainer && envDetector.areLiveActivitiesAvailable {
+                        Text("LiveContainer 環境下已啟用系統免擴充通道，透過原生動態島即時更新歌詞。")
+                    } else if envDetector.isLiveContainer {
+                        Text("若處於 LiveContainer 環境中，iOS 系統可能限制 WidgetKit / ActivityKit 擴展程序的註冊。")
+                    } else {
+                        Text("獨立側載環境下，完整支援系統原生即時動態與動態島擴充程序。")
+                    }
                 }
 
                 // MARK: - Background Keep-Alive
@@ -339,6 +345,18 @@ struct SettingsView: View {
                 }
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: cacheClearedToast)
+        }
+    }
+
+    private var liveActivityStatusText: String {
+        if envDetector.areLiveActivitiesAvailable {
+            if envDetector.isLiveContainer {
+                return String(localized: "支援（系統免擴充通道）")
+            } else {
+                return String(localized: "支援")
+            }
+        } else {
+            return String(localized: "受限或不支援")
         }
     }
 

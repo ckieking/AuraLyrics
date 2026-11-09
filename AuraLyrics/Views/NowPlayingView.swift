@@ -186,19 +186,17 @@ struct NowPlayingView: View {
             }
 
             // Live Activity toggle
-            if !envDetector.isLiveContainer {
-                Toggle(isOn: Binding(
-                    get: { liveActivityEngine.isEnabled },
-                    set: { enabled in
-                        liveActivityEngine.isEnabled = enabled
-                        if enabled {
-                            liveActivityEngine.startActivity(track: monitor.currentTrack)
-                            monitor.syncExternalEngines()
-                        }
+            Toggle(isOn: Binding(
+                get: { liveActivityEngine.isEnabled },
+                set: { enabled in
+                    liveActivityEngine.isEnabled = enabled
+                    if enabled {
+                        liveActivityEngine.startActivity(track: monitor.currentTrack)
+                        monitor.syncExternalEngines()
                     }
-                )) {
-                    Text("即時動態與動態島")
                 }
+            )) {
+                Text("即時動態與動態島")
             }
 
             Divider()
