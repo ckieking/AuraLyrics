@@ -98,6 +98,27 @@ public final class RuntimeEnvironmentDetector: ObservableObject {
 
 // MARK: - LiveContainer Background Task Runtime Bridge
 
+fileprivate typealias EncodeActivityIMP = @convention(c) (AnyObject, Selector, AnyObject) -> Void
+fileprivate typealias DecodeActivityIMP = @convention(c) (AnyObject, Selector, AnyObject) -> AnyObject
+fileprivate typealias CancelTaskIMP = @convention(c) (AnyObject, Selector, NSString) -> Void
+fileprivate typealias PermissibleIMP = @convention(c) (AnyObject, Selector, NSString) -> ObjCBool
+
+private func bridgeHookEncodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) {
+    LCBackgroundTaskRuntimeBridge.handleEncodeActivity(activity: activity, selector: selector, coder: coder)
+}
+
+private func bridgeHookDecodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) -> AnyObject {
+    LCBackgroundTaskRuntimeBridge.handleDecodeActivity(activity: activity, selector: selector, coder: coder)
+}
+
+private func bridgeHookCancelTask(scheduler: AnyObject, selector: Selector, identifier: NSString) {
+    LCBackgroundTaskRuntimeBridge.handleCancelTask(scheduler: scheduler, selector: selector, identifier: identifier)
+}
+
+private func bridgeHookPermissible(registry: AnyObject, selector: Selector, identifier: NSString) -> ObjCBool {
+    LCBackgroundTaskRuntimeBridge.handlePermissibleIdentifier(registry: registry, selector: selector, identifier: identifier)
+}
+
 /// Runtime swizzling bridge providing transparent XPC identifier translation for guest BGContinuedProcessingTasks.
 public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
     public static let shared = LCBackgroundTaskRuntimeBridge()
@@ -113,15 +134,10 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
     private static let continuedProcessingReason = "com.apple.das.bgongoingprocessing"
     private static let continuedProcessingNamePrefix = "bgContinuedProcessing-"
 
-    private typealias EncodeActivityIMP = @convention(c) (AnyObject, Selector, AnyObject) -> Void
-    private typealias DecodeActivityIMP = @convention(c) (AnyObject, Selector, AnyObject) -> AnyObject
-    private typealias CancelTaskIMP = @convention(c) (AnyObject, Selector, NSString) -> Void
-    private typealias PermissibleIMP = @convention(c) (AnyObject, Selector, NSString) -> ObjCBool
-
-    private static var originalEncodeActivity: EncodeActivityIMP?
-    private static var originalDecodeActivity: DecodeActivityIMP?
-    private static var originalCancelTask: CancelTaskIMP?
-    private static var originalIsPermissibleIdentifier: PermissibleIMP?
+    fileprivate static var originalEncodeActivity: EncodeActivityIMP?
+    fileprivate static var originalDecodeActivity: DecodeActivityIMP?
+    fileprivate static var originalCancelTask: CancelTaskIMP?
+    fileprivate static var originalIsPermissibleIdentifier: PermissibleIMP?
 
     private init() {}
 
@@ -213,36 +229,24 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         }
 
         // 5. Swizzle _DASActivity encodeWithCoder:
-        let hookEncode: EncodeActivityIMP = { activity, selector, coder in
-            Self.handleEncodeActivity(activity: activity, selector: selector, coder: coder)
-        }
-        let hookEncodeIMP = unsafeBitCast(hookEncode, to: IMP.self)
+        let hookEncodeIMP = unsafeBitCast(bridgeHookEncodeActivity as EncodeActivityIMP, to: IMP.self)
         let oldEncode = method_setImplementation(encodeMethod, hookEncodeIMP)
-        Self.originalEncodeActivity = unsafeBitCast(oldEncode, to: EncodeActivityIMP.self)
+        LCBackgroundTaskRuntimeBridge.originalEncodeActivity = unsafeBitCast(oldEncode, to: EncodeActivityIMP.self)
 
         // 6. Swizzle _DASActivity initWithCoder:
-        let hookDecode: DecodeActivityIMP = { activity, selector, coder in
-            Self.handleDecodeActivity(activity: activity, selector: selector, coder: coder)
-        }
-        let hookDecodeIMP = unsafeBitCast(hookDecode, to: IMP.self)
+        let hookDecodeIMP = unsafeBitCast(bridgeHookDecodeActivity as DecodeActivityIMP, to: IMP.self)
         let oldDecode = method_setImplementation(decodeMethod, hookDecodeIMP)
-        Self.originalDecodeActivity = unsafeBitCast(oldDecode, to: DecodeActivityIMP.self)
+        LCBackgroundTaskRuntimeBridge.originalDecodeActivity = unsafeBitCast(oldDecode, to: DecodeActivityIMP.self)
 
         // 7. Swizzle _DASScheduler cancelTaskRequestWithIdentifier:
-        let hookCancel: CancelTaskIMP = { scheduler, selector, identifier in
-            Self.handleCancelTask(scheduler: scheduler, selector: selector, identifier: identifier)
-        }
-        let hookCancelIMP = unsafeBitCast(hookCancel, to: IMP.self)
+        let hookCancelIMP = unsafeBitCast(bridgeHookCancelTask as CancelTaskIMP, to: IMP.self)
         let oldCancel = method_setImplementation(cancelMethod, hookCancelIMP)
-        Self.originalCancelTask = unsafeBitCast(oldCancel, to: CancelTaskIMP.self)
+        LCBackgroundTaskRuntimeBridge.originalCancelTask = unsafeBitCast(oldCancel, to: CancelTaskIMP.self)
 
         // 8. Swizzle _BGTaskIdentifierRegistry isPermissibleFullyComposedIdentifier:
-        let hookPermissible: PermissibleIMP = { registry, selector, identifier in
-            Self.handlePermissibleIdentifier(registry: registry, selector: selector, identifier: identifier)
-        }
-        let hookPermissibleIMP = unsafeBitCast(hookPermissible, to: IMP.self)
+        let hookPermissibleIMP = unsafeBitCast(bridgeHookPermissible as PermissibleIMP, to: IMP.self)
         let oldPermissible = method_setImplementation(permissibleMethod, hookPermissibleIMP)
-        Self.originalIsPermissibleIdentifier = unsafeBitCast(oldPermissible, to: PermissibleIMP.self)
+        LCBackgroundTaskRuntimeBridge.originalIsPermissibleIdentifier = unsafeBitCast(oldPermissible, to: PermissibleIMP.self)
 
         Self.isBridgeInstalled = true
     }
@@ -304,7 +308,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         return (coder as AnyObject).isKind(of: cls)
     }
 
-    private static func handleEncodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) {
+    fileprivate static func handleEncodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) {
         guard let orig = originalEncodeActivity else { return }
 
         if isXPCCoder(coder, className: "NSXPCEncoder"),
@@ -326,7 +330,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         orig(activity, selector, coder)
     }
 
-    private static func handleDecodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) -> AnyObject {
+    fileprivate static func handleDecodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) -> AnyObject {
         guard let orig = originalDecodeActivity else { return activity }
 
         if isXPCCoder(coder, className: "NSXPCDecoder"), let nsCoder = coder as? NSCoder {
@@ -347,7 +351,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         return orig(activity, selector, coder)
     }
 
-    private static func handleCancelTask(scheduler: AnyObject, selector: Selector, identifier: NSString) {
+    fileprivate static func handleCancelTask(scheduler: AnyObject, selector: Selector, identifier: NSString) {
         guard let orig = originalCancelTask else { return }
         orig(scheduler, selector, identifier)
 
@@ -357,7 +361,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         }
     }
 
-    private static func handlePermissibleIdentifier(registry: AnyObject, selector: Selector, identifier: NSString) -> ObjCBool {
+    fileprivate static func handlePermissibleIdentifier(registry: AnyObject, selector: Selector, identifier: NSString) -> ObjCBool {
         if isGuestTaskIdentifier(identifier as String) {
             return ObjCBool(true)
         }
