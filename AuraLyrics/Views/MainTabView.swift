@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 主導覽分頁列舉
+/// Main navigation tabs.
 enum MainTab: Int, CaseIterable, Identifiable {
     case nowPlaying = 0
     case library = 1
@@ -25,7 +25,7 @@ enum MainTab: Int, CaseIterable, Identifiable {
     }
 }
 
-/// UIViewRepresentable 將 PiPLyricsEngine 的 sourceView 嵌入 View 樹狀結構中，確保系統允許啟動子母畫面 (PiP)
+/// Embeds PiPLyricsEngine sourceView in the view hierarchy for Picture-in-Picture session initialization.
 struct PiPSourceViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         return PiPLyricsEngine.shared.sourceView
@@ -34,7 +34,7 @@ struct PiPSourceViewRepresentable: UIViewRepresentable {
     func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
-/// 主導覽分頁視圖（iOS 27 原生 SwiftUI TabView 控件 + 官方原生液態玻璃底欄）
+/// Main navigation tab view.
 struct MainTabView: View {
     @State private var selectedTab: MainTab = .nowPlaying
 
@@ -53,7 +53,7 @@ struct MainTabView: View {
             }
         }
         .background {
-            // 背景不可見但存在於 View 樹狀階層的 PiP 錨點容器
+            // Invisible PiP source view anchor within view tree
             PiPSourceViewRepresentable()
                 .frame(width: 1, height: 1)
                 .opacity(0.01)

@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Apple Liquid Glass 視覺系統：專為 iOS 27 原生體驗設計的高質感半透明物理材質
-/// 提供次表面散射、動態高光反光邊緣與流體彈簧壓感
+/// Translucent glass material styling with specular highlight borders.
 public struct LiquidGlassCapsuleModifier: ViewModifier {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     var tintColor: Color? = nil
@@ -27,7 +26,7 @@ public struct LiquidGlassCapsuleModifier: ViewModifier {
                                 .fill(tint.opacity(0.12))
                         }
 
-                        // 次表面多視角高光邊緣 (Specular Highlight Border)
+                        // Specular highlight border.
                         Capsule(style: .continuous)
                             .strokeBorder(
                                 LinearGradient(
@@ -115,7 +114,7 @@ public struct LiquidGlassCircleModifier: ViewModifier {
                                 )
                         }
 
-                        // 高光外圈
+                        // Specular border ring.
                         Circle()
                             .strokeBorder(
                                 LinearGradient(
@@ -137,7 +136,7 @@ public struct LiquidGlassCircleModifier: ViewModifier {
     }
 }
 
-/// 流體彈簧壓感按鈕樣式 (HIG Fluid Springs)
+/// Spring-based scaling button style on press.
 public struct LiquidSpringButtonStyle: ButtonStyle {
     var scaleAmount: CGFloat = 0.94
 

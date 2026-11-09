@@ -2,7 +2,7 @@ import Foundation
 import Translation
 import NaturalLanguage
 
-/// 翻譯目標語言選項模型
+/// Model representing a target translation language option.
 public struct TranslationTargetLanguageItem: Identifiable, Hashable, Sendable {
     public var id: String { identifier }
     public let identifier: String
@@ -16,7 +16,7 @@ public struct TranslationTargetLanguageItem: Identifiable, Hashable, Sendable {
     }
 }
 
-/// 歌詞離線翻譯與繁簡轉換服務（支援 iOS 原生 Translation 框架與本機 NLP 語意判別）
+/// Lyrics translation and Chinese script conversion service.
 @MainActor
 public final class LyricsTranslationService: ObservableObject {
     public static let shared = LyricsTranslationService()
@@ -25,14 +25,14 @@ public final class LyricsTranslationService: ObservableObject {
     public static let targetLanguageKey = "lyricsTranslationTargetLanguage"
     public static let defaultTargetLanguage = "zh-Hant"
 
-    /// 目標翻譯語言（BCP-47 代碼，如 zh-Hant, en, ja）
+    /// Target translation language code (BCP-47 identifier, e.g. zh-Hant, en, ja).
     @Published public var currentTargetLanguage: String {
         didSet {
             UserDefaults.standard.set(currentTargetLanguage, forKey: Self.targetLanguageKey)
         }
     }
 
-    /// 動態快取之 iOS 支援翻譯語言清單（排序：系統語言第一、App 語言第二、其餘依語系排序）
+    /// Cached list of supported translation languages sorted by priority.
     @Published public private(set) var availableLanguages: [TranslationTargetLanguageItem] = []
 
     private init() {
@@ -41,13 +41,13 @@ public final class LyricsTranslationService: ObservableObject {
         refreshAvailableLanguages()
     }
 
-    // MARK: - 動態取得並排序 iOS 支援的所有翻譯語言
+    // MARK: - Fetch And Sort Supported Languages
     public func refreshAvailableLanguages() {
         Task {
             let availability = LanguageAvailability()
             let supported = await availability.supportedLanguages
 
-            // 若系統未回傳（例如模擬器離線環境），提供常用備援語系
+            // Fallback language list when availability check returns empty.
             let languagesToProcess: [Locale.Language]
             if !supported.isEmpty {
                 languagesToProcess = supported
@@ -56,15 +56,15 @@ public final class LyricsTranslationService: ObservableObject {
                 languagesToProcess = fallbackCodes.map { Locale.Language(identifier: $0) }
             }
 
-            // 1. 取得系統首選語言
+            // 1. Get system preferred language.
             let systemPreferredLangCode = Locale.preferredLanguages.first ?? "zh-Hant"
             let systemLocaleLang = Locale.Language(identifier: systemPreferredLangCode)
 
-            // 2. 取得 App 當前語言
+            // 2. Get App preferred language.
             let appLangCode = Bundle.main.preferredLocalizations.first ?? "zh-Hant"
             let appLocaleLang = Locale.Language(identifier: appLangCode)
 
-            // 轉換為 Item 並去重
+            // Deduplicate into items map.
             var itemsMap: [String: TranslationTargetLanguageItem] = [:]
             let currentLocale = Locale.current
 
@@ -82,7 +82,7 @@ public final class LyricsTranslationService: ObservableObject {
             var sortedItems: [TranslationTargetLanguageItem] = []
             var usedIds = Set<String>()
 
-            // 找到與系統語言匹配的 item（第一順位）
+            // First priority: system language match.
             let systemMatched = itemsMap.values.first { item in
                 item.localeLanguage.languageCode == systemLocaleLang.languageCode &&
                 (item.localeLanguage.script == nil || item.localeLanguage.script == systemLocaleLang.script)
@@ -95,7 +95,7 @@ public final class LyricsTranslationService: ObservableObject {
                 usedIds.insert(sys.identifier)
             }
 
-            // 找到與 App 語言匹配的 item（第二順位）
+            // Second priority: App language match.
             let appMatched = itemsMap.values.first { item in
                 !usedIds.contains(item.identifier) &&
                 item.localeLanguage.languageCode == appLocaleLang.languageCode &&
@@ -110,7 +110,7 @@ public final class LyricsTranslationService: ObservableObject {
                 usedIds.insert(app.identifier)
             }
 
-            // 其餘語言依顯示名稱排序
+            // Sort remaining languages alphabetically by display name.
             let remaining = itemsMap.values
                 .filter { !usedIds.contains($0.identifier) }
                 .sorted { $0.displayName.localizedCompare($1.displayName) == .orderedAscending }
@@ -121,7 +121,7 @@ public final class LyricsTranslationService: ObservableObject {
         }
     }
 
-    // MARK: - 繁簡文字無損轉換
+    // MARK: - Chinese Script Conversion
     nonisolated public static func convertSimplifiedToTraditional(_ text: String) -> String {
         var str = text
         if let transformed = str.applyingTransform(StringTransform("Simplified-Traditional"), reverse: false) {
@@ -142,7 +142,7 @@ public final class LyricsTranslationService: ObservableObject {
         return str
     }
 
-    // MARK: - 歌詞文字與音節全面簡轉繁
+    // MARK: - Convert Lyrics Text And Syllables To Traditional Chinese
     nonisolated public static func convertLyricsToTraditional(_ lyrics: SyncedLyrics) -> SyncedLyrics {
         var updated = lyrics
         updated.lines = lyrics.lines.map { line in
@@ -163,8 +163,8 @@ public final class LyricsTranslationService: ObservableObject {
         return updated
     }
 
-    // MARK: - 歌詞語言偵測與同語系檢查
-    /// 偵測整首歌詞的主要語言
+    // MARK: - Language Detection And Matching
+    /// Detects dominant language of lyrics lines.
     nonisolated public static func detectLyricsLanguage(_ lyrics: SyncedLyrics) -> NLLanguage? {
         let sampleText = lyrics.lines.prefix(20).map { $0.text }.joined(separator: "\n")
         guard !sampleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
@@ -174,12 +174,12 @@ public final class LyricsTranslationService: ObservableObject {
         return recognizer.dominantLanguage
     }
 
-    /// 判斷歌詞原文是否與目標語言相同（避免中文歌出中文翻譯、英文歌出英文翻譯）
+    /// Checks whether original lyrics match target translation language.
     nonisolated public static func isSameLanguage(lyrics: SyncedLyrics, targetLanguageId: String) -> Bool {
         guard let dominant = detectLyricsLanguage(lyrics) else { return false }
         let targetLower = targetLanguageId.lowercased()
 
-        // 華語判別
+        // Chinese language match.
         if targetLower.hasPrefix("zh") {
             return dominant == .traditionalChinese || dominant == .simplifiedChinese
         }
@@ -204,7 +204,7 @@ public final class LyricsTranslationService: ObservableObject {
         return false
     }
 
-    /// 判斷目標語言為繁中且原文歌詞為簡體中文（華語歌）
+    /// Checks if target is Traditional Chinese while source lyrics are Simplified Chinese.
     nonisolated public static func isTargetHantAndLyricsSimplified(lyrics: SyncedLyrics, targetLanguageId: String) -> Bool {
         let targetLower = targetLanguageId.lowercased()
         guard targetLower == "zh-hant" || targetLower.hasPrefix("zh-tw") || targetLower.hasPrefix("zh-hk") else {
@@ -214,27 +214,27 @@ public final class LyricsTranslationService: ObservableObject {
         return dominant == .simplifiedChinese
     }
 
-    // MARK: - 判定歌詞是否需要進行 Translation 翻譯
+    // MARK: - Translation Eligibility Evaluation
     nonisolated public static func shouldTranslate(lyrics: SyncedLyrics, targetLanguageId: String) -> Bool {
         guard !lyrics.lines.isEmpty else { return false }
 
-        // 若原文與目標語言同語系，不需要翻譯
+        // Skip translation if source matches target language.
         if isSameLanguage(lyrics: lyrics, targetLanguageId: targetLanguageId) {
             return false
         }
 
-        // 若已經具備匹配當前目標語言的翻譯，不需要再次翻譯
+        // Skip if matching translation already exists.
         if let existingTarget = lyrics.translationTargetLanguage,
            existingTarget.caseInsensitiveCompare(targetLanguageId) == .orderedSame,
            lyrics.hasTranslation {
             return false
         }
 
-        // 若歌詞尚未有翻譯，或翻譯對應之語言不符當前目標語言，則需要翻譯
+        // Requires translation if missing or targeting different language.
         return true
     }
 
-    // MARK: - Apple TranslationSession 批次翻譯整首歌詞
+    // MARK: - Batch Translation via TranslationSession
     public static func translateLyrics(
         _ lyrics: SyncedLyrics,
         using session: TranslationSession,
@@ -242,7 +242,7 @@ public final class LyricsTranslationService: ObservableObject {
     ) async -> SyncedLyrics? {
         guard !lyrics.lines.isEmpty else { return nil }
 
-        // 篩選出需要翻譯的行（建立 requests，以行索引作為 clientIdentifier）
+        // Construct batch translation requests using line index as identifier.
         var requests: [TranslationSession.Request] = []
         for (index, line) in lyrics.lines.enumerated() {
             let trimmed = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -259,7 +259,7 @@ public final class LyricsTranslationService: ObservableObject {
             for resp in responses {
                 if let idStr = resp.clientIdentifier, let idx = Int(idStr) {
                     var transText = resp.targetText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    // 若目標語言為繁體中文，確保輸出結果無殘留簡體
+                    // Ensure output is in Traditional Chinese if requested.
                     if targetLanguageId.lowercased().hasPrefix("zh-hant") || targetLanguageId.lowercased().hasPrefix("zh-tw") {
                         transText = convertSimplifiedToTraditional(transText)
                     }
@@ -276,7 +276,7 @@ public final class LyricsTranslationService: ObservableObject {
             translatedLyrics.lines = updatedLines
             translatedLyrics.translationTargetLanguage = targetLanguageId
 
-            // 儲存至本地快取
+            // Persist translated lyrics to cache.
             LyricsProviderService.shared.saveLyricsToCache(translatedLyrics)
             return translatedLyrics
         } catch {

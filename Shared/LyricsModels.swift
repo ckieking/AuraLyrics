@@ -1,6 +1,6 @@
 import Foundation
 
-/// 歌曲基本資訊
+/// Basic track metadata.
 public struct TrackInfo: Codable, Equatable, Sendable {
     public var title: String
     public var artist: String
@@ -58,7 +58,7 @@ public struct TrackInfo: Codable, Equatable, Sendable {
     )
 }
 
-/// 單字/音節時間軸（支援 Apple Music 逐字卡拉OK播放）
+/// Syllable-level timing metadata for synchronized karaoke text.
 public struct LyricSyllable: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
     public var text: String
@@ -78,16 +78,16 @@ public struct LyricSyllable: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// 單行時間軸歌詞
+/// Single-line timed lyric model.
 public struct LyricLine: Identifiable, Codable, Equatable, Sendable {
     public var id: UUID
-    /// 歌詞開始時間（毫秒）
+    /// Line start timestamp in milliseconds.
     public var timeMs: Int
-    /// 原文歌詞
+    /// Original lyric text.
     public var text: String
-    /// 翻譯歌詞（若無則為 nil）
+    /// Translated lyric text, or nil if unavailable.
     public var translation: String?
-    /// 逐字音節時間軸（若有 Enhanced LRC 逐字資料）
+    /// Word or syllable timing data when available.
     public var syllables: [LyricSyllable]?
 
     public init(
@@ -105,19 +105,19 @@ public struct LyricLine: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// 完整同步歌詞集合與相關元資料
+/// Synchronized lyrics container with metadata.
 public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
     public var id: String { "\(trackTitle)-\(artistName)-\(source)-\(lines.count)-\(lines.first?.timeMs ?? 0)-\(lines.last?.timeMs ?? 0)-\(hasSyllables ? "ws" : "ls")" }
     public var trackTitle: String
     public var artistName: String
     public var lines: [LyricLine]
-    /// 參與人員與創作團隊名單（如 Written by ..., Produced by ...）
+    /// Songwriter and production credits.
     public var credits: [String]
-    /// 時間軸微調偏移量（毫秒，正值代表歌詞提前、負值代表延後）
+    /// Manual timing offset in milliseconds (positive advances lyrics, negative delays).
     public var offsetMs: Int
-    /// 來源標記（如 "LRCLIB" 或 "NetEase" 或 "Local"）
+    /// Lyric provider source identifier (e.g. "LRCLIB", "NetEase", "Local").
     public var source: String
-    /// 目前翻譯所對應之目標語言識別碼（如 "zh-Hant", "en", "ja"）
+    /// Target language code for translation (e.g. "zh-Hant", "en", "ja").
     public var translationTargetLanguage: String?
 
     public init(
@@ -173,7 +173,7 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         source: "None"
     )
 
-    /// 是否包含逐字音節時間軸資料
+    /// Indicates whether syllable-level timing data is present.
     public var hasSyllables: Bool {
         lines.contains { line in
             if let syllables = line.syllables, !syllables.isEmpty {
@@ -183,7 +183,7 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         }
     }
 
-    /// 是否包含有效的雙語翻譯資料
+    /// Indicates whether valid translation text is present.
     public var hasTranslation: Bool {
         lines.contains { line in
             if let trans = line.translation, !trans.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -193,17 +193,17 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
         }
     }
 
-    /// 根據當前播放時間（毫秒）與全域微調偏移量，取得當前正在唱的歌詞行索引
+    /// Computes active lyric line index for given playback timestamp and offset.
     public func currentLineIndex(at currentPlaybackTimeMs: Int, globalOffsetMs: Int = 0) -> Int? {
         guard !lines.isEmpty else { return nil }
         let adjustedTime = currentPlaybackTimeMs + globalOffsetMs + offsetMs
 
-        // 若尚未到達第一句歌詞時間
+        // Check if playback position is prior to the first lyric line.
         if adjustedTime < lines[0].timeMs {
             return nil
         }
 
-        // 二分搜尋尋找最大 <= adjustedTime 的歌詞行
+        // Binary search for the line with maximum start time <= adjustedTime.
         var low = 0
         var high = lines.count - 1
         var resultIndex = 0
@@ -221,7 +221,7 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
-/// 顯示引擎模式
+/// Lyrics display engine mode.
 public enum DisplayEngineMode: String, CaseIterable, Identifiable, Codable, Sendable {
     case automatic = "auto"
     case pipCapsule = "pip"
@@ -240,7 +240,7 @@ public enum DisplayEngineMode: String, CaseIterable, Identifiable, Codable, Send
     }
 }
 
-/// 歌詞來源平台
+/// Lyrics provider source platform.
 public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable {
     case musixmatch = "Musixmatch"
     case netease = "NetEase"
@@ -259,7 +259,7 @@ public enum LyricsSource: String, CaseIterable, Identifiable, Codable, Sendable 
     }
 }
 
-/// 歌詞語系獨立順位設定分類
+/// Language profile for provider search priority ordering.
 public enum LyricsLanguageProfile: String, CaseIterable, Identifiable, Codable, Sendable {
     case western = "western"
     case asian = "asian"
@@ -276,7 +276,7 @@ public enum LyricsLanguageProfile: String, CaseIterable, Identifiable, Codable, 
     }
 }
 
-/// 自動歌詞搜尋順位項目（區分平台來源與逐字/逐行時間軸）
+/// Provider search priority item differentiating platform and sync granularity.
 public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashable, Sendable {
     public var id: String
     public var source: LyricsSource
@@ -365,7 +365,7 @@ public struct LyricsSearchPriorityItem: Identifiable, Codable, Equatable, Hashab
     public static let defaultList: [LyricsSearchPriorityItem] = defaultList(for: .western)
 }
 
-/// PiP 懸浮窗樣式風格
+/// Picture-in-Picture floating capsule visual theme.
 public enum PiPVisualTheme: String, CaseIterable, Identifiable, Codable, Sendable {
     case dynamicIsland = "dynamicIsland"
     case standardCard = "standardCard"

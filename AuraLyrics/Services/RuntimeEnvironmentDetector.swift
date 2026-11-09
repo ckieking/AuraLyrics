@@ -2,7 +2,7 @@ import Foundation
 import ActivityKit
 import Combine
 
-/// 運行環境診斷與判定器
+/// Runtime environment detector and diagnostics.
 @MainActor
 public final class RuntimeEnvironmentDetector: ObservableObject {
     public static let shared = RuntimeEnvironmentDetector()
@@ -18,23 +18,23 @@ public final class RuntimeEnvironmentDetector: ObservableObject {
     public func detectEnvironment() {
         let env = ProcessInfo.processInfo.environment
 
-        // 1. 檢驗 LiveContainer 特徵變數與 Class
+        // 1. Inspect LiveContainer environment variables, bundle path, and classes.
         let hasLCHome = env["LC_HOME_PATH"] != nil
         let hasLCBundle = Bundle.main.bundlePath.contains("LiveContainer")
         let hasLCClass = NSClassFromString("LCSharedUtils") != nil
 
         self.isLiveContainer = hasLCHome || hasLCBundle || hasLCClass
 
-        // 2. 檢驗 ActivityKit 授權與系統可用性
+        // 2. Check ActivityKit authorization and availability.
         if #available(iOS 16.2, *) {
             let authInfo = ActivityAuthorizationInfo()
-            // 如果在 LiveContainer 內部，即使 areActivitiesEnabled 為 true，也因為 Guest App 未向 chronod 註冊而無法啟動獨立 Widget
+            // In LiveContainer, guest apps cannot register widget extensions with chronod.
             self.areLiveActivitiesAvailable = authInfo.areActivitiesEnabled && !self.isLiveContainer
         } else {
             self.areLiveActivitiesAvailable = false
         }
 
-        // 3. 彙整環境描述
+        // 3. Compile environment description string.
         if isLiveContainer {
             self.environmentDescription = String(localized: "LiveContainer 虛擬容器環境（預設採用免 Extension 的子母畫面 PiP 懸浮膠囊）")
         } else {
@@ -42,7 +42,7 @@ public final class RuntimeEnvironmentDetector: ObservableObject {
         }
     }
 
-    /// 根據當前環境取得推薦的顯示引擎
+    /// Returns recommended display engine mode based on runtime detection.
     public var recommendedEngine: DisplayEngineMode {
         if isLiveContainer {
             return .pipCapsule

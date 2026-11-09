@@ -1,10 +1,10 @@
 import Foundation
 
-/// LRC 歌詞解析與雙語合併引擎（支援標準 LRC 與 Enhanced LRC 逐字時間軸）
+/// LRC parser and bilingual merger supporting standard and enhanced syllable-level lyrics.
 public final class LRCParser: Sendable {
     public static let shared = LRCParser()
 
-    // MARK: - 預編譯正則表達式快取（避免每次解析與每行重複編譯）
+    // MARK: - Precompiled Regular Expressions Cache
     private static let lrcLineRegex = try? NSRegularExpression(pattern: "\\[(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?\\]", options: [])
     private static let offsetTagRegex = try? NSRegularExpression(pattern: "^\\[offset:\\s*([+-]?\\d+)\\s*\\]$", options: [.caseInsensitive])
     private static let enhancedSyllableRegex = try? NSRegularExpression(pattern: "<(\\d{2,}):(\\d{2})(?:\\.(\\d{2,3}))?>([^<]*)", options: [])
@@ -14,7 +14,7 @@ public final class LRCParser: Sendable {
 
     private init() {}
 
-    /// 解析 LRC 字串為時間排序的 LyricLine 陣列（支援逐字音節解析與 [offset:] 標籤）
+    /// Parses LRC text into time-sorted LyricLine array.
     public func parse(lrcContent: String) -> [LyricLine] {
         var lines: [LyricLine] = []
         let rawLines = lrcContent.components(separatedBy: .newlines)
@@ -26,7 +26,7 @@ public final class LRCParser: Sendable {
             let trimmed = line.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { continue }
 
-            // 解析標準 LRC [offset:+/-ms] 標籤
+            // Parse standard [offset:+/-ms] tag.
             if trimmed.lowercased().hasPrefix("[offset:"),
                let offsetRegex = Self.offsetTagRegex,
                let match = offsetRegex.firstMatch(in: trimmed, options: [], range: NSRange(location: 0, length: trimmed.utf16.count)),
@@ -38,7 +38,7 @@ public final class LRCParser: Sendable {
                 continue
             }
 
-            // 略過純元資料標籤（如 [ti:Song], [ar:Artist]）
+            // Skip metadata tags (e.g., [ti:], [ar:], [al:], [by:]).
             if trimmed.hasPrefix("[ti:") || trimmed.hasPrefix("[ar:") || trimmed.hasPrefix("[al:") || trimmed.hasPrefix("[by:") {
                 continue
             }
@@ -46,13 +46,13 @@ public final class LRCParser: Sendable {
             let matches = regex.matches(in: trimmed, options: [], range: NSRange(location: 0, length: trimmed.utf16.count))
             guard !matches.isEmpty else { continue }
 
-            // 取得最後一個行時間標籤後面的文字內容
+            // Extract text after the last timestamp tag.
             let lastMatch = matches[matches.count - 1]
             let textStartIndex = lastMatch.range.location + lastMatch.range.length
             let nsString = trimmed as NSString
             let rawLyricText = nsString.substring(from: textStartIndex).trimmingCharacters(in: .whitespaces)
 
-            // 解析是否含有 Enhanced 逐字音節標籤
+            // Parse Enhanced LRC syllable tags if present.
             let (cleanText, rawSyllables) = parseEnhancedSyllables(from: rawLyricText)
             let adjustedSyllables = rawSyllables?.map { syl in
                 LyricSyllable(
@@ -63,7 +63,7 @@ public final class LRCParser: Sendable {
                 )
             }
 
-            // 支援一對多時間標籤（如 [00:10.00][01:20.00] 相同歌詞）
+            // Handle repeated timestamps for identical lyrics line.
             for match in matches {
                 guard match.numberOfRanges >= 3 else { continue }
 
@@ -92,11 +92,11 @@ public final class LRCParser: Sendable {
             }
         }
 
-        // 依時間排序
+        // Sort lines chronologically.
         return lines.sorted { $0.timeMs < $1.timeMs }
     }
 
-    /// 解析單行文字中是否夾帶 Enhanced LRC 音節標籤（如 <00:12.34>字<00:12.80>詞）
+    /// Parses inline syllable timestamp tags (<mm:ss.xx>syllable) from a lyric line.
     private func parseEnhancedSyllables(from text: String) -> (cleanText: String, syllables: [LyricSyllable]?) {
         guard text.contains("<") && text.contains(">"),
               let regex = Self.enhancedSyllableRegex else {
@@ -134,7 +134,7 @@ public final class LRCParser: Sendable {
             syllables.append(LyricSyllable(text: sylText, timeMs: timeMs))
         }
 
-        // 計算各音節持續時間
+        // Calculate duration for each syllable.
         for i in 0..<syllables.count {
             if i + 1 < syllables.count {
                 syllables[i].durationMs = max(50, syllables[i+1].timeMs - syllables[i].timeMs)
@@ -146,7 +146,7 @@ public final class LRCParser: Sendable {
         return (clean.isEmpty ? text : clean, syllables.isEmpty ? nil : syllables)
     }
 
-    /// 將原文歌詞與翻譯歌詞依時間戳比對合併（使用二分搜尋達到 O(N log M) 效能）
+    /// Merges translated lyrics into original lyrics using binary search by timestamp.
     public func mergeTranslations(original: [LyricLine], translation: [LyricLine], thresholdMs: Int = 800) -> [LyricLine] {
         guard !translation.isEmpty else { return original }
 
@@ -155,7 +155,7 @@ public final class LRCParser: Sendable {
         result.reserveCapacity(original.count)
 
         for orig in original {
-            // 二分搜尋尋找最接近 orig.timeMs 的翻譯行
+            // Binary search for nearest translation line.
             var low = 0
             var high = sortedTrans.count - 1
             while low <= high {
@@ -202,8 +202,8 @@ public final class LRCParser: Sendable {
         return result
     }
 
-    // MARK: - 網易雲 YRC 原生逐字歌詞解析
-    /// 解析網易雲 YRC 逐字歌詞（格式如：[16210,3460](16210,280,0)字(16490,310,0)詞）
+    // MARK: - NetEase YRC Parser
+    /// Parses NetEase YRC syllable-level timed lyrics.
     public func parseYRC(yrcContent: String) -> [LyricLine] {
         var lines: [LyricLine] = []
         let rawLines = yrcContent.components(separatedBy: .newlines)
@@ -215,7 +215,7 @@ public final class LRCParser: Sendable {
             let trimmed = rawLine.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else { continue }
 
-            // 略過純 JSON 元資料行（若有的話）
+            // Skip JSON metadata lines if present.
             if trimmed.hasPrefix("{") && trimmed.hasSuffix("}") {
                 continue
             }
@@ -230,11 +230,11 @@ public final class LRCParser: Sendable {
             let startMsStr = nsLine.substring(with: lineMatch.range(at: 1))
             let lineStartMs = Int(startMsStr) ?? 0
 
-            // 取出行標籤後方字串
+            // Extract text content after line timing tag.
             let tagEndIndex = lineMatch.range.location + lineMatch.range.length
             let contentString = nsLine.substring(from: tagEndIndex)
 
-            // 解析音節
+            // Parse syllables.
             var syllables: [LyricSyllable] = []
             var fullText = ""
 
@@ -260,7 +260,7 @@ public final class LRCParser: Sendable {
                 }
             }
 
-            // 若該行沒有音節括號，則為純文字行
+            // Fall back to plain line text if no syllables found.
             if syllables.isEmpty {
                 let plainText = contentString.trimmingCharacters(in: .whitespaces)
                 if !plainText.isEmpty {
@@ -282,8 +282,8 @@ public final class LRCParser: Sendable {
         return lines.sorted { $0.timeMs < $1.timeMs }
     }
 
-    // MARK: - 酷狗/舊版卡拉OK KRC 逐字歌詞解析
-    /// 解析 KRC 格式逐字歌詞（格式如：[16210,3460]<0,280>字 或 (0,280)字）
+    // MARK: - KRC Parser
+    /// Parses KRC format timed lyrics.
     public func parseKRC(krcContent: String) -> [LyricLine] {
         var lines: [LyricLine] = []
         let rawLines = krcContent.components(separatedBy: .newlines)
@@ -324,7 +324,7 @@ public final class LRCParser: Sendable {
                     let num1 = Int(num1Str) ?? 0
                     let duration = max(10, Int(num2Str) ?? 100)
 
-                    // 若 num1 小於 lineStartMs，視為行內相對偏移量；否則為絕對時間戳
+                    // Interpret num1 as relative line offset or absolute timestamp.
                     let wordStartMs = (num1 < lineStartMs) ? (lineStartMs + num1) : num1
 
                     fullText += wordText
@@ -357,7 +357,7 @@ public final class LRCParser: Sendable {
         return lines.sorted { $0.timeMs < $1.timeMs }
     }
 
-    // MARK: - 製作人員與創作團隊名單識別過濾 (Apple Music Credits)
+    // MARK: - Song Credits Extraction
     private static let creditRoleKeywords: [String] = [
         "作词", "作詞", "作曲", "编曲", "編曲",
         "制作人", "製作人", "制作", "製作", "监制", "監製",
@@ -371,12 +371,12 @@ public final class LRCParser: Sendable {
         "Lyricist", "Composer", "Arranger", "Producer"
     ]
 
-    /// 判斷某行文本是否屬於製作名單（僅限歌曲開頭或結尾）
+    /// Determines whether a text line represents production credits.
     public func isCreditLine(text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return false }
 
-        // 1. 直接以英文創作職能開頭 (如 "Written by...", "Produced by...")
+        // 1. Matches common production role prefixes.
         let englishPrefixes = ["written by", "produced by", "mixed by", "mastered by", "recorded by", "arranged by", "composed by", "lyrics by", "vocals by", "op:", "sp:"]
         let lower = trimmed.lowercased()
         for prefix in englishPrefixes {
@@ -385,7 +385,7 @@ public final class LRCParser: Sendable {
             }
         }
 
-        // 2. 包含冒號分隔符號（: 或 ：）
+        // 2. Colon-separated role and name format.
         let parts = trimmed.components(separatedBy: CharacterSet(charactersIn: ":："))
         if parts.count >= 2 {
             let role = parts[0].trimmingCharacters(in: .whitespaces)
@@ -397,7 +397,7 @@ public final class LRCParser: Sendable {
             }
         }
 
-        // 3. 包含常見打軸或版權特徵
+        // 3. Known production or copyright metadata patterns.
         if trimmed.contains("歌词制作") || trimmed.contains("歌詞製作") || trimmed.contains("打轴") || trimmed.contains("QQ:") || trimmed.contains("QQ群") {
             return true
         }
@@ -405,7 +405,7 @@ public final class LRCParser: Sendable {
         return false
     }
 
-    /// 將原始名單轉換為 Apple Music 風格（例如 "Written by 周杰倫"）
+    /// Normalizes credit line into standardized format.
     public func formatCredit(raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         let parts = trimmed.components(separatedBy: CharacterSet(charactersIn: ":："))
@@ -436,7 +436,7 @@ public final class LRCParser: Sendable {
         }
     }
 
-    /// 從解析好的歌詞行中提取出製作名單，並回傳純淨歌詞與 Credits 清單
+    /// Extracts production credits and returns cleaned lyrics lines.
     public func extractCredits(from lines: [LyricLine]) -> (cleanLines: [LyricLine], credits: [String]) {
         guard !lines.isEmpty else { return ([], []) }
 
@@ -445,12 +445,12 @@ public final class LRCParser: Sendable {
 
         for (index, line) in lines.enumerated() {
             let isCredit = isCreditLine(text: line.text)
-            // 只有在開頭前 15 行且時間在前 45 秒內，或者在歌曲最後 5 行內才視為 Credit
+            // Only evaluate candidates in song intro (first 15 lines / 45s) or outro (last 5 lines).
             let isHeadCandidate = (index < 15 && line.timeMs < 45_000)
             let isTailCandidate = (index >= max(0, lines.count - 5))
 
             if isCredit && (isHeadCandidate || isTailCandidate) {
-                // 忽略非官方打軸或QQ群等純垃圾訊息，有價值的製作資訊才加入 credits
+                // Filter out unofficial fan-made metadata tags.
                 if !line.text.contains("打轴") && !line.text.contains("QQ:") && !line.text.contains("QQ群") {
                     let formatted = formatCredit(raw: line.text)
                     if !credits.contains(formatted) {
@@ -465,13 +465,13 @@ public final class LRCParser: Sendable {
         return (cleanLines, credits)
     }
 
-    /// 解析 LRC 並直接分離 Credits
+    /// Parses LRC content and extracts credits.
     public func parseWithCredits(lrcContent: String) -> (cleanLines: [LyricLine], credits: [String]) {
         let raw = parse(lrcContent: lrcContent)
         return extractCredits(from: raw)
     }
 
-    // MARK: - Musixmatch Richsync (逐字音節時間軸) 解析
+    // MARK: - Musixmatch Richsync Parser
     public func parseMusixmatchRichsync(richsyncBody: String) -> [LyricLine] {
         guard let data = richsyncBody.data(using: .utf8) else { return [] }
 
@@ -504,13 +504,13 @@ public final class LRCParser: Sendable {
                 let text = tok.c
                 let startMs = tsMs + Int(tok.o * 1000)
 
-                // 若此 token 是純空格且前面已有音節，合併至前一個音節以維持字詞平滑發光
+                // Merge trailing whitespace token into preceding syllable.
                 if text == " " && !syllables.isEmpty {
                     syllables[syllables.count - 1].text += " "
                     continue
                 }
 
-                // 計算音節持續時長（至下一個非空格 token 的起唱點或行尾）
+                // Calculate syllable duration up to next token or line end.
                 var nextStartMs = teMs
                 for j in (i + 1)..<tokens.count {
                     if tokens[j].c != " " {
@@ -541,12 +541,12 @@ public final class LRCParser: Sendable {
         return result.sorted { $0.timeMs < $1.timeMs }
     }
 
-    // MARK: - Musixmatch Subtitles (普通逐行時間軸) 解析
+    // MARK: - Musixmatch Subtitles Parser
     public func parseMusixmatchSubtitles(subtitleBody: String) -> [LyricLine] {
         let trimmed = subtitleBody.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
 
-        // 若為 JSON 陣列格式 (mxm 時間格式)
+        // Handle Musixmatch JSON array format.
         if trimmed.hasPrefix("[") {
             guard let data = trimmed.data(using: .utf8) else { return [] }
 
@@ -575,11 +575,11 @@ public final class LRCParser: Sendable {
             }
         }
 
-        // 若為標準 LRC 字串格式
+        // Handle standard LRC string format.
         return parse(lrcContent: subtitleBody)
     }
 
-    // MARK: - PetitLyrics WSY (逐字音節時間軸 XML, lyricsType = 3) 解析
+    // MARK: - PetitLyrics WSY (Word-Sync XML) Parser
     public func parsePetitLyricsWSY(wsyXML: String) -> [LyricLine] {
         let trimmed = wsyXML.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return [] }
@@ -593,7 +593,7 @@ public final class LRCParser: Sendable {
         return delegate.lines.sorted { $0.timeMs < $1.timeMs }
     }
 
-    // MARK: - PetitLyrics LSY (普通逐行時間軸二進位 XOR 解碼, lyricsType = 2 搭配 lyricsType = 1 純文字)
+    // MARK: - PetitLyrics LSY (Line-Sync Binary XOR) Parser
     public func decodePetitLyricsLSY(lsyBase64: String, plainLyricsBase64: String) -> [LyricLine] {
         guard let encryptedData = Data(base64Encoded: lsyBase64, options: .ignoreUnknownCharacters),
               let plainData = Data(base64Encoded: plainLyricsBase64, options: .ignoreUnknownCharacters),
@@ -797,7 +797,7 @@ private final class PetitLyricsWSYXMLDelegate: NSObject, XMLParserDelegate {
         let validWords = currentWords.filter { !$0.text.isEmpty }
         guard !validWords.isEmpty else { return }
 
-        // 確認非空字詞時間軸單調遞增；若損毀則僅捨棄逐字音節並退回逐行時間軸，避免整行歌詞遺失
+        // Verify monotonic timing; fall back to line-sync if corrupted.
         var isMonotonic = true
         for i in 0..<(validWords.count - 1) {
             if validWords[i].startMs > validWords[i + 1].startMs {
@@ -808,9 +808,7 @@ private final class PetitLyricsWSYXMLDelegate: NSObject, XMLParserDelegate {
 
         var syllables: [LyricSyllable] = []
         if isMonotonic {
-            // 關鍵排版聚合：PetitLyrics WSY 原始資料將英文單字（如 Weekend、Cruel）與日文外來語（片假名如 アイドル、ラブストーリー）
-            // 拆散為單一字母或單一字元，若直接轉為 LyricSyllable 會導致 SyllableFlowLayout 將單字拆碎折行。
-            // 依語法與禁則規則聚合為完整單字，保留字詞原子性與行內平滑光暈。
+            // Aggregate consecutive alphanumeric characters or katakana to preserve word atomicity during syllable layout.
             struct MergedWord {
                 var text: String
                 var startMs: Int

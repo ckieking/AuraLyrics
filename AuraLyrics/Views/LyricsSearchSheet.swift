@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 手動線上搜尋歌詞彈跳視窗（Apple HIG 抽屜卡片、細緻標籤與即時預覽）
+/// Online lyrics search sheet providing query input, results listing, and metadata preview.
 struct LyricsSearchSheet: View {
     @Environment(\.dismiss) private var dismiss
     let currentTrack: TrackInfo
@@ -68,14 +68,14 @@ struct LyricsSearchSheet: View {
         .presentationDragIndicator(.visible)
     }
 
-    // MARK: - 搜尋結果列表
+    // MARK: - Search Results List
     private var resultsListView: some View {
         List {
             Section {
                 ForEach(searchResults) { lyrics in
                     Button {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        // 若正在播放真實曲目，以當前曲目標題與歌手寫入本地快取，確保下次自動命中
+                        // Cache under current track metadata if playing real track
                         var selected = lyrics
                         if !currentTrack.title.isEmpty && currentTrack.title != TrackInfo.placeholder.title {
                             selected.trackTitle = currentTrack.title
@@ -101,7 +101,7 @@ struct LyricsSearchSheet: View {
 
                                 Spacer()
 
-                                // 來源徽章
+                                // Source badge
                                 Text(lyrics.source)
                                     .font(.caption2)
                                     .fontWeight(.bold)
@@ -111,7 +111,7 @@ struct LyricsSearchSheet: View {
                                     .cornerRadius(5)
                             }
 
-                            // 標籤群組 (雙語 + 行數)
+                            // Badges (Syllable, Bilingual, Line count)
                             HStack(spacing: 6) {
                                 if lyrics.hasSyllables {
                                     Text("逐字音節")
@@ -140,7 +140,7 @@ struct LyricsSearchSheet: View {
                                     .foregroundColor(.secondary)
                             }
 
-                            // 前兩行預覽
+                            // Preview lines
                             if let firstLine = lyrics.lines.first?.text, !firstLine.isEmpty {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("「\(firstLine)」")
@@ -172,7 +172,7 @@ struct LyricsSearchSheet: View {
         .listStyle(.insetGrouped)
     }
 
-    // MARK: - 載入中狀態
+    // MARK: - Loading View
     private var loadingView: some View {
         VStack(spacing: 14) {
             ProgressView()
@@ -186,7 +186,7 @@ struct LyricsSearchSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - 初始提示狀態
+    // MARK: - Empty Prompt View
     private var emptyPromptView: some View {
         VStack(spacing: 12) {
             ZStack {
@@ -212,7 +212,7 @@ struct LyricsSearchSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - 錯誤或無結果狀態
+    // MARK: - Error State View
     private func errorStateView(_ error: String) -> some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.magnifyingglass")
@@ -242,7 +242,7 @@ struct LyricsSearchSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - 搜尋邏輯（支援任務取消與並行檢索）
+    // MARK: - Search Execution
     private func performSearch() {
         let query = searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty else { return }

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 歌詞來源與逐字時間軸搜尋順位設定視圖（支援三語系獨立順位設定，採用 Apple HIG 原生 onMove 與 EditButton 架構）
+/// Settings view for configuring lyrics search priority orders across language profiles with drag-to-reorder and toggles.
 struct LyricsSourcePriorityView: View {
     @ObservedObject var lyricsProvider = LyricsProviderService.shared
 
@@ -10,7 +10,7 @@ struct LyricsSourcePriorityView: View {
 
     var body: some View {
         List {
-            // MARK: - 語系分類選擇器
+            // MARK: - Language Profile Selector
             Section {
                 Picker("語系分類", selection: $selectedProfile) {
                     ForEach(LyricsLanguageProfile.allCases) { profile in
@@ -22,7 +22,7 @@ struct LyricsSourcePriorityView: View {
                 Text("搜尋語系")
             }
 
-            // MARK: - 該語系搜尋順位列表
+            // MARK: - Priority Items List
             Section {
                 ForEach(items) { item in
                     HStack(spacing: 12) {
@@ -86,7 +86,7 @@ struct LyricsSourcePriorityView: View {
                 Text("播放此語系曲目時，系統將由上至下依序查詢已啟用的歌詞來源。點選右上角「編輯」即可拖曳排序；點選開關可停用特定來源。")
             }
 
-            // MARK: - 重設順位
+            // MARK: - Reset Priority
             Section {
                 Button(role: .destructive) {
                     showResetAlert = true

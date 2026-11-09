@@ -41,6 +41,6 @@
   <!-- Liquid Glass Specular Highlight (Reflection at 11~1 o'clock) -->
   <circle cx="512" cy="512" r="280" stroke="#FFFFFF" stroke-width="12" fill="none" opacity="0.85" stroke-dasharray="280 1480" stroke-linecap="round"/>
 
-  <!-- Subtle 1px Canvas Border Outline for Light Mode HIG compliance -->
+  <!-- Subtle 1px Canvas Border Outline for Light Mode -->
   <rect x="0.5" y="0.5" width="1023" height="1023" fill="none" stroke="rgba(0,0,0,0.06)" stroke-width="1"/>
 </svg>

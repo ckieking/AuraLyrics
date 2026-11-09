@@ -5,12 +5,10 @@ import BackgroundTasks
 import UIKit
 import Combine
 
-/// 背景保活管理員
-/// 依據當前啟用的功能提供智慧分流保活：
-/// 1. 若「即時動態」啟用：為避免 iOS 系統守護行程 sessionkitd 判定本 App 正在播放媒體而封鎖 Live Activity 背景更新
-///    (Process is playing background media and forbidden to update activity)，此模式下【絕對不播放】AVAudioPlayer，
-///    改採低耗電 CLLocationManager (百米精度) + BGTaskScheduler / 滾動式 UIBackgroundTask，確保行程在背景維持活躍且具備合法更新權限。
-/// 2. 若僅使用「PiP 懸浮窗」且「即時動態」未開啟：啟動低音量非零 PCM Dither 之音訊保活，確保 PiP 視訊通話通道不中斷。
+/// Background execution and keep-alive manager.
+/// Coordinates background execution strategies based on active display engines:
+/// - When Live Activities are active, audio playback is stopped to allow Live Activity background updates; location updates and rolling background tasks maintain execution.
+/// - When only Picture-in-Picture is active, inaudible PCM dither audio keeps the background execution pipeline active.
 @MainActor
 public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
     public static let shared = BackgroundKeepAliveManager()
@@ -29,7 +27,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         setupLifecycleObservers()
     }
 
-    // MARK: - 初始化定位管理器 (專供即時動態背景保活)
+    // MARK: - Location Manager Setup
     private func setupLocationManager() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
@@ -38,9 +36,9 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         locationAuthorizationStatus = locationManager.authorizationStatus
     }
 
-    // MARK: - 監聽生命週期與系統通知
+    // MARK: - Lifecycle Observers
     private func setupLifecycleObservers() {
-        // App 進入背景
+        // Did enter background
         NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
             object: nil,
@@ -51,7 +49,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
             }
         }
 
-        // App 回到前景
+        // Will enter foreground
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
@@ -62,7 +60,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
             }
         }
 
-        // 音訊中斷通知（PiP 音訊保活專用）
+        // Audio session interruption notification
         NotificationCenter.default.addObserver(
             forName: AVAudioSession.interruptionNotification,
             object: AVAudioSession.sharedInstance(),
@@ -80,14 +78,14 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - 註冊 BGTaskScheduler
+    // MARK: - BGTaskScheduler Registration
     public func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.auralyrics.bg.lyrics", using: .main) { task in
             task.expirationHandler = {
                 task.setTaskCompleted(success: false)
             }
             Task { @MainActor in
-                // 收到背景任務排程回呼時刷新保活並排定下一次排程
+                // Refresh keep-alive and schedule next background task cycle.
                 BackgroundKeepAliveManager.shared.ensureRollingBackgroundTask()
                 BackgroundKeepAliveManager.shared.scheduleNextBackgroundTask()
                 task.setTaskCompleted(success: true)
@@ -95,7 +93,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         }
     }
 
-    /// 使用標準公開 API 排程下一次背景更新任務
+    /// Schedules next background refresh task via BGTaskScheduler.
     public func scheduleNextBackgroundTask() {
         let request = BGAppRefreshTaskRequest(identifier: "com.auralyrics.bg.lyrics")
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
@@ -106,30 +104,30 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - 啟動保活
+    // MARK: - Start Keep Alive
     public func startKeepAlive() {
         refreshKeepAliveMode()
     }
 
-    // MARK: - 智慧分流刷新邏輯
+    // MARK: - Keep Alive Routing
     public func refreshKeepAliveMode() {
         let isLiveActivityActive = LiveActivityLyricsEngine.shared.isEnabled || LiveActivityLyricsEngine.shared.isActivityActive
         let isPiPActive = PiPLyricsEngine.shared.isPiPEnabled || PiPLyricsEngine.shared.isPiPActive
 
         if isLiveActivityActive {
-            // 即時動態模式：停用 AVAudioPlayer 以解除 sessionkitd 封鎖，改用 Location + BGTask
+            // Live Activity mode: disable AVAudioPlayer and use location updates + background tasks.
             stopAudioPlayer()
             startLocationKeepAlive()
             ensureRollingBackgroundTask()
             isRunning = true
         } else if isPiPActive {
-            // 僅 PiP 模式：關閉定位，改用微幅 Dither 之音訊保活
+            // PiP mode: stop location updates and enable dither audio playback.
             stopLocationKeepAlive()
             endRollingBackgroundTask()
             startAudioPlayer()
             isRunning = true
         } else {
-            // 兩者皆未啟用：維持輕量待機，不佔用高耗電資源
+            // Inactive: release keep-alive resources.
             stopLocationKeepAlive()
             endRollingBackgroundTask()
             stopAudioPlayer()
@@ -137,7 +135,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - 定位保活 (Live Activity 專用)
+    // MARK: - Location Keep-Alive
     private func startLocationKeepAlive() {
         let status = locationManager.authorizationStatus
         if status == .notDetermined {
@@ -153,7 +151,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         locationManager.stopUpdatingLocation()
     }
 
-    // MARK: - 滾動式 BackgroundTask 續期 (確保持有 sessionkitd 認可之 BackgroundTask 斷言)
+    // MARK: - Rolling Background Task Assertion
     private func ensureRollingBackgroundTask() {
         if rollingBgTask != .invalid {
             UIApplication.shared.endBackgroundTask(rollingBgTask)
@@ -166,7 +164,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
             }
         }
 
-        // 定期無縫換約，維持斷言長效
+        // Periodically renew background task assertion.
         rollingTimer?.invalidate()
         rollingTimer = Timer.scheduledTimer(withTimeInterval: 25.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -175,7 +173,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
             }
         }
 
-        // 透過公開 BGTaskScheduler 請求下次背景執行週期
+        // Schedule next task execution cycle via BGTaskScheduler.
         scheduleNextBackgroundTask()
     }
 
@@ -188,17 +186,17 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - 進入背景與前景事件處理
+    // MARK: - Lifecycle Handlers
     private func handleDidEnterBackground() {
         refreshKeepAliveMode()
     }
 
     private func handleWillEnterForeground() {
-        // 回到前景時重整狀態
+        // Re-evaluate keep-alive mode upon returning to foreground.
         refreshKeepAliveMode()
     }
 
-    // MARK: - 音訊保活管理 (僅供純 PiP 模式，Live Activity 模式下嚴格停用)
+    // MARK: - Audio Keep-Alive
     private func startAudioPlayer() {
         guard audioPlayer == nil || audioPlayer?.isPlaying == false else { return }
 
@@ -211,7 +209,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
                 let ditherData = generateLowDitherWavData(durationSeconds: 1.0)
                 audioPlayer = try AVAudioPlayer(data: ditherData)
                 audioPlayer?.numberOfLoops = -1
-                audioPlayer?.volume = 0.01 // 非零極小音量
+                audioPlayer?.volume = 0.01 // Non-zero minimal volume.
                 audioPlayer?.prepareToPlay()
             }
 
@@ -234,8 +232,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         isRunning = false
     }
 
-    /// 在記憶體中動態生成含 +-1 LSB 微幅 Dither 的 16-bit 44.1kHz WAV 音訊
-    /// 絕不為全零 0x00，使 CoreAudio 硬體 DSP 判定為非無效串流，同時人耳與音響完全無法察覺
+    /// Generates 16-bit 44.1kHz mono PCM WAV data containing alternating +/-1 LSB dither samples.
     private func generateLowDitherWavData(durationSeconds: Double) -> Data {
         let sampleRate: Int32 = 44100
         let channels: Int16 = 1
@@ -273,7 +270,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         var dSize = dataSize
         data.append(Data(bytes: &dSize, count: 4))
 
-        // 交替 +-1 LSB 微幅 dither
+        // Alternating +/-1 LSB dither
         var samples = [Int16](repeating: 0, count: totalSamples)
         for i in 0..<totalSamples {
             samples[i] = (i % 2 == 0) ? 1 : -1
@@ -301,10 +298,10 @@ extension BackgroundKeepAliveManager: CLLocationManagerDelegate {
     }
 
     nonisolated public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        // 收到定位事件（即使無實質位移），向系統證明行程仍在活躍狀態
+        // Process location updates to maintain execution state.
     }
 
     nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        // 忽略微小定位失敗，保持常駐
+        // Suppress transient location lookup errors.
     }
 }

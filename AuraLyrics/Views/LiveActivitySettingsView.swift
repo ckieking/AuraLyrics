@@ -1,7 +1,7 @@
 import SwiftUI
 import CoreLocation
 
-/// 即時動態與動態島專屬設定頁面
+/// Live Activity and Dynamic Island configuration view.
 public struct LiveActivitySettingsView: View {
     @ObservedObject private var liveActivityEngine = LiveActivityLyricsEngine.shared
     @ObservedObject private var monitor = AppleMusicMonitor.shared
@@ -11,7 +11,7 @@ public struct LiveActivitySettingsView: View {
 
     public var body: some View {
         Form {
-            // MARK: - 主功能開關
+            // MARK: - Main Feature Toggle
             Section {
                 Toggle("啟用即時動態與動態島歌詞", isOn: $liveActivityEngine.isEnabled)
                     .onChange(of: liveActivityEngine.isEnabled) { _, newValue in
@@ -32,7 +32,7 @@ public struct LiveActivitySettingsView: View {
                 Text("開啟後，當 Apple Music 播放音樂時，動態島與即時動態將同步呈現即時滾動歌詞。")
             }
 
-            // MARK: - 動態島緊湊樣式設定
+            // MARK: - Dynamic Island Compact Style
             Section {
                 NavigationLink {
                     DynamicIslandCompactStyleSettingsView(selectedStyle: $liveActivityEngine.compactStyle)
@@ -49,7 +49,7 @@ public struct LiveActivitySettingsView: View {
                 Text("動態島外觀")
             }
 
-            // MARK: - 次要行（副行）顯示設定
+            // MARK: - Secondary Line Mode
             Section {
                 NavigationLink {
                     SecondaryModeSettingsView(selectedMode: $liveActivityEngine.secondaryMode)
@@ -66,7 +66,7 @@ public struct LiveActivitySettingsView: View {
                 Text("副行資訊")
             }
 
-            // MARK: - 暫停與繼續播放策略
+            // MARK: - Pause and Resume Policy
             Section {
                 NavigationLink {
                     PausePolicySettingsView(selectedPolicy: $liveActivityEngine.pausePolicy)
@@ -97,7 +97,7 @@ public struct LiveActivitySettingsView: View {
                 Text("即時動態被關閉後可能需要重新開啟此 App 來恢復")
             }
 
-            // MARK: - 背景同步與權限提示
+            // MARK: - Background Sync and Location Permissions
             Section {
                 HStack {
                     Text("背景保活狀態")
@@ -152,7 +152,7 @@ public struct LiveActivitySettingsView: View {
     }
 }
 
-// MARK: - 動態島樣式即時預覽元件
+// MARK: - Dynamic Island Compact Preview
 private struct DynamicIslandCompactPreview: View {
     let style: DynamicIslandCompactStyle
     @ObservedObject private var monitor = AppleMusicMonitor.shared
@@ -225,7 +225,7 @@ private struct DynamicIslandCompactPreview: View {
     }
 }
 
-// MARK: - 動態島緊湊顯示樣式設定子頁面
+// MARK: - Dynamic Island Compact Style Destination
 private struct DynamicIslandCompactStyleSettingsView: View {
     @Binding var selectedStyle: DynamicIslandCompactStyle
 
@@ -269,7 +269,7 @@ private struct DynamicIslandCompactStyleSettingsView: View {
     }
 }
 
-// MARK: - 副行顯示模式設定子頁面
+// MARK: - Secondary Mode Destination
 private struct SecondaryModeSettingsView: View {
     @Binding var selectedMode: LiveActivitySecondaryMode
 
@@ -302,7 +302,7 @@ private struct SecondaryModeSettingsView: View {
     }
 }
 
-// MARK: - 音樂暫停處理方式設定子頁面
+// MARK: - Pause Policy Destination
 private struct PausePolicySettingsView: View {
     @Binding var selectedPolicy: LiveActivityPausePolicy
 
@@ -340,7 +340,7 @@ private struct PausePolicySettingsView: View {
     }
 }
 
-// MARK: - 音樂繼續播放處理方式設定子頁面
+// MARK: - Resume Policy Destination
 private struct ResumePolicySettingsView: View {
     @Binding var selectedPolicy: LiveActivityResumePolicy
 

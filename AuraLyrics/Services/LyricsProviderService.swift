@@ -2,7 +2,7 @@ import Foundation
 import Combine
 import NaturalLanguage
 
-/// 歌詞來源與本地快取管理器（純手機端連線，無須後端伺服器）
+/// Lyrics provider service and local cache manager.
 public final class LyricsProviderService: ObservableObject {
     public static let shared = LyricsProviderService()
 
@@ -26,7 +26,7 @@ public final class LyricsProviderService: ObservableObject {
         loadPriorityItems()
     }
 
-    // MARK: - 分語系順位管理
+    // MARK: - Language-Specific Priority Ordering
     private func loadPriorityItems() {
         for profile in LyricsLanguageProfile.allCases {
             let versionKey = "\(prioritySchemaVersionPrefix)\(profile.rawValue)"
@@ -34,7 +34,7 @@ public final class LyricsProviderService: ObservableObject {
             let version = UserDefaults.standard.integer(forKey: versionKey)
 
             if version < currentPrioritySchemaVersion {
-                // 首次升級至多語系 Schema v3：若為 .asian 且先前有舊版順位設定，繼承舊設定
+                // Migration to multi-language priority profiles.
                 if profile == .asian,
                    let oldData = UserDefaults.standard.data(forKey: "lyricsSearchPriorityOrder"),
                    let oldList = try? JSONDecoder().decode([LyricsSearchPriorityItem].self, from: oldData),
@@ -122,11 +122,11 @@ public final class LyricsProviderService: ObservableObject {
         return "歐美: \(w) / 亞: \(a) / 日: \(j)"
     }
 
-    // MARK: - 快取遷移 (Cache Schema v3)
+    // MARK: - Cache Migration (Schema v3)
     private func checkAndMigrateCache() {
         let storedVersion = UserDefaults.standard.integer(forKey: "lyricsCacheSchemaVersion")
         if storedVersion < currentCacheSchemaVersion {
-            // 升級至支援分語系與嚴格防張冠李戴之快取架構：保留使用者手動匯入之 Local 歌詞，清除舊版快取
+            // Purge legacy caches while preserving manually imported local lyrics.
             if FileManager.default.fileExists(atPath: cacheDirectoryURL.path),
                let files = try? FileManager.default.contentsOfDirectory(at: cacheDirectoryURL, includingPropertiesForKeys: nil) {
                 for file in files where file.pathExtension == "json" {
@@ -142,7 +142,7 @@ public final class LyricsProviderService: ObservableObject {
         }
     }
 
-    // MARK: - 本地快取路徑
+    // MARK: - Local Cache File Paths
     private var cacheDirectoryURL: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
         return paths[0].appendingPathComponent(cacheDirectoryName)
@@ -165,7 +165,7 @@ public final class LyricsProviderService: ObservableObject {
         return cacheDirectoryURL.appendingPathComponent("\(sanitized).json")
     }
 
-    // MARK: - 讀取本地快取
+    // MARK: - Read Local Cache
     public func loadCachedLyrics(title: String, artist: String) -> SyncedLyrics? {
         let fileURL = cacheFileURL(title: title, artist: artist)
         if let data = try? Data(contentsOf: fileURL),
@@ -183,7 +183,7 @@ public final class LyricsProviderService: ObservableObject {
         return nil
     }
 
-    // MARK: - 儲存至本地快取
+    // MARK: - Save Local Cache
     public func saveLyricsToCache(_ lyrics: SyncedLyrics) {
         createCacheDirectoryIfNeeded()
         let fileURL = cacheFileURL(title: lyrics.trackTitle, artist: lyrics.artistName)
@@ -192,7 +192,7 @@ public final class LyricsProviderService: ObservableObject {
         }
     }
 
-    // MARK: - 更新特定歌曲的時間軸微調 Offset
+    // MARK: - Update Timing Offset For Track
     public func updateOffset(title: String, artist: String, newOffsetMs: Int, currentLyrics: SyncedLyrics) -> SyncedLyrics {
         var updated = currentLyrics
         updated.offsetMs = newOffsetMs
@@ -200,7 +200,7 @@ public final class LyricsProviderService: ObservableObject {
         return updated
     }
 
-    // MARK: - 匯入外部 .lrc 檔案
+    // MARK: - Import External .lrc File
     public func importLocalLRCFile(url: URL, title: String, artist: String) -> SyncedLyrics? {
         guard let content = try? String(contentsOf: url, encoding: .utf8) else { return nil }
         let (lines, credits) = LRCParser.shared.parseWithCredits(lrcContent: content)
@@ -218,7 +218,7 @@ public final class LyricsProviderService: ObservableObject {
         return synced
     }
 
-    // MARK: - 列出所有已快取的歌詞檔案
+    // MARK: - List Cached Lyrics
     public func listAllCachedLyrics() -> [SyncedLyrics] {
         guard let files = try? FileManager.default.contentsOfDirectory(at: cacheDirectoryURL, includingPropertiesForKeys: nil) else {
             return []
@@ -233,7 +233,7 @@ public final class LyricsProviderService: ObservableObject {
         return list.sorted { $0.trackTitle < $1.trackTitle }
     }
 
-    // MARK: - 刪除快取
+    // MARK: - Delete Cached Lyrics
     public func deleteCachedLyrics(title: String, artist: String) {
         let fileURL = cacheFileURL(title: title, artist: artist)
         try? FileManager.default.removeItem(at: fileURL)
@@ -249,7 +249,7 @@ public final class LyricsProviderService: ObservableObject {
         createCacheDirectoryIfNeeded()
     }
 
-    // MARK: - 多層次語系自動判別
+    // MARK: - Multi-Tiered Language Classification
     public func detectLanguageProfile(for track: TrackInfo) -> LyricsLanguageProfile {
         let genreLower = track.genre.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let title = track.title
@@ -257,7 +257,7 @@ public final class LyricsProviderService: ObservableObject {
         let album = track.album
         let combinedMeta = "\(title) \(artist) \(album)"
 
-        // 1. Genre 優先判別
+        // 1. Genre classification.
         if !genreLower.isEmpty {
             let japaneseGenres = ["j-pop", "jpop", "japanese", "anime", "kayokyoku", "j-rock", "jrock", "vocaloid", "enka"]
             if japaneseGenres.contains(where: { genreLower.contains($0) }) {
@@ -269,8 +269,7 @@ public final class LyricsProviderService: ObservableObject {
             }
         }
 
-        // 2. 字元集特徵判別 (假名、日系專用符號、韓文諺文)
-        // 平假名: 0x3040...0x309F, 片假名: 0x30A0...0x30FF, 半形片假名: 0xFF66...0xFF9F
+        // 2. Character set inspection (Hiragana, Katakana, Hangul).
         let hasKana = combinedMeta.unicodeScalars.contains { scalar in
             let v = scalar.value
             return (v >= 0x3040 && v <= 0x309F) || (v >= 0x30A0 && v <= 0x30FF) || (v >= 0xFF66 && v <= 0xFF9F)
@@ -289,7 +288,7 @@ public final class LyricsProviderService: ObservableObject {
             return .japanese
         }
 
-        // 韓文諺文: 0xAC00...0xD7AF, 0x1100...0x11FF, 0x3130...0x318F
+        // Hangul Syllables and Jamo range check.
         let hasHangul = combinedMeta.unicodeScalars.contains { scalar in
             let v = scalar.value
             return (v >= 0xAC00 && v <= 0xD7AF) || (v >= 0x1100 && v <= 0x11FF) || (v >= 0x3130 && v <= 0x318F)
@@ -298,7 +297,7 @@ public final class LyricsProviderService: ObservableObject {
             return .asian
         }
 
-        // 3. Apple 原生 NaturalLanguage 語意辨識器 (離線本機 NLP 機率推斷)
+        // 3. NaturalLanguage offline semantic recognition.
         let recognizer = NLLanguageRecognizer()
         recognizer.processString(combinedMeta)
         if let dominant = recognizer.dominantLanguage {
@@ -312,7 +311,7 @@ public final class LyricsProviderService: ObservableObject {
             }
         }
 
-        // 4. 中文字元 (CJK Unified Ideographs: 0x4E00...0x9FFF)
+        // 4. CJK Unified Ideographs character check.
         let hasCJK = combinedMeta.unicodeScalars.contains { scalar in
             let v = scalar.value
             return v >= 0x4E00 && v <= 0x9FFF
@@ -321,11 +320,11 @@ public final class LyricsProviderService: ObservableObject {
             return .asian
         }
 
-        // 5. 其餘回退為歐美/預設
+        // 5. Fall back to Western / Default profile.
         return .western
     }
 
-    // MARK: - 線上自動搜尋歌詞（依語系專屬平台與逐字/逐行順位搜尋）
+    // MARK: - Automatic Online Lyrics Search
     public func fetchLyrics(track: TrackInfo) async -> SyncedLyrics? {
         let cleanTitle = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -334,7 +333,7 @@ public final class LyricsProviderService: ObservableObject {
 
         let cached = loadCachedLyrics(title: cleanTitle, artist: cleanArtist)
 
-        // 1. 若為使用者本地手動匯入，絕對優先採用
+        // 1. Manually imported local lyrics take highest priority.
         if let cached = cached, cached.source == "Local" {
             return await normalizeHantLyricsIfNeeded(cached)
         }
@@ -342,14 +341,14 @@ public final class LyricsProviderService: ObservableObject {
         let profile = detectLanguageProfile(for: track)
         let activePriorities = priorityItems(for: profile).filter { $0.isEnabled }
 
-        // 2. 若本地快取已符合該語系最高優先級別且具備逐字，可直接沿用節省連線與電量
+        // 2. Reuse cached lyrics if highest priority criteria are satisfied.
         if let cached = cached, cached.hasSyllables,
            let topPriority = activePriorities.first, topPriority.isWordSync,
            topPriority.source.rawValue.caseInsensitiveCompare(cached.source) == .orderedSame {
             return await normalizeHantLyricsIfNeeded(cached)
         }
 
-        // 3. 記憶體暫存各來源請求結果，確保在一次歌曲搜尋中各來源最多僅呼叫一次
+        // 3. In-memory deduplication of network provider requests.
         var sourceCache: [LyricsSource: SyncedLyrics?] = [:]
 
         func getOrFetch(source: LyricsSource) async -> SyncedLyrics? {
@@ -371,14 +370,14 @@ public final class LyricsProviderService: ObservableObject {
             return res
         }
 
-        // 4. 依該語系自訂順位依序比對
+        // 4. Evaluate candidates against ordered priority rules.
         for item in activePriorities {
             guard let result = await getOrFetch(source: item.source) else {
                 continue
             }
 
             if item.isWordSync {
-                // 逐字項目：必須包含音節時間軸
+                // Word-sync priority requires syllable timings.
                 if result.hasSyllables {
                     var toSave = result
                     toSave.trackTitle = cleanTitle
@@ -388,7 +387,7 @@ public final class LyricsProviderService: ObservableObject {
                     return toSave
                 }
             } else {
-                // 普通逐行項目：無論有無逐字皆可滿足降級標準
+                // Line-sync priority accepts either syllable or line-level timing.
                 var toSave = result
                 toSave.trackTitle = cleanTitle
                 toSave.artistName = cleanArtist
@@ -398,19 +397,19 @@ public final class LyricsProviderService: ObservableObject {
             }
         }
 
-        // 5. 若所有啟用順位皆未滿足，回退至既有快取
+        // 5. Fall back to existing cached lyrics if none matched.
         if let cached = cached {
             return await normalizeHantLyricsIfNeeded(cached)
         }
         return nil
     }
 
-    /// 當目標語言為繁體中文且歌詞為簡體中文華語歌時，將原文轉為繁體並清除多餘的重複翻譯行
+    /// Converts Simplified Chinese lyrics to Traditional Chinese when target language is Traditional Chinese.
     private func normalizeHantLyricsIfNeeded(_ lyrics: SyncedLyrics) async -> SyncedLyrics {
         let currentTarget = await MainActor.run { LyricsTranslationService.shared.currentTargetLanguage }
         if LyricsTranslationService.isTargetHantAndLyricsSimplified(lyrics: lyrics, targetLanguageId: currentTarget) {
             var converted = LyricsTranslationService.convertLyricsToTraditional(lyrics)
-            // 原文已轉為繁體，同語系不顯示翻譯副行
+            // Clear duplicate translation line when text is converted to Traditional Chinese.
             converted.lines = converted.lines.map { line in
                 var copy = line
                 copy.translation = nil
@@ -422,7 +421,7 @@ public final class LyricsProviderService: ObservableObject {
         return lyrics
     }
 
-    // MARK: - 手動搜尋跨庫歌詞（Structured Concurrency 並行請求，不污染快取直到使用者點選）
+    // MARK: - Multi-Provider Concurrent Search
     public func searchOnlineLyrics(
         query: String,
         targetTitle: String = "",
@@ -468,7 +467,7 @@ public final class LyricsProviderService: ObservableObject {
             }
         }
 
-        // 依多樣性呈現候選清單
+        // Return candidate list sorted by relevance and provider diversity.
         appendIfNew(petitList)
         appendIfNew(netEaseList)
         appendIfNew(mxmList)
@@ -477,7 +476,7 @@ public final class LyricsProviderService: ObservableObject {
         return results
     }
 
-    // MARK: - Musixmatch API 請求（免金鑰匿名憑證 + Richsync 逐字 + 雙重把關）
+    // MARK: - Musixmatch API Integration
     private func getMusixmatchToken() async -> String? {
         if let stored = UserDefaults.standard.string(forKey: "musixmatchUserToken"),
            !stored.isEmpty, stored != "00000000000000000000000000000000000000000000000000000000" {
@@ -531,12 +530,12 @@ public final class LyricsProviderService: ObservableObject {
         guard !cleanTitle.isEmpty else { return [] }
         guard let token = await getMusixmatchToken() else { return [] }
 
-        // 先以原標題與歌手請求
+        // Query using raw title and artist.
         if let result = await performMusixmatchRequest(title: cleanTitle, artist: cleanArtist, durationSec: durationSec, token: token, allowRetryOn401: true) {
             return [result]
         }
 
-        // 若無結果或被硬性門檻攔截，嘗試清洗後的標題
+        // Fall back to sanitized title if initial query yields no results.
         let variants = MetadataNormalizer.extractQueryVariants(title: cleanTitle, artist: cleanArtist)
         if variants.primaryTitle != cleanTitle && !variants.primaryTitle.isEmpty {
             if let result = await performMusixmatchRequest(title: variants.primaryTitle, artist: variants.primaryArtist, durationSec: durationSec, token: token, allowRetryOn401: true) {
@@ -614,7 +613,7 @@ public final class LyricsProviderService: ObservableObject {
                 return nil
             }
 
-            // 驗證 Musixmatch 回傳之真實曲目資訊 (嚴格防張冠李戴)
+            // Validate candidate metadata against target track.
             var mxmTrackName = title
             var mxmArtistName = artist
             var mxmDuration = durationSec
@@ -636,7 +635,7 @@ public final class LyricsProviderService: ObservableObject {
                 }
             }
 
-            // 執行嚴格硬性門檻驗證
+            // Apply strict verification thresholds.
             guard MetadataNormalizer.evaluateCandidateMatch(
                 targetTitle: title,
                 targetArtist: artist,
@@ -649,7 +648,7 @@ public final class LyricsProviderService: ObservableObject {
                 return nil
             }
 
-            // 1. 優先嘗試 Richsync 逐字音節時間軸
+            // 1. Attempt Richsync syllable-level lyrics.
             if let richsyncCall = macroCalls["track.richsync.get"] as? [String: Any],
                let rsMsg = richsyncCall["message"] as? [String: Any],
                let rsHeader = rsMsg["header"] as? [String: Any],
@@ -674,7 +673,7 @@ public final class LyricsProviderService: ObservableObject {
                 }
             }
 
-            // 2. 若無逐字，降級提取 Subtitles 逐行時間軸
+            // 2. Fall back to Subtitles line-level lyrics.
             if let subCall = macroCalls["track.subtitles.get"] as? [String: Any],
                let subMsg = subCall["message"] as? [String: Any],
                let subHeader = subMsg["header"] as? [String: Any],
@@ -706,7 +705,7 @@ public final class LyricsProviderService: ObservableObject {
         return nil
     }
 
-    // MARK: - LRCLIB API 請求（支援精確匹配與 /api/search 雙重把關）
+    // MARK: - LRCLIB API Integration
     private struct LRCLIBRecord: Codable {
         let id: Int?
         let trackName: String?
@@ -724,7 +723,7 @@ public final class LyricsProviderService: ObservableObject {
 
         var results: [SyncedLyrics] = []
 
-        // 1. 若只有一筆需求，先嘗試精確 /api/get
+        // 1. Direct match via /api/get.
         if maxCount == 1, var components = URLComponents(string: "https://lrclib.net/api/get") {
             var queryItems = [
                 URLQueryItem(name: "track_name", value: cleanTitle),
@@ -770,11 +769,11 @@ public final class LyricsProviderService: ObservableObject {
             }
         }
 
-        // 2. 備援或多候選檢索：使用 /api/search
+        // 2. Fallback search via /api/search.
         let searchQuery = "\(cleanTitle) \(cleanArtist)".trimmingCharacters(in: .whitespaces)
         results = await performLRCLIBSearch(query: searchQuery, targetTitle: cleanTitle, targetArtist: cleanArtist, durationSec: durationSec, maxCount: maxCount)
 
-        // 若無結果，嘗試清洗後的標題
+        // Retry with sanitized title if no match found.
         if results.isEmpty {
             let variants = MetadataNormalizer.extractQueryVariants(title: cleanTitle, artist: cleanArtist)
             if variants.primaryTitle != cleanTitle && !variants.primaryTitle.isEmpty {
@@ -854,7 +853,7 @@ public final class LyricsProviderService: ObservableObject {
         await fetchCandidatesFromLRCLIB(title: title, artist: artist, durationSec: durationSec, maxCount: 1).first
     }
 
-    // MARK: - 網易雲音樂公開 API 請求（擴充別名與 transNames，支援 YRC/KRC/LRC 與繁簡折疊評分）
+    // MARK: - NetEase Cloud Music API Integration
     private struct NetEaseSearchResult: Codable {
         struct ResultData: Codable {
             struct Song: Codable {
@@ -886,7 +885,7 @@ public final class LyricsProviderService: ObservableObject {
 
         var candidateSongs = await requestNetEaseSearchCandidates(title: cleanTitle, artist: cleanArtist, durationSec: durationSec)
 
-        // 若第一次查詢無結果，嘗試以清洗後的 primaryTitle 或 secondaryTitle 重試
+        // Retry with sanitized primary or secondary title if initial search returns empty.
         if candidateSongs.isEmpty {
             let variants = MetadataNormalizer.extractQueryVariants(title: cleanTitle, artist: cleanArtist)
             if variants.primaryTitle != cleanTitle && !variants.primaryTitle.isEmpty {
@@ -1036,7 +1035,7 @@ public final class LyricsProviderService: ObservableObject {
                     finalLines = LRCParser.shared.mergeTranslations(original: cleanLines, translation: transLines)
                     transTargetLang = "zh-Hans"
                 }
-                // 若目標語言為其他語言（如 en/ja），不套用中文 tlyric，留待 TranslationSession 批次翻譯
+                // When targeting other languages (e.g. en, ja), bypass Chinese tlyric and let TranslationSession translate.
             }
 
             let resolvedTitle = songItem.song.name.isEmpty ? targetTitle : songItem.song.name
@@ -1057,7 +1056,7 @@ public final class LyricsProviderService: ObservableObject {
         }
     }
 
-    // MARK: - PetitLyrics API 請求（WSY 逐字 + LSY 逐行 + 雙重把關）
+    // MARK: - PetitLyrics API Integration
     public func fetchCandidatesFromPetitLyrics(title: String, artist: String, durationSec: TimeInterval = 0, maxCount: Int = 3) async -> [SyncedLyrics] {
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1347,7 +1346,7 @@ public final class LyricsProviderService: ObservableObject {
     }
 }
 
-// MARK: - 元資料正規化與候選匹配雙重把關引擎
+// MARK: - Metadata Sanitization And Match Verification Engine
 public struct MetadataNormalizer {
     public static func foldText(_ text: String) -> String {
         var transformed = text
@@ -1369,7 +1368,7 @@ public struct MetadataNormalizer {
             if CharacterSet.punctuationCharacters.contains(scalar) ||
                CharacterSet.whitespacesAndNewlines.contains(scalar) ||
                CharacterSet.symbols.contains(scalar) ||
-               scalar.value == 0x3000 || // 全形空白
+               scalar.value == 0x3000 || // Full-width space.
                scalar.value == 0x3001 || // 、
                scalar.value == 0x3002 || // 。
                scalar.value == 0xFF08 || // （
@@ -1390,7 +1389,7 @@ public struct MetadataNormalizer {
 
     public static func extractQueryVariants(title: String, artist: String) -> (primaryTitle: String, secondaryTitle: String?, primaryArtist: String, searchVariants: [String]) {
         var cleanTitle = title
-        // 1. 移除常見干擾標籤 (支援半形與全形括號)
+        // 1. Strip common media brackets and descriptor tags.
         let noisePatterns = [
             #"(?i)[\(\[\{（【「『〔［]\s*(?:feat\.|ft\.|featuring|prod\.|produced by)[^\)\]\}）】」』〕］]+[\)\]\}）】」』〕］]"#,
             #"(?i)\b(?:feat\.|ft\.|featuring|prod\.|produced by)\b[^\-]+"#,
@@ -1414,7 +1413,7 @@ public struct MetadataNormalizer {
             cleanTitle = title
         }
 
-        // 2. 拆解雙語或括號別名 (如 "Idol (アイドル)", "光るなら (Your Lie in April)")
+        // 2. Extract bilingual or parenthetical alias titles.
         var primary = cleanTitle
         var secondary: String? = nil
 
@@ -1436,7 +1435,7 @@ public struct MetadataNormalizer {
             }
         }
 
-        // 3. 提取主歌手
+        // 3. Extract primary artist.
         var primaryArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
         let artistDelimiters = [", ", " / ", " & ", " × ", " feat. ", " feat ", " ft. ", " (CV: ", " (CV.", " CV: "]
         for delim in artistDelimiters {
@@ -1449,7 +1448,7 @@ public struct MetadataNormalizer {
             primaryArtist = artist
         }
 
-        // 4. 建構查詢候選
+        // 4. Build query candidates.
         var variants: [String] = []
         let rawCombined = "\(title) \(artist)".trimmingCharacters(in: .whitespacesAndNewlines)
         variants.append(rawCombined)
@@ -1534,7 +1533,7 @@ public struct MetadataNormalizer {
 
         guard !foldedTargets.isEmpty && !foldedCandidates.isEmpty else { return nil }
 
-        // 1. 歌名比對
+        // 1. Title similarity comparison.
         var bestTitleSim: Double = 0.0
         var titleScoreBonus: Double = 0.0
 
@@ -1566,12 +1565,12 @@ public struct MetadataNormalizer {
             }
         }
 
-        // 硬性門檻 1: 歌名折疊後相似度 < 0.45 直接淘汰 (阻絕張冠李戴)
+        // Reject candidate if normalized title similarity falls below threshold (< 0.45).
         if bestTitleSim < 0.45 {
             return nil
         }
 
-        // 2. 版本衝突與伴奏檢驗
+        // 2. Instrumental and version mismatch verification.
         let targetTitleLower = targetTitle.lowercased()
         let candTitleLower = candidateTitle.lowercased()
 
@@ -1579,7 +1578,7 @@ public struct MetadataNormalizer {
         let isCandInst = candTitleLower.contains("instrumental") || candTitleLower.contains("伴奏") || candTitleLower.contains("karaoke") || candTitleLower.contains("カラオケ") || candTitleLower.contains("off vocal")
 
         if !isTargetInst && isCandInst {
-            return nil // 目標為原曲，候選為伴奏，硬性淘汰
+            return nil // Instrumental mismatch.
         }
 
         var versionPenalty: Double = 0.0
@@ -1601,13 +1600,13 @@ public struct MetadataNormalizer {
             versionPenalty += 60.0
         }
 
-        // 3. 時長誤差檢驗
+        // 3. Duration tolerance check.
         var durationScore: Double = 0.0
         var diff: Double = 0.0
         if targetDuration > 0 && candidateDuration > 0 {
             diff = abs(candidateDuration - targetDuration)
             if !isTargetLive && diff > 12.0 {
-                return nil // 非 Live 時長誤差 > 12 秒，硬性淘汰
+                return nil // Exceeds duration difference tolerance.
             }
             if diff < 3.0 {
                 durationScore = 40.0
@@ -1620,7 +1619,7 @@ public struct MetadataNormalizer {
             }
         }
 
-        // 4. 歌手匹配檢驗
+        // 4. Artist matching check.
         var artistScore: Double = 0.0
         let foldedTargetArt = foldText(targetArtist)
         let foldedPrimaryTargetArt = foldText(primaryTargetArt)
@@ -1633,12 +1632,10 @@ public struct MetadataNormalizer {
             if match1 || match2 {
                 artistScore = 25.0
             } else {
-                // 歌手完全不符：嚴格防範「同名異曲」張冠李戴
-                // 1. 若時長誤差 > 3.0 秒，或雙方任何一方缺乏有效時長無法驗證，直接淘汰！
+                // Strict mismatched artist guard: verify duration difference and check against cross-language script contamination.
                 if targetDuration <= 0 || candidateDuration <= 0 || diff > 3.0 {
                     return nil
                 }
-                // 2. 跨語系假名污染防護：若目標曲目完全不含日文假名，而候選歌手或曲名包含日文假名，直接淘汰
                 let targetHasKana = (targetTitle + targetArtist).unicodeScalars.contains { s in
                     let v = s.value
                     return (v >= 0x3040 && v <= 0x309F) || (v >= 0x30A0 && v <= 0x30FF) || (v >= 0xFF66 && v <= 0xFF9F)
@@ -1665,7 +1662,7 @@ public struct MetadataNormalizer {
     }
 }
 
-// MARK: - PetitLyrics API 回應模型與 XML 解析器
+// MARK: - PetitLyrics API Response Models and XML Parser
 private struct PetitLyricsCandidate {
     var lyricsId: String = ""
     var title: String = ""
