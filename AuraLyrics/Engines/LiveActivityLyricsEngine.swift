@@ -1,12 +1,31 @@
 import Foundation
 import ActivityKit
+import BackgroundTasks
 import Combine
 import UIKit
 
-/// Native Live Activity and Dynamic Island lyrics engine using ActivityKit.
+/// Native Live Activity and Dynamic Island lyrics engine supporting both ActivityKit and BGContinuedProcessingTask.
 @MainActor
 public final class LiveActivityLyricsEngine: ObservableObject {
     public static let shared = LiveActivityLyricsEngine()
+
+    // MARK: - Channel B (BGContinuedProcessingTask) Identifiers & State
+    public static let continuedTaskIdentifier = "com.auralyrics.app.bgtask.lyrics"
+
+    private var currentContinuedTask: BGContinuedProcessingTask?
+    private var isContinuedTaskRegistered: Bool = false
+    private var pendingForegroundSubmission: Bool = false
+
+    // Monotonic Progress Guard state variables
+    private var monotonicBaseUnits: Int64 = 0
+    private let unitsPerTrack: Int64 = 100
+    private var lastReportedCompletedUnits: Int64 = 0
+    private var lastTrackKey: String = ""
+
+    // Debounce cache for Channel B updates
+    private var lastSentContinuedTitle: String?
+    private var lastSentContinuedSubtitle: String?
+    private var lastSentContinuedIsPlaying: Bool = true
 
     // MARK: - User Preferences
     @Published public var isEnabled: Bool {
@@ -64,6 +83,15 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         return UITraitCollection.current.userInterfaceStyle == .light
     }
 
+    /// Determines whether the engine should utilize the BGContinuedProcessingTask channel.
+    private var shouldUseContinuedProcessing: Bool {
+        if #available(iOS 26.0, *) {
+            let detector = RuntimeEnvironmentDetector.shared
+            return detector.isUsingContinuedProcessingLiveActivity || detector.isLiveContainer
+        }
+        return false
+    }
+
     private init() {
         self.isEnabled = UserDefaults.standard.bool(forKey: "isLiveActivityEnabled")
 
@@ -82,6 +110,41 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         let secondaryRaw = UserDefaults.standard.string(forKey: "liveActivitySecondaryMode")
             ?? LiveActivitySecondaryMode.bilingualOrNext.rawValue
         self.secondaryMode = LiveActivitySecondaryMode(rawValue: secondaryRaw) ?? .bilingualOrNext
+
+        // Register BGContinuedProcessingTask handler during startup.
+        registerContinuedProcessingTask()
+
+        // Register foreground notification observer to resume pending submissions.
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleAppDidBecomeActive()
+        }
+    }
+
+    /// Pre-registers the background continued processing task before application launch completes.
+    public func registerContinuedProcessingTask() {
+        guard #available(iOS 26.0, *), !isContinuedTaskRegistered else { return }
+        isContinuedTaskRegistered = true
+
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.continuedTaskIdentifier,
+            using: .main
+        ) { [weak self] task in
+            guard let continuedTask = task as? BGContinuedProcessingTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            self?.handleContinuedProcessingTaskLaunch(continuedTask)
+        }
+    }
+
+    private func handleAppDidBecomeActive() {
+        guard pendingForegroundSubmission, isEnabled else { return }
+        pendingForegroundSubmission = false
+        startActivity(track: AppleMusicMonitor.shared.currentTrack)
     }
 
     // MARK: - Start Live Activity
@@ -90,13 +153,22 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         initialLine: String? = nil,
         initialSecondary: String? = nil
     ) {
-        guard #available(iOS 16.2, *) else {
-            lastErrorMessage = String(localized: "此 iOS 版本不支援即時動態")
+        guard isEnabled else { return }
+
+        // Route to Channel B (BGContinuedProcessingTask) when running under LiveContainer.
+        if shouldUseContinuedProcessing {
+            startContinuedProcessingTask(track: track, initialLine: initialLine, initialSecondary: initialSecondary)
             return
         }
 
         if RuntimeEnvironmentDetector.shared.isLiveContainer {
-            lastErrorMessage = String(localized: "LiveContainer 虛擬環境無法載入 Widget Extension，請改用子母畫面 (PiP) 懸浮視窗")
+            lastErrorMessage = String(localized: "LiveContainer 虛擬環境需 iOS 26+ 方可使用免 Extension 即時動態，請改用子母畫面 (PiP) 懸浮視窗")
+            return
+        }
+
+        // Channel A: Native ActivityKit
+        guard #available(iOS 16.2, *) else {
+            lastErrorMessage = String(localized: "此 iOS 版本不支援即時動態")
             return
         }
 
@@ -130,6 +202,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: true,
             progress: 0.0,
             artworkPath: artworkPath,
+            artworkData: track.artworkData,
             compactStyle: compactStyle.rawValue,
             isLightMode: isSystemLightMode
         )
@@ -169,6 +242,97 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
+    /// Submits a BGContinuedProcessingTask request with foreground guards and monotonic progress initialization.
+    private func startContinuedProcessingTask(
+        track: TrackInfo,
+        initialLine: String?,
+        initialSecondary: String?
+    ) {
+        guard #available(iOS 26.0, *) else { return }
+
+        let lineText = (initialLine?.isEmpty == false) ? initialLine! :
+            ((track.title == TrackInfo.placeholder.title) ? String(localized: "AuraLyrics 即時歌詞") : track.title)
+        let secondaryText = initialSecondary ?? (track.artist.isEmpty ? nil : track.artist)
+
+        // If a task is already active, update its titles and progress in place.
+        if let task = currentContinuedTask {
+            task.updateTitle(lineText, subtitle: secondaryText)
+            self.lastSentContinuedTitle = lineText
+            self.lastSentContinuedSubtitle = secondaryText
+            self.lastSentContinuedIsPlaying = true
+            self.isActivityActive = true
+            self.lastErrorMessage = nil
+            BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
+            return
+        }
+
+        // Foreground submit guard: Apple requires first submission to occur while the app is active.
+        if UIApplication.shared.applicationState != .active {
+            self.pendingForegroundSubmission = true
+            self.lastErrorMessage = String(localized: "首次啟動免擴充動態島必須在 App 前景狀態下進行，請返回 AuraLyrics 開啟")
+            return
+        }
+
+        let request = BGContinuedProcessingTaskRequest(
+            identifier: Self.continuedTaskIdentifier,
+            title: lineText,
+            subtitle: secondaryText
+        )
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            self.pendingForegroundSubmission = false
+            self.isActivityActive = true
+            self.lastErrorMessage = nil
+            self.lastSentContinuedTitle = lineText
+            self.lastSentContinuedSubtitle = secondaryText
+            self.lastSentContinuedIsPlaying = true
+            BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
+        } catch {
+            self.lastErrorMessage = String(format: String(localized: "啟動免擴充動態島失敗: %@"), error.localizedDescription)
+            self.isActivityActive = false
+        }
+    }
+
+    /// Handles launch callback from BGTaskScheduler for a continued processing task.
+    private func handleContinuedProcessingTaskLaunch(_ task: BGContinuedProcessingTask) {
+        task.expirationHandler = { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.handleContinuedTaskExpired(task)
+            }
+        }
+
+        self.currentContinuedTask = task
+        self.isActivityActive = true
+        self.lastErrorMessage = nil
+
+        // Initialize monotonic progress counters.
+        task.progress.totalUnitCount = monotonicBaseUnits + unitsPerTrack
+        task.progress.completedUnitCount = max(monotonicBaseUnits, lastReportedCompletedUnits)
+        lastReportedCompletedUnits = task.progress.completedUnitCount
+
+        // Immediately apply current track state if available.
+        let track = AppleMusicMonitor.shared.currentTrack
+        let title = (track.title == TrackInfo.placeholder.title) ? String(localized: "AuraLyrics 即時歌詞") : track.title
+        let subtitle = track.artist.isEmpty ? nil : track.artist
+        task.updateTitle(title, subtitle: subtitle)
+        self.lastSentContinuedTitle = title
+        self.lastSentContinuedSubtitle = subtitle
+
+        BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
+    }
+
+    /// Handles system task expiration by marking incomplete and scheduling recovery.
+    private func handleContinuedTaskExpired(_ task: BGContinuedProcessingTask) {
+        task.setTaskCompleted(success: false)
+        if currentContinuedTask === task {
+            currentContinuedTask = nil
+        }
+        self.isActivityActive = false
+        self.pendingForegroundSubmission = true
+        BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
+    }
+
     // MARK: - Update Lyrics State
     public func updateLyrics(
         line: String,
@@ -180,6 +344,19 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     ) {
         guard isEnabled else { return }
 
+        // Route to Channel B when active or indicated.
+        if shouldUseContinuedProcessing || currentContinuedTask != nil {
+            updateContinuedProcessingLyrics(
+                line: line,
+                secondaryLine: secondaryLine,
+                track: track,
+                isPlaying: isPlaying,
+                progress: progress
+            )
+            return
+        }
+
+        // Channel A (ActivityKit) execution
         guard let activity = currentActivity else {
             if isPlaying {
                 startActivity(track: track, initialLine: line, initialSecondary: secondaryLine)
@@ -196,7 +373,6 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
 
         let artworkPath = currentCachedArtworkPath ?? cacheArtwork(from: track.artworkData)
-
         let currentLight = isSystemLightMode
 
         // Skip redundant IPC updates if state payload is unchanged.
@@ -219,12 +395,12 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isPlaying: isPlaying,
             progress: progress,
             artworkPath: artworkPath,
+            artworkData: track.artworkData,
             compactStyle: compactStyle.rawValue,
             isLightMode: currentLight
         )
         lastSentState = updatedState
 
-        // Calculate dynamic staleDate based on interval to next lyric line.
         let delta = nextLineIntervalSec ?? 8.0
         let staleTimeout = min(max(delta + 2.5, 4.0), 12.0)
         let targetStaleDate = Date().addingTimeInterval(staleTimeout)
@@ -237,9 +413,76 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
+    /// Dispatches title, subtitle, and monotonic progress updates to BGContinuedProcessingTask.
+    private func updateContinuedProcessingLyrics(
+        line: String,
+        secondaryLine: String?,
+        track: TrackInfo,
+        isPlaying: Bool,
+        progress: Double
+    ) {
+        guard let task = currentContinuedTask else {
+            if isPlaying {
+                startContinuedProcessingTask(track: track, initialLine: line, initialSecondary: secondaryLine)
+            }
+            return
+        }
+
+        let resolvedSecondary: String?
+        switch secondaryMode {
+        case .bilingualOrNext, .bilingualOnly, .nextOnly:
+            resolvedSecondary = secondaryLine ?? (track.artist.isEmpty ? nil : track.artist)
+        case .none:
+            resolvedSecondary = track.artist.isEmpty ? nil : track.artist
+        }
+
+        // Debounce title & subtitle updates to reduce cross-process IPC.
+        let isContentChanged = (lastSentContinuedTitle != line ||
+                                lastSentContinuedSubtitle != resolvedSecondary ||
+                                lastSentContinuedIsPlaying != isPlaying)
+
+        if isContentChanged {
+            task.updateTitle(line, subtitle: resolvedSecondary)
+            lastSentContinuedTitle = line
+            lastSentContinuedSubtitle = resolvedSecondary
+            lastSentContinuedIsPlaying = isPlaying
+        }
+
+        // Monotonic Progress Guard: advance track unit counter and prevent backward progression.
+        let trackKey = "\(track.title)_\(track.artist)"
+        if !lastTrackKey.isEmpty && lastTrackKey != trackKey {
+            // Track changed: shift monotonic base units upward without rewinding completed units.
+            monotonicBaseUnits = max(lastReportedCompletedUnits, monotonicBaseUnits + unitsPerTrack)
+        }
+        lastTrackKey = trackKey
+
+        let clampedProgress = min(max(progress, 0.0), 1.0)
+        let songProgressUnits = Int64(clampedProgress * Double(unitsPerTrack))
+        let targetCompleted = monotonicBaseUnits + songProgressUnits
+        let newCompleted = max(targetCompleted, lastReportedCompletedUnits)
+
+        task.progress.totalUnitCount = monotonicBaseUnits + unitsPerTrack
+        task.progress.completedUnitCount = newCompleted
+        lastReportedCompletedUnits = newCompleted
+    }
+
     // MARK: - Heartbeat for Long Instrumental Breaks
     public func sendHeartbeat(track: TrackInfo) {
-        guard isActivityActive, let activity = currentActivity, let last = lastSentState else { return }
+        guard isActivityActive else { return }
+
+        // Channel B: Nudge monotonic progress forward to prevent system reclamation.
+        if let task = currentContinuedTask {
+            let total = task.progress.totalUnitCount
+            if lastReportedCompletedUnits < total - 1 {
+                let bumped = lastReportedCompletedUnits + 1
+                task.progress.completedUnitCount = bumped
+                lastReportedCompletedUnits = bumped
+            }
+            return
+        }
+
+        // Channel A: Extend ActivityKit staleDate.
+        guard let activity = currentActivity, let last = lastSentState else { return }
         let nextStale = Date().addingTimeInterval(8)
         updateTask?.cancel()
         updateTask = Task {
@@ -254,8 +497,12 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         switch pausePolicy {
         case .dismissImmediately:
             endActivity()
+
         case .keepActiveWithTimeout:
-            if var state = lastSentState, let activity = currentActivity {
+            if let task = currentContinuedTask {
+                task.updateTitle(lastSentContinuedTitle ?? "", subtitle: String(localized: "已暫停"))
+                lastSentContinuedIsPlaying = false
+            } else if var state = lastSentState, let activity = currentActivity {
                 state.isPlaying = false
                 lastSentState = state
                 updateTask?.cancel()
@@ -263,14 +510,19 @@ public final class LiveActivityLyricsEngine: ObservableObject {
                     await activity.update(ActivityContent(state: state, staleDate: nil))
                 }
             }
+
             pauseTimer?.invalidate()
             pauseTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: false) { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.endActivity()
                 }
             }
+
         case .keepActiveAlways:
-            if var state = lastSentState, let activity = currentActivity {
+            if let task = currentContinuedTask {
+                task.updateTitle(lastSentContinuedTitle ?? "", subtitle: String(localized: "已暫停"))
+                lastSentContinuedIsPlaying = false
+            } else if var state = lastSentState, let activity = currentActivity {
                 state.isPlaying = false
                 lastSentState = state
                 updateTask?.cancel()
@@ -287,18 +539,19 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         guard isEnabled else { return }
 
-        if currentActivity == nil {
+        if currentActivity == nil && currentContinuedTask == nil {
             if resumePolicy == .autoResume {
                 startActivity(track: track)
             }
-        } else {
-            if var state = lastSentState, let activity = currentActivity {
-                state.isPlaying = true
-                lastSentState = state
-                updateTask?.cancel()
-                updateTask = Task {
-                    await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(8)))
-                }
+        } else if let task = currentContinuedTask {
+            lastSentContinuedIsPlaying = true
+            task.updateTitle(lastSentContinuedTitle ?? track.title, subtitle: lastSentContinuedSubtitle ?? track.artist)
+        } else if var state = lastSentState, let activity = currentActivity {
+            state.isPlaying = true
+            lastSentState = state
+            updateTask?.cancel()
+            updateTask = Task {
+                await activity.update(ActivityContent(state: state, staleDate: Date().addingTimeInterval(8)))
             }
         }
     }
@@ -321,22 +574,37 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         updateTask = nil
         lastSentState = nil
         currentCachedArtworkPath = nil
+        pendingForegroundSubmission = false
 
-        guard let activity = currentActivity else {
+        // Tear down Channel B continued processing task.
+        if let task = currentContinuedTask {
+            task.setTaskCompleted(success: true)
+            self.currentContinuedTask = nil
+        }
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
+
+        // Reset monotonic tracking for fresh sessions.
+        monotonicBaseUnits = 0
+        lastReportedCompletedUnits = 0
+        lastTrackKey = ""
+        lastSentContinuedTitle = nil
+        lastSentContinuedSubtitle = nil
+
+        // Tear down Channel A ActivityKit.
+        if let activity = currentActivity {
+            self.currentActivity = nil
+            Task {
+                await activity.end(nil, dismissalPolicy: .immediate)
+            }
+        } else {
             Task {
                 for act in Activity<LyricsActivityAttributes>.activities {
                     await act.end(nil, dismissalPolicy: .immediate)
                 }
             }
-            BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
-            return
         }
 
-        self.currentActivity = nil
         self.isActivityActive = false
-        Task {
-            await activity.end(nil, dismissalPolicy: .immediate)
-        }
         BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
     }
 
@@ -353,6 +621,9 @@ public final class LiveActivityLyricsEngine: ObservableObject {
                 UIApplication.shared.endBackgroundTask(taskID)
             }
         }
+
+        // Cancel pending background task requests synchronously.
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: "com.auralyrics.app.bgtask.lyrics")
 
         Task.detached {
             for activity in Activity<LyricsActivityAttributes>.activities {
@@ -371,6 +642,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
     // MARK: - Clean Up Orphaned Activities
     public func cleanUpOrphanedActivities() {
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
         Task {
             for activity in Activity<LyricsActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
