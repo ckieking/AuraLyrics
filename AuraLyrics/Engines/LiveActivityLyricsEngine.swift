@@ -121,7 +121,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             forName: UIApplication.didBecomeActiveNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { @MainActor [weak self] _ in
             self?.handleAppDidBecomeActive()
         }
     }
@@ -262,7 +262,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         // If a task is already active, update its titles and progress in place.
         if let task = currentContinuedTask {
-            task.updateTitle(lineText, subtitle: secondaryText)
+            task.updateTitle(lineText, subtitle: secondaryText ?? "")
             self.lastSentContinuedTitle = lineText
             self.lastSentContinuedSubtitle = secondaryText
             self.lastSentContinuedIsPlaying = true
@@ -285,7 +285,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         let request = BGContinuedProcessingTaskRequest(
             identifier: Self.continuedTaskIdentifier,
             title: lineText,
-            subtitle: secondaryText
+            subtitle: secondaryText ?? ""
         )
 
         self.isSubmittingContinuedTask = true
@@ -333,7 +333,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         let track = AppleMusicMonitor.shared.currentTrack
         let title = (track.title == TrackInfo.placeholder.title) ? String(localized: "AuraLyrics 即時歌詞") : track.title
         let subtitle = track.artist.isEmpty ? nil : track.artist
-        task.updateTitle(title, subtitle: subtitle)
+        task.updateTitle(title, subtitle: subtitle ?? "")
         self.lastSentContinuedTitle = title
         self.lastSentContinuedSubtitle = subtitle
 
@@ -473,7 +473,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
                                 lastSentContinuedIsPlaying != isPlaying)
 
         if isContentChanged {
-            task.updateTitle(line, subtitle: resolvedSecondary)
+            task.updateTitle(line, subtitle: resolvedSecondary ?? "")
             lastSentContinuedTitle = line
             lastSentContinuedSubtitle = resolvedSecondary
             lastSentContinuedIsPlaying = isPlaying
@@ -665,7 +665,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
 
         // Cancel pending background task requests synchronously.
-        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: "com.auralyrics.app.bgtask.lyrics")
+        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
 
         Task.detached {
             for activity in Activity<LyricsActivityAttributes>.activities {
@@ -674,7 +674,9 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             let taskID = holder.id
             if taskID != .invalid {
                 holder.id = .invalid
-                UIApplication.shared.endBackgroundTask(taskID)
+                await MainActor.run {
+                    UIApplication.shared.endBackgroundTask(taskID)
+                }
             }
         }
 

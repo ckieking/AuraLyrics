@@ -137,7 +137,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         let testIdentifier: NSString = "com.auralyrics.app.bgtask.lyrics"
         let sel = NSSelectorFromString("isPermissibleFullyComposedIdentifier:")
 
-        if let sharedMethod = class_getClassMethod(registryClass, NSSelectorFromString("sharedRegistry")),
+        if class_getClassMethod(registryClass, NSSelectorFromString("sharedRegistry")) != nil,
            let sharedRegistry = (registryClass as AnyObject).perform(NSSelectorFromString("sharedRegistry"))?.takeUnretainedValue() {
             if let method = class_getInstanceMethod(registryClass, sel) {
                 let imp = method_getImplementation(method)
@@ -425,7 +425,11 @@ private final class LCBackgroundTaskCoder: NSObject {
 
     @objc(decodeObjectOfClass:forKey:)
     func decodeObject(of aClass: AnyClass, forKey key: String) -> Any? {
-        let obj = coder.decodeObject(of: aClass, forKey: key)
+        let sel = NSSelectorFromString("decodeObjectOfClass:forKey:")
+        var obj: Any?
+        if (coder as AnyObject).responds(to: sel) {
+            obj = (coder as AnyObject).perform(sel, with: aClass, with: key)?.takeUnretainedValue()
+        }
         return translatedObject(obj, forKey: key)
     }
 
