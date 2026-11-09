@@ -84,6 +84,7 @@ jobs:
                   "NSLocationWhenInUseUsageDescription",
                   "NSLocationAlwaysAndWhenInUseUsageDescription",
                   "UIBackgroundModes",
+                  "BGTaskSchedulerPermittedIdentifiers",
                   "NSSupportsLiveActivities",
                   "NSSupportsLiveActivitiesFrequentUpdates",
                   "LSRequiresIPhoneOS",
@@ -102,6 +103,10 @@ jobs:
               print(f"✓ Successfully merged main App Info.plist ({len(target)} keys)")
               assert "NSAppleMusicUsageDescription" in target, "Missing NSAppleMusicUsageDescription key!"
               assert "UIBackgroundModes" in target, "Missing UIBackgroundModes key!"
+              assert "BGTaskSchedulerPermittedIdentifiers" in target, "Missing BGTaskSchedulerPermittedIdentifiers key!"
+              bg_ids = target.get("BGTaskSchedulerPermittedIdentifiers", [])
+              assert "com.auralyrics.app.bgtask.*" in bg_ids, "Missing wildcard bgtask ID!"
+              assert "com.auralyrics.app.bgtask.lyrics" in bg_ids, "Missing specific bgtask ID!"
 
           # 2. Widget Extension Info.plist completion and version synchronization
           widget_plist_path = "package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
@@ -138,6 +143,7 @@ jobs:
               print("  CFBundleShortVersionString:", p.get("CFBundleShortVersionString"))
               print("  CFBundleVersion:", p.get("CFBundleVersion"))
               print("  NSAppleMusicUsageDescription:", p.get("NSAppleMusicUsageDescription"))
+              print("  BGTaskSchedulerPermittedIdentifiers:", p.get("BGTaskSchedulerPermittedIdentifiers"))
               print("  NSSupportsLiveActivities:", p.get("NSSupportsLiveActivities"))
           '
 

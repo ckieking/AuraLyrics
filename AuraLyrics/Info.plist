@@ -31,6 +31,8 @@
     </array>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
+        <string>com.auralyrics.app.bgtask.*</string>
+        <string>com.auralyrics.app.bgtask.lyrics</string>
         <string>com.auralyrics.bg.lyrics</string>
     </array>
     <key>NSLocationWhenInUseUsageDescription</key>
