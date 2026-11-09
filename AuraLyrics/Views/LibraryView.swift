@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 本地歌詞庫與快取管理視圖（Apple HIG 搜尋、預覽彈窗與狀態感知）
+/// Cached lyrics library and management view with search and preview sheet.
 struct LibraryView: View {
     @ObservedObject private var musicMonitor = AppleMusicMonitor.shared
     @State private var cachedLyrics: [SyncedLyrics] = []
@@ -83,7 +83,7 @@ struct LibraryView: View {
         }
     }
 
-    // MARK: - 歌詞列表
+    // MARK: - Lyrics List
     private var lyricsListView: some View {
         List {
             Section {
@@ -91,7 +91,7 @@ struct LibraryView: View {
                     let isPlaying = isCurrentPlaying(lyrics)
 
                     HStack(spacing: 12) {
-                        // 點選套用主要熱區
+                        // Apply lyrics button
                         Button {
                             applyLyrics(lyrics)
                         } label: {
@@ -157,7 +157,7 @@ struct LibraryView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityLabel(String(format: String(localized: "%@，%@，來源 %@%@"), lyrics.trackTitle, lyrics.artistName, lyrics.source, isPlaying ? String(localized: "，正在套用中") : ""))
 
-                        // 獨立預覽按鈕 (>= 44x44pt 拇指熱區)
+                        // Preview button
                         Button {
                             previewTarget = lyrics
                         } label: {
@@ -186,7 +186,7 @@ struct LibraryView: View {
         .listStyle(.insetGrouped)
     }
 
-    // MARK: - 空資料夾狀態
+    // MARK: - Empty Library View
     private var emptyLibraryView: some View {
         VStack(spacing: 16) {
             ZStack {
@@ -228,7 +228,7 @@ struct LibraryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - 搜尋無結果狀態
+    // MARK: - Empty Search View
     private var emptySearchView: some View {
         VStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
@@ -255,7 +255,7 @@ struct LibraryView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - 輔助方法
+    // MARK: - Helper Methods
     private func isCurrentPlaying(_ lyrics: SyncedLyrics) -> Bool {
         guard !musicMonitor.currentTrack.title.isEmpty else { return false }
         return musicMonitor.currentLyrics.trackTitle == lyrics.trackTitle &&
@@ -306,7 +306,7 @@ struct LibraryView: View {
     }
 }
 
-// MARK: - 歌詞預覽彈窗 (Apple Sheet 風格)
+// MARK: - Lyrics Preview Sheet
 private struct LyricsPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     let lyrics: SyncedLyrics

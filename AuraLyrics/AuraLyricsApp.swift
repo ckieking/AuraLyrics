@@ -4,22 +4,22 @@ import UIKit
 @main
 struct AuraLyricsApp: App {
     init() {
-        // 1. 偵測環境（LiveContainer vs 獨立側載）
+        // 1. Detect runtime environment (LiveContainer vs standalone sideload).
         RuntimeEnvironmentDetector.shared.detectEnvironment()
 
-        // 2. 註冊 BGTaskScheduler 背景排程任務
+        // 2. Register BGTaskScheduler background tasks.
         BackgroundKeepAliveManager.shared.registerBackgroundTasks()
 
-        // 3. 清理過往異常終止殘留之孤兒即時動態
+        // 3. Clean up orphaned Live Activities from previous termination.
         LiveActivityLyricsEngine.shared.cleanUpOrphanedActivities()
 
-        // 4. 註冊 App 終止監聽，於滑動關閉 App 時非阻塞式清理即時動態
+        // 4. Register termination observer to clean up Live Activities on exit.
         setupTerminationObserver()
 
-        // 5. 啟動 Apple Music 播放器狀態監聽
+        // 5. Start Apple Music playback state monitoring.
         AppleMusicMonitor.shared.startMonitoring()
 
-        // 6. 依據設定啟動智慧分流背景保活
+        // 6. Start background keep-alive according to configured mode.
         BackgroundKeepAliveManager.shared.startKeepAlive()
     }
 
@@ -36,7 +36,7 @@ struct AuraLyricsApp: App {
     var body: some Scene {
         WindowGroup {
             MainTabView()
-                .tint(.pink) // 遵循 Apple HIG 單一強調色原則，呼應 Apple Music 品牌感
+                .tint(.pink) // App accent tint color.
                 .onAppear {
                     BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
                 }

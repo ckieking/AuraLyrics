@@ -1,7 +1,6 @@
 import SwiftUI
 
-/// Apple Music 經典沉浸式動態多色網格漸層背景 (Ambient Mesh Gradient)
-/// 依據歌曲/專輯封面即時提取之主色與多個輔色，建構不受深淺主題干擾的深邃高對比流光舞台
+/// Dynamic mesh gradient background rendered using palette colors extracted from album artwork.
 public struct AmbientGradientBackground: View {
     let palette: ArtworkPalette
     let artworkImage: UIImage?
@@ -21,12 +20,12 @@ public struct AmbientGradientBackground: View {
             let size = proxy.size
 
             ZStack {
-                // MARK: - 最底層：極深色基底，保證任何時候絕對不透白
+                // MARK: - Base Layer: Dark background tone
                 palette.backgroundDark
                     .frame(width: size.width, height: size.height)
 
                 if !reduceTransparency {
-                    // MARK: - 第二層：微弱封面漫射紋理（增加原創封面的視覺關聯度，嚴格約束在容器尺寸內避免撐大外層佈局）
+                    // MARK: - Second Layer: Blurred artwork diffuse texture
                     if let image = artworkImage {
                         Image(uiImage: image)
                             .resizable()
@@ -37,12 +36,12 @@ public struct AmbientGradientBackground: View {
                             .opacity(0.32)
                     }
 
-                    // MARK: - 第三層：Apple Music 原生 3x3 MeshGradient 多焦點流光網格
+                    // MARK: - Third Layer: 3x3 MeshGradient
                     meshGradientView
                         .frame(width: size.width, height: size.height)
                         .clipped()
 
-                    // MARK: - 第四層：頂底暗角與微噪遮罩（確保狀態列與底部完全符合 WCAG AAA 白字對比度）
+                    // MARK: - Fourth Layer: Top and bottom vignette mask
                     LinearGradient(
                         stops: [
                             .init(color: Color.black.opacity(0.45), location: 0.0),
@@ -55,7 +54,7 @@ public struct AmbientGradientBackground: View {
                     )
                     .frame(width: size.width, height: size.height)
                 } else {
-                    // 減少透明度無障礙模式：使用高對比度雙色線性漸層
+                    // Accessibility reduce transparency mode: fallback linear gradient.
                     LinearGradient(
                         colors: [palette.primary, palette.backgroundDark],
                         startPoint: .top,
@@ -78,7 +77,7 @@ public struct AmbientGradientBackground: View {
         }
     }
 
-    // MARK: - iOS 18+ 原生 MeshGradient 3x3 網格
+    // MARK: - 3x3 MeshGradient
     private var meshGradientView: some View {
         let p1X: Float = animateMesh ? 0.42 : 0.58
         let p1Y: Float = animateMesh ? 0.45 : 0.55
@@ -99,7 +98,7 @@ public struct AmbientGradientBackground: View {
                 palette.backgroundDark, palette.primary, palette.backgroundDark
             ]
         )
-        .blur(radius: 20) // 輕微柔化網格交界處，創造如絲綢般平滑流光的奢華質感
+        .blur(radius: 20) // Soften mesh transitions.
         .opacity(0.92)
     }
 }

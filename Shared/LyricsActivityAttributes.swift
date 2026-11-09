@@ -1,27 +1,27 @@
 import ActivityKit
 import Foundation
 
-/// AuraLyrics 的即時動態與動態島資料屬性
+/// ActivityKit attributes for lyrics Live Activity and Dynamic Island.
 public struct LyricsActivityAttributes: ActivityAttributes {
-    /// 動態更新的狀態資料（每當歌詞行切換時傳遞）
+    /// Dynamic state payload pushed on each lyrics line update.
     public struct ContentState: Codable, Hashable, Sendable {
-        /// 當前播放行主歌詞
+        /// Primary current lyrics line text.
         public var currentLine: String
-        /// 次要行（雙語翻譯或下一句歌詞預覽）
+        /// Secondary row text (translation or next line preview).
         public var secondaryLine: String?
-        /// 歌曲名稱
+        /// Track title.
         public var trackTitle: String
-        /// 歌手名稱
+        /// Artist name.
         public var artistName: String
-        /// 播放中狀態
+        /// Playback state indicator.
         public var isPlaying: Bool
-        /// 當前曲目播放進度（0.0 ~ 1.0）
+        /// Current playback progress (0.0 to 1.0).
         public var progress: Double
-        /// 共享群組內的專輯封面縮圖路徑
+        /// App Group relative path to cached artwork thumbnail.
         public var artworkPath: String?
-        /// 緊湊樣式設定
+        /// Dynamic Island compact presentation style key.
         public var compactStyle: String
-        /// 系統淺色模式標記（確保鎖定畫面卡片精準切換深淺外觀）
+        /// Indicates whether system appearance is in light mode.
         public var isLightMode: Bool
 
         public init(
@@ -47,7 +47,7 @@ public struct LyricsActivityAttributes: ActivityAttributes {
         }
     }
 
-    /// 靜態屬性（建立 Live Activity 時指定）
+    /// Static attributes specified upon activity creation.
     public var albumTitle: String
     public var totalDurationSec: Double
 

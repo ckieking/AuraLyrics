@@ -56,7 +56,7 @@ jobs:
           mkdir -p package/Payload
           cp -r build/AuraLyrics.xcarchive/Products/Applications/AuraLyrics.app package/Payload/
 
-          # 核心修復：使用 Python 精確合併原始 Info.plist 權限與宣告（解決 Xcode 剝除自訂鍵值之問題）
+          # Merge source Info.plist keys and synchronize versions
           export TARGET_VERSION="${APP_VERSION}"
           export TARGET_BUILD="${BUILD}"
           python3 - << 'EOF'
@@ -65,7 +65,7 @@ jobs:
           version = os.environ.get("TARGET_VERSION", "0.10.0")
           build = os.environ.get("TARGET_BUILD", "1")
 
-          # 1. 主 App Info.plist 補全與版本同步
+          # 1. Main App Info.plist completion and version synchronization
           main_plist_path = "package/Payload/AuraLyrics.app/Info.plist"
           source_main_path = "AuraLyrics_Info_backup.plist" if os.path.exists("AuraLyrics_Info_backup.plist") else "AuraLyrics/Info.plist"
           if os.path.exists(main_plist_path) and os.path.exists(source_main_path):
@@ -74,7 +74,7 @@ jobs:
               with open(source_main_path, "rb") as f:
                   source = plistlib.load(f)
 
-              # 合併所有自訂欄位，並強制覆蓋關鍵隱私與能力描述
+              # Merge all custom keys and override critical privacy and capability descriptors
               for k, v in source.items():
                   if k not in target:
                       target[k] = v
@@ -99,11 +99,11 @@ jobs:
 
               with open(main_plist_path, "wb") as f:
                   plistlib.dump(target, f)
-              print(f"✓ 成功合併主 App Info.plist (共 {len(target)} 個鍵值)")
-              assert "NSAppleMusicUsageDescription" in target, "缺少 NSAppleMusicUsageDescription 鍵值！"
-              assert "UIBackgroundModes" in target, "缺少 UIBackgroundModes 鍵值！"
+              print(f"✓ Successfully merged main App Info.plist ({len(target)} keys)")
+              assert "NSAppleMusicUsageDescription" in target, "Missing NSAppleMusicUsageDescription key!"
+              assert "UIBackgroundModes" in target, "Missing UIBackgroundModes key!"
 
-          # 2. Widget Extension Info.plist 補全與版本同步
+          # 2. Widget Extension Info.plist completion and version synchronization
           widget_plist_path = "package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
           source_widget_path = "AuraLyricsWidget_Info_backup.plist" if os.path.exists("AuraLyricsWidget_Info_backup.plist") else "AuraLyricsWidget/Info.plist"
           if os.path.exists(widget_plist_path) and os.path.exists(source_widget_path):

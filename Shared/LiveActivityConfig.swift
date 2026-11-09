@@ -1,6 +1,6 @@
 import Foundation
 
-/// 動態島緊湊視圖顯示樣式
+/// Display style for the Dynamic Island compact presentation.
 public enum DynamicIslandCompactStyle: String, CaseIterable, Identifiable, Codable {
     case artworkAndText = "artworkAndText"
     case iconAndText = "iconAndText"
@@ -31,7 +31,7 @@ public enum DynamicIslandCompactStyle: String, CaseIterable, Identifiable, Codab
     }
 }
 
-/// 音樂暫停時即時動態與動態島之保留策略
+/// Retention policy for Live Activity when playback is paused.
 public enum LiveActivityPausePolicy: String, CaseIterable, Identifiable, Codable {
     case keepActiveWithTimeout = "keepActiveWithTimeout"
     case keepActiveAlways = "keepActiveAlways"
@@ -62,7 +62,7 @@ public enum LiveActivityPausePolicy: String, CaseIterable, Identifiable, Codable
     }
 }
 
-/// 音樂恢復播放時的即時動態重啟策略
+/// Resume behavior for Live Activity when playback continues.
 public enum LiveActivityResumePolicy: String, CaseIterable, Identifiable, Codable {
     case autoResume = "autoResume"
     case manualOnly = "manualOnly"
@@ -79,7 +79,7 @@ public enum LiveActivityResumePolicy: String, CaseIterable, Identifiable, Codabl
     }
 }
 
-/// 即時動態與動態島副行資訊顯示模式
+/// Secondary row display mode for Live Activity and Dynamic Island.
 public enum LiveActivitySecondaryMode: String, CaseIterable, Identifiable, Codable {
     case bilingualOrNext = "bilingualOrNext"
     case bilingualOnly = "bilingualOnly"

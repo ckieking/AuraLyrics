@@ -4,7 +4,7 @@ import AVKit
 import SwiftUI
 import Combine
 
-// MARK: - PiP 懸浮視窗專用 ViewModel
+// MARK: - PiP Lyrics View Model
 @MainActor
 public final class PiPLyricsViewModel: ObservableObject {
     public static let shared = PiPLyricsViewModel()
@@ -17,7 +17,7 @@ public final class PiPLyricsViewModel: ObservableObject {
     private init() {}
 }
 
-// MARK: - PiP 懸浮歌詞原生畫面（支援深淺色自適應：上方大字當前歌詞 + 下方小字淺灰下一句歌詞）
+// MARK: - Picture-in-Picture Lyrics View
 public struct PiPLyricsView: View {
     @ObservedObject var vm: PiPLyricsViewModel
     @Environment(\.colorScheme) private var colorScheme
@@ -34,7 +34,7 @@ public struct PiPLyricsView: View {
         let strokeColor = isLight ? Color.black.opacity(0.08) : Color.white.opacity(0.16)
 
         ZStack {
-            // 背景底層：圓角膠囊 (自適應深淺色)
+            // Background capsule layer.
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(backgroundColor)
                 .overlay(
@@ -43,7 +43,7 @@ public struct PiPLyricsView: View {
                 )
 
             VStack(alignment: .leading, spacing: 4) {
-                // 上方大字：播放中當前歌詞（固定字級不縮放、不省略，過長時自然換行至下一行）
+                // Primary current lyric line.
                 Text(vm.primaryLine)
                     .font(.system(size: 17, weight: .bold, design: .rounded))
                     .foregroundColor(primaryTextColor)
@@ -51,7 +51,7 @@ public struct PiPLyricsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 下方小字：下一句歌詞（淺灰，被上方折行大字自然往下推，不縮放）
+                // Secondary preview row (next line or translation).
                 if let nextLine = vm.secondaryLine, !nextLine.isEmpty {
                     Text(nextLine)
                         .font(.system(size: 14, weight: .medium, design: .rounded))
@@ -69,14 +69,14 @@ public struct PiPLyricsView: View {
     }
 }
 
-// MARK: - PiP 懸浮歌詞引擎（採用 AVPictureInPictureVideoCallViewController，無黑屏、無影片控制條）
+// MARK: - Picture-in-Picture Lyrics Engine via AVPictureInPictureVideoCallViewController
 @MainActor
 public final class PiPLyricsEngine: NSObject, ObservableObject {
     public static let shared = PiPLyricsEngine()
 
     @Published public private(set) var isPiPActive: Bool = false
     @Published public private(set) var isPiPPossible: Bool = false
-    /// 懸浮窗功能開關（預設為關閉，關閉時移至背景絕不自動跳出懸浮窗）
+    /// Enables or disables Picture-in-Picture automatic presentation.
     @Published public var isPiPEnabled: Bool = false {
         didSet {
             pipController?.canStartPictureInPictureAutomaticallyFromInline = isPiPEnabled
@@ -91,7 +91,7 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
         }
     }
 
-    /// 來源 View：嵌入主畫面作為 PiP 展開錨點
+    /// Source view providing layout anchor for Picture-in-Picture presentation.
     public let sourceView: UIView = {
         let view = UIView(frame: CGRect(x: 0, y: 0, width: 360, height: 90))
         view.backgroundColor = .clear
@@ -106,18 +106,18 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
         setupPiP()
     }
 
-    // MARK: - 初始化 Picture in Picture 控制器 (VideoCall 模式，純 UIView 渲染)
+    // MARK: - Picture in Picture Setup
     public func setupPiP() {
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
             isPiPPossible = false
             return
         }
 
-        // 1. 建立 VideoCallViewController 並設定理想大小
+        // 1. Configure VideoCallViewController with preferred aspect size.
         let videoCallVC = AVPictureInPictureVideoCallViewController()
         videoCallVC.preferredContentSize = CGSize(width: 360, height: 90)
 
-        // 2. 將 SwiftUI View 嵌入 videoCallVC
+        // 2. Embed SwiftUI lyrics view into videoCallVC.
         let hostingController = UIHostingController(rootView: PiPLyricsView())
         hostingController.view.backgroundColor = .clear
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
@@ -135,7 +135,7 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
         self.pipVideoCallVC = videoCallVC
 
-        // 3. 綁定 activeVideoCallSourceView
+        // 3. Attach active video call source view.
         let contentSource = AVPictureInPictureController.ContentSource(
             activeVideoCallSourceView: sourceView,
             contentViewController: videoCallVC
@@ -143,14 +143,14 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
 
         let controller = AVPictureInPictureController(contentSource: contentSource)
         controller.delegate = self
-        // 預設為關閉：在使用者未主動開啟前，移至背景絕不自動彈出懸浮窗
+        // Disabled by default: prevent auto-presentation until user initiates.
         controller.canStartPictureInPictureAutomaticallyFromInline = false
 
         self.pipController = controller
         self.isPiPPossible = true
     }
 
-    // MARK: - 開啟 / 關閉 PiP
+    // MARK: - Toggle / Start / Stop PiP
     public func togglePiP() {
         guard let controller = pipController else { return }
         if controller.isPictureInPictureActive || isPiPEnabled {
@@ -178,7 +178,7 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
         }
     }
 
-    // MARK: - 更新歌詞狀態至 ViewModel
+    // MARK: - Update Lyrics State In ViewModel
     public func updateLyrics(line: String, secondaryLine: String?, progress: Double) {
         let vm = PiPLyricsViewModel.shared
         if vm.primaryLine != line {

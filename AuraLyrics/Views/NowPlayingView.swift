@@ -3,7 +3,7 @@ import MediaPlayer
 import UIKit
 import Translation
 
-/// Apple Music 正在播放與即時歌詞同步畫面（iOS 27 原生 Apple HIG 沉浸流光舞台 + 右上角獨立放大 Liquid Glass 雙圓鈕）
+/// Now playing view displaying real-time synced lyrics with ambient gradient background and action buttons.
 struct NowPlayingView: View {
     @ObservedObject var monitor = AppleMusicMonitor.shared
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
@@ -22,29 +22,28 @@ struct NowPlayingView: View {
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
 
-    /// Translation 框架會話設定觸發器（變更時觸發 translationTask）
+    /// Translation framework session configuration trigger.
     @State private var translationConfig: TranslationSession.Configuration? = nil
 
-    /// 零重繪之可視行索引與滾動狀態追蹤器（參考型別，不觸發全視圖 body 刷新）
+    /// Tracks visible line indices and scroll state without triggering view body redraws.
     @State private var tracker = ViewportTracker()
 
-    /// 焦點歌詞當前是否在螢幕可視範圍內（離屏時解除全螢幕模糊，保留清晰閱覽體驗）
+    /// Tracks whether current focused line is inside viewport.
     @State private var isCurrentLineInViewport: Bool = true
 
-    /// 快取解碼後之專輯封面圖，避免在 body 內高頻重複解碼 PNG
+    /// Cached decoded artwork image to prevent repetitive decoding.
     @State private var cachedArtworkImage: UIImage? = nil
 
-    /// 當前專輯封面解析出之色彩調色盤（Apple Music 沉浸式流光背景）
+    /// Extracted artwork color palette for ambient gradient backdrop.
     @State private var currentPalette: ArtworkPalette = .fallback
 
     var body: some View {
         NavigationStack {
             ZStack(alignment: .topTrailing) {
-                // MARK: - 內容層：可滾動穿透之歌詞清單（置於純淨空間，絕不被底層背景干擾佈局尺寸）
+                // MARK: - Lyrics Scroll View
                 lyricsScrollView
 
-                // MARK: - 內容頂層：右上角兩顆完全獨立放大的 Liquid Glass 圓形按鈕
-                // 擺脫系統 ToolbarItem 自動分組機制，徹底消除系統膠囊底襯，按鈕即為最底層！
+                // MARK: - Top-Trailing Controls
                 HStack(spacing: 12) {
                     pipIndependentButton
                     moreMenuIndependentButton
@@ -53,7 +52,7 @@ struct NowPlayingView: View {
                 .padding(.top, 8)
             }
             .background {
-                // MARK: - 內容底層修飾：沉浸式動態專輯流光背景 (Ambient Backdrop)
+                // MARK: - Ambient Backdrop
                 ambientBackdrop
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -104,7 +103,7 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 檢查當前歌詞是否需要翻譯並觸發 TranslationSession
+    /// Checks whether lyrics require translation and triggers translation session.
     private func checkAndTriggerTranslation(forceTargetLanguageChange: Bool = false) {
         guard showTranslation else { return }
         let lyrics = monitor.currentLyrics
@@ -112,7 +111,7 @@ struct NowPlayingView: View {
 
         let targetId = translationService.currentTargetLanguage
 
-        // 若原文與目標語言同語系，若為繁中配簡中則進行簡轉繁，否則略過翻譯
+        // Convert Simplified to Traditional Chinese directly if applicable, skipping API translation.
         if LyricsTranslationService.isSameLanguage(lyrics: lyrics, targetLanguageId: targetId) {
             if LyricsTranslationService.isTargetHantAndLyricsSimplified(lyrics: lyrics, targetLanguageId: targetId) {
                 var converted = LyricsTranslationService.convertLyricsToTraditional(lyrics)
@@ -138,7 +137,7 @@ struct NowPlayingView: View {
         }
     }
 
-    // MARK: - 右上角獨立按鈕：子母畫面 (PiP，直徑 40pt，按鈕即為最底層)
+    // MARK: - Picture-in-Picture Button
     private var pipIndependentButton: some View {
         let isPiPOn = pipEngine.isPiPActive || pipEngine.isPiPEnabled
         let buttonDiameter: CGFloat = 40
@@ -160,17 +159,17 @@ struct NowPlayingView: View {
         .accessibilityLabel(isPiPOn ? String(localized: "關閉子母畫面 (PiP)") : String(localized: "開啟子母畫面 (PiP)"))
     }
 
-    // MARK: - 右上角獨立小圓按鈕：更多操作選單 (直徑 40pt，按鈕即為最底層)
+    // MARK: - More Options Menu
     private var moreMenuIndependentButton: some View {
         let buttonDiameter: CGFloat = 40
 
         return Menu {
-            // 雙語歌詞選項
+            // Bilingual lyrics toggle
             Toggle(isOn: $showTranslation) {
                 Text("雙語歌詞")
             }
 
-            // 翻譯目標語言子選單（排序：系統語言第一、App 語言第二）
+            // Target language selection menu
             if showTranslation && !translationService.availableLanguages.isEmpty {
                 Menu {
                     Picker("翻譯語言", selection: $translationService.currentTargetLanguage) {
@@ -186,7 +185,7 @@ struct NowPlayingView: View {
                 }
             }
 
-            // 即時動態與動態島開關（在非 LiveContainer 環境下提供，雙向同步設定）
+            // Live Activity toggle
             if !envDetector.isLiveContainer {
                 Toggle(isOn: Binding(
                     get: { liveActivityEngine.isEnabled },
@@ -234,7 +233,7 @@ struct NowPlayingView: View {
         return translationService.availableLanguages.first(where: { $0.identifier == currentId })?.displayName ?? currentId
     }
 
-    // MARK: - 沉浸式氛圍背景 (Apple Music 原生 Mesh 漸層，不受深淺模式影響，高對比度)
+    // MARK: - Ambient Backdrop
     @ViewBuilder
     private var ambientBackdrop: some View {
         AmbientGradientBackground(
@@ -244,11 +243,11 @@ struct NowPlayingView: View {
         .accessibilityHidden(true)
     }
 
-    // MARK: - 中央滾動歌詞清單 (Scroll-Through Lyrics with Apple Music Smart Follow)
+    // MARK: - Lyrics Scroll View
     private var lyricsScrollView: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                // 頂部回滾定位錨點
+                // Top scroll anchor
                 Color.clear
                     .frame(height: 1)
                     .id("LyricsTopAnchor")
@@ -371,7 +370,7 @@ struct NowPlayingView: View {
                             .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
                         }
 
-                        // MARK: - Apple Music 原生風格：製作團隊與創作名單 (Credits, e.g. Written by ...)
+                        // MARK: - Song Credits
                         if !monitor.currentLyrics.credits.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("製作團隊")
@@ -420,7 +419,7 @@ struct NowPlayingView: View {
                     }
                 }
             }
-            //智能跟隨（播放中歌詞在畫面內才跟隨，移出畫面外暫停，回到畫面繼續；初始前兩行必定跟隨）
+            // Auto-scrolls to current playing line when visible in viewport
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 checkCurrentLineVisibility()
                 guard let index = newIndex else { return }
@@ -435,14 +434,14 @@ struct NowPlayingView: View {
                     }
                 }
             }
-            //每首歌播完切換下一首時顯示新歌詞並同時滾動回最上方（無視歌詞是否在畫面內外）
+            // Reset scroll offset on track change
             .onChange(of: monitor.currentTrack) { _, _ in
                 scrollToTop(proxy: proxy)
             }
             .onChange(of: monitor.currentLyrics.id) { _, _ in
                 scrollToTop(proxy: proxy)
             }
-            //當使用者重新將本頁面作為焦點頁面時（App 回到前景、分頁切回），強制定位到目前歌詞進度並恢復跟隨
+            // Force scroll to current line on appear
             .onAppear {
                 updateCachedArtwork()
                 checkAndTriggerTranslation()
@@ -471,7 +470,7 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 依據與當前焦點行之距離，計算光學景深多階模糊半徑 (Progressive Optical Defocus Blur)
+    /// Calculates defocus blur radius based on distance from current focused line.
     private func defocusBlurRadius(for index: Int) -> CGFloat {
         guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, isCurrentLineInViewport, scenePhase == .active else {
             return 0.0
@@ -482,17 +481,17 @@ struct NowPlayingView: View {
         let distance = abs(index - current)
         switch distance {
         case 0:
-            return 0.0  // 僅焦點行絕對銳利純淨（刀鋒字形 + 空間粉白發光光暈）
+            return 0.0  // Current active line remains sharp
         case 1:
-            return 0.6  // 上下相鄰行：微柔焦散景（細微光學景深，不與焦點行混同，且不失預讀清晰度）
+            return 0.6  // Immediate adjacent lines
         case 2:
-            return 1.8  // 次相鄰行：清晰可見的中度散景
+            return 1.8  // Secondary adjacent lines
         default:
-            return 3.0  // 遠距行：深邃光學景深融入流光背景
+            return 3.0  // Distant lines
         }
     }
 
-    /// 依據與當前焦點行之距離，計算光學景深多階透明度 (Progressive Depth Opacity)
+    /// Calculates opacity based on distance from current focused line.
     private func lyricOpacity(for index: Int) -> Double {
         guard let current = monitor.currentLineIndex else {
             return reduceTransparency ? 0.70 : 0.40
@@ -508,21 +507,20 @@ struct NowPlayingView: View {
             return 0.50
         }
         if !isCurrentLineInViewport || isUserScrolling {
-            // 離屏瀏覽或滑動時適度提升至便於閱讀的清晰度，但嚴格不超過當前播放行未唱到字元的基底亮度 (0.35)，維持視覺焦點
             return max(inactiveLyricOpacity, 0.32) <= 0.35 ? 0.32 : inactiveLyricOpacity
         }
         let base = min(max(inactiveLyricOpacity, 0.05), 0.60)
         switch distance {
         case 1:
-            return min(0.40, max(0.30, base * 2.8)) // 距離 1：保持清晰易讀，約 35%
+            return min(0.40, max(0.30, base * 2.8)) // Distance 1
         case 2:
-            return min(0.24, max(0.16, base * 1.8)) // 距離 2：層次過渡
+            return min(0.24, max(0.16, base * 1.8)) // Distance 2
         default:
-            return base                             // 距離 >= 3：背景深處
+            return base                             // Distance >= 3
         }
     }
 
-    /// 計算翻譯文字之階梯式景深透明度（依循無障礙與視覺焦點階層）
+    /// Calculates translation text opacity based on distance from current line.
     private func translationOpacity(for index: Int) -> Double {
         guard let current = monitor.currentLineIndex else {
             return reduceTransparency ? 0.75 : 0.45
@@ -551,7 +549,7 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 檢查焦點行是否在目前畫面可視範圍內（離屏時解除全螢幕模糊，保留清晰閱覽體驗）
+    /// Checks whether current focused line is inside the visible viewport.
     private func checkCurrentLineVisibility(animated: Bool = true) {
         guard let current = monitor.currentLineIndex else {
             if !isCurrentLineInViewport {
@@ -590,7 +588,7 @@ struct NowPlayingView: View {
         }
     }
 
-    /// 強制滾動定位至當前正在播放的歌詞行（居中），並自然將其納入 tracker 以恢復智能跟隨
+    /// Scrolls to current playing lyric line and centers it in view.
     private func forceScrollToCurrentLine(proxy: ScrollViewProxy, animated: Bool = true) {
         guard let currentIndex = monitor.currentLineIndex,
               monitor.currentLyrics.lines.indices.contains(currentIndex) else { return }
@@ -618,7 +616,7 @@ struct NowPlayingView: View {
     }
 }
 
-/// 零重繪之可視行索引與滾動狀態追蹤器（參考型別，不觸發全視圖 body 刷新）
+/// Stores visible line indices and scroll state without triggering view body updates.
 private final class ViewportTracker {
     var visibleIndices: Set<Int> = []
     var isUserScrolling: Bool = false

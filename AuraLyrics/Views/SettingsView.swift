@@ -1,7 +1,7 @@
 import SwiftUI
 import ActivityKit
 
-/// 設定與環境診斷視圖（Apple HIG 實時 PiP 預覽卡與多維度無障礙診斷）
+/// Settings and diagnostic view providing options for PiP, Live Activities, lyrics sources, and runtime environment status.
 struct SettingsView: View {
     @ObservedObject var envDetector = RuntimeEnvironmentDetector.shared
     @ObservedObject var pipEngine = PiPLyricsEngine.shared
@@ -20,16 +20,16 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
-                // MARK: - 子母畫面 (PiP) 實時預覽與開關
+                // MARK: - Picture-in-Picture Settings & Preview
                 Section {
-                    // 1:1 實時 PiP 預覽視窗卡
+                    // PiP Preview Card
                     VStack(alignment: .leading, spacing: 10) {
                         Text("子母畫面預覽")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .foregroundColor(.secondary)
 
-                        // 模擬真實懸浮視窗比例 (寬高比 ~ 3.5:1，高度 80pt)
+                        // Floating window aspect ratio preview (~3.5:1, height 80pt)
                         PiPLyricsView(viewModel: pipVM)
                             .frame(height: 80)
                             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -52,7 +52,7 @@ struct SettingsView: View {
                     Text("子母畫面 (PiP)")
                 }
 
-                // MARK: - 即時動態與動態島
+                // MARK: - Live Activities
                 Section {
                     NavigationLink {
                         LiveActivitySettingsView()
@@ -68,7 +68,7 @@ struct SettingsView: View {
                     Text("即時動態")
                 }
 
-                // MARK: - 歌詞來源與搜尋順位
+                // MARK: - Lyrics Source Priority
                 Section {
                     NavigationLink {
                         LyricsSourcePriorityView()
@@ -81,7 +81,7 @@ struct SettingsView: View {
                     Text("可自訂 Musixmatch、網易雲音樂、LRCLIB 與 PetitLyrics 的搜尋順位，並區分逐字時間軸與普通逐行歌詞。")
                 }
 
-                // MARK: - 雙語歌詞與離線翻譯
+                // MARK: - Bilingual Lyrics and Offline Translation
                 Section {
                     Toggle("顯示雙語歌詞", isOn: $showTranslation)
                         .onChange(of: showTranslation) { _, _ in
@@ -99,7 +99,7 @@ struct SettingsView: View {
                     Text("雙語歌詞與翻譯")
                 }
 
-                // MARK: - 歌詞視覺效果
+                // MARK: - Visual Effects
                 Section {
                     Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur)
                     InactiveLyricOpacitySlider(
@@ -110,7 +110,7 @@ struct SettingsView: View {
                     Text("歌詞視覺效果")
                 }
 
-                // MARK: - 歌詞同步時間微調（全域共用）
+                // MARK: - Global Lyrics Sync Offset
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -172,9 +172,9 @@ struct SettingsView: View {
                     Text("所有歌曲共用此微調時間，正值代表歌詞提前唱出、負值代表延後。")
                 }
 
-                // MARK: - 系統與環境診斷（圖示形狀 + 狀態文字 + 色彩，符合無障礙規範）
+                // MARK: - Diagnostics
                 Section {
-                    // 執行環境
+                    // Runtime Environment
                     HStack {
                         Label {
                             Text("執行環境")
@@ -193,7 +193,7 @@ struct SettingsView: View {
                         .font(.subheadline)
                     }
 
-                    // 即時動態 (ActivityKit)
+                    // Live Activities (ActivityKit)
                     HStack {
                         Label {
                             Text("即時動態 (ActivityKit)")
@@ -212,7 +212,7 @@ struct SettingsView: View {
                         .font(.subheadline)
                     }
 
-                    // 子母畫面 (PiP)
+                    // Picture-in-Picture
                     HStack {
                         Label {
                             Text("子母畫面 (PiP)")
@@ -231,7 +231,7 @@ struct SettingsView: View {
                         .font(.subheadline)
                     }
 
-                    // 背景保活狀態
+                    // Background Keep-Alive Status
                     HStack {
                         Label {
                             Text("背景保活狀態")
@@ -255,7 +255,7 @@ struct SettingsView: View {
                     Text("若處於 LiveContainer 環境中，iOS 系統可能限制 WidgetKit / ActivityKit 擴展程序的註冊。")
                 }
 
-                // MARK: - 背景保活管理
+                // MARK: - Background Keep-Alive
                 Section {
                     Toggle("啟用背景保活", isOn: Binding(
                         get: { keepAlive.isRunning },
@@ -272,7 +272,7 @@ struct SettingsView: View {
                     Text("背景保活")
                 }
 
-                // MARK: - 快取管理
+                // MARK: - Cache Management
                 Section {
                     Button(role: .destructive) {
                         showResetCacheAlert = true
@@ -287,7 +287,7 @@ struct SettingsView: View {
                     Text("儲存空間與快取")
                 }
 
-                // MARK: - 關於與開源說明
+                // MARK: - About and License
                 Section {
                     HStack {
                         Text("應用程式版本")
@@ -353,7 +353,7 @@ struct SettingsView: View {
         }
     }
 
-    /// 動態讀取 App 系統版本與內部建置號
+    /// Dynamically reads App marketing version and build number.
     private var appVersionString: String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.10.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
@@ -361,7 +361,7 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - 非焦點歌詞透明度無極調節滑桿（單行純淨版：滑桿 + 百分比，具備預設值標記與磁吸）
+// MARK: - Inactive Lyrics Opacity Slider
 private struct InactiveLyricOpacitySlider: View {
     @Binding var opacity: Double
     let isEnabled: Bool

@@ -3,12 +3,12 @@ import ActivityKit
 import Combine
 import UIKit
 
-/// 原生即時動態與動態島引擎（ActivityKit）
+/// Native Live Activity and Dynamic Island lyrics engine using ActivityKit.
 @MainActor
 public final class LiveActivityLyricsEngine: ObservableObject {
     public static let shared = LiveActivityLyricsEngine()
 
-    // MARK: - 使用者偏好設定
+    // MARK: - User Preferences
     @Published public var isEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: "isLiveActivityEnabled")
@@ -45,7 +45,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 運行狀態
+    // MARK: - Runtime State
     @Published public private(set) var isActivityActive: Bool = false
     @Published public private(set) var lastErrorMessage: String? = nil
 
@@ -55,7 +55,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     private var pauseTimer: Timer?
     private var currentCachedArtworkPath: String?
 
-    /// 取得目前系統是否處於淺色模式
+    /// Returns whether the system interface style is currently light mode.
     private var isSystemLightMode: Bool {
         if let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }) as? UIWindowScene,
            let window = scene.windows.first {
@@ -84,7 +84,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         self.secondaryMode = LiveActivitySecondaryMode(rawValue: secondaryRaw) ?? .bilingualOrNext
     }
 
-    // MARK: - 啟動即時動態
+    // MARK: - Start Live Activity
     public func startActivity(
         track: TrackInfo,
         initialLine: String? = nil,
@@ -134,7 +134,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             isLightMode: isSystemLightMode
         )
 
-        // 若已有運行的 Activity 則原地更新，避免動態島彈跳閃爍
+        // Update existing activity in place to prevent animation flickering.
         if let activity = currentActivity {
             lastSentState = initialContentState
             updateTask?.cancel()
@@ -169,7 +169,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 更新歌詞狀態
+    // MARK: - Update Lyrics State
     public func updateLyrics(
         line: String,
         secondaryLine: String?,
@@ -199,7 +199,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         let currentLight = isSystemLightMode
 
-        // 若主要歌詞、次要行、曲目、播放狀態、樣式與深淺模式皆未改變，不重複發送 IPC，節省背景預算
+        // Skip redundant IPC updates if state payload is unchanged.
         if let last = lastSentState,
            last.currentLine == line,
            last.secondaryLine == resolvedSecondary,
@@ -224,7 +224,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         )
         lastSentState = updatedState
 
-        // 精準動態 staleDate：下一句歌詞出現時間 + 2.5 秒，最少 4 秒，最長 12 秒
+        // Calculate dynamic staleDate based on interval to next lyric line.
         let delta = nextLineIntervalSec ?? 8.0
         let staleTimeout = min(max(delta + 2.5, 4.0), 12.0)
         let targetStaleDate = Date().addingTimeInterval(staleTimeout)
@@ -237,7 +237,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 長間奏定期心跳 (維持 staleDate 不逾期)
+    // MARK: - Heartbeat for Long Instrumental Breaks
     public func sendHeartbeat(track: TrackInfo) {
         guard isActivityActive, let activity = currentActivity, let last = lastSentState else { return }
         let nextStale = Date().addingTimeInterval(8)
@@ -247,7 +247,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 暫停與繼續播放處理
+    // MARK: - Playback State Changes
     public func handlePlaybackPaused() {
         guard isActivityActive else { return }
 
@@ -303,7 +303,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 快速切換開關
+    // MARK: - Toggle State
     public func toggleLiveActivity(track: TrackInfo) {
         if isEnabled {
             isEnabled = false
@@ -313,7 +313,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 結束即時動態
+    // MARK: - End Live Activity
     public func endActivity() {
         pauseTimer?.invalidate()
         pauseTimer = nil
@@ -340,7 +340,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
     }
 
-    // MARK: - App 終止清理 (非阻塞式排空 XPC，確保 Activity.end 抵達系統 ActivityKit)
+    // MARK: - Synchronous Termination Cleanup
     public nonisolated func cleanUpAllActivitiesSync() {
         final class TaskHolder: @unchecked Sendable {
             var id: UIBackgroundTaskIdentifier = .invalid
@@ -365,11 +365,11 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             }
         }
 
-        // 旋轉主執行緒 RunLoop 0.35 秒排空 Mach port 訊息，絕不使用 Semaphore 死鎖
+        // Pump the main RunLoop briefly to flush pending Mach port messages.
         RunLoop.current.run(until: Date().addingTimeInterval(0.35))
     }
 
-    // MARK: - App 啟動時清理過往殘留之孤兒即時動態
+    // MARK: - Clean Up Orphaned Activities
     public func cleanUpOrphanedActivities() {
         Task {
             for activity in Activity<LyricsActivityAttributes>.activities {
@@ -378,7 +378,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 內部設定變更時刷新當前狀態
+    // MARK: - Settings Refresh
     private func triggerStateRefresh() {
         guard var state = lastSentState, let activity = currentActivity else { return }
         state.compactStyle = compactStyle.rawValue
@@ -388,7 +388,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
-    // MARK: - 封面縮圖快取至共享/快取檔案路徑 (避免 4KB payload 超限)
+    // MARK: - Cache Artwork Thumbnail To Disk
     private func cacheArtwork(from data: Data?) -> String? {
         guard let data = data, let image = UIImage(data: data) else { return nil }
         let targetSize = CGSize(width: 80, height: 80)

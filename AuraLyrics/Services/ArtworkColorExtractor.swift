@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 import CoreGraphics
 
-/// 專輯封面色彩調色盤（提供 Apple Music 沉浸式流光背景所需的階層色彩）
+/// Color palette extracted from album artwork for ambient gradient backgrounds.
 public struct ArtworkPalette: Equatable, Sendable {
     public let primary: Color
     public let secondary: Color
@@ -10,7 +10,7 @@ public struct ArtworkPalette: Equatable, Sendable {
     public let accent: Color
     public let backgroundDark: Color
 
-    /// 預設 Apple Music 沉浸深邃調色盤（沉穩深藍紫、暗洋紅、深墨靛青）
+    /// Default dark color palette.
     public static let fallback = ArtworkPalette(
         primary: Color(red: 0.14, green: 0.10, blue: 0.22),
         secondary: Color(red: 0.22, green: 0.08, blue: 0.18),
@@ -20,19 +20,18 @@ public struct ArtworkPalette: Equatable, Sendable {
     )
 }
 
-/// 高效輕量之專輯封面多重色階提取器
-/// 透過小尺寸降採樣與色相/亮度規範化，在 1~2ms 內萃取出適應白字對比之多層次漸層色
+/// Extracts multi-tiered color palettes from artwork via downsampling and HSB normalization.
 public final class ArtworkColorExtractor {
     public static let shared = ArtworkColorExtractor()
 
-    /// 記憶體快取：以 UIImage 的 Hash 或識別碼快取調色盤，避免重複計算
+    /// In-memory cache for extracted palettes keyed by identifier.
     private let cache = NSCache<NSString, PaletteBox>()
 
     private init() {
         cache.countLimit = 50
     }
 
-    /// 從圖片數據中非同步解析調色盤
+    /// Asynchronously extracts a color palette from the given image.
     public func extractPalette(from image: UIImage?, cacheKey: String? = nil) async -> ArtworkPalette {
         guard let image = image else { return .fallback }
 
@@ -51,11 +50,11 @@ public final class ArtworkColorExtractor {
         return palette
     }
 
-    /// 同步快速分析（若需要立即回傳）
+    /// Analyzes image pixels synchronously to extract dominant colors.
     public static func analyzeImage(_ image: UIImage) -> ArtworkPalette {
         guard let cgImage = image.cgImage else { return .fallback }
 
-        // 縮小為 32x32 採樣點（1024 像素），計算極速且消除高頻雜訊
+        // Downsample to 32x32 pixels to reduce computational cost and filter high-frequency noise.
         let targetSize = 32
         let width = targetSize
         let height = targetSize
@@ -81,13 +80,13 @@ public final class ArtworkColorExtractor {
 
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-        // 取樣五個關鍵區域：左上、右上、中心、左下、右下
+        // Sample five key coordinates: top-left, top-right, center, bottom-left, bottom-right.
         let points: [(x: Int, y: Int)] = [
-            (width / 4, height / 4),         // 左上
-            (width * 3 / 4, height / 4),     // 右上
-            (width / 2, height / 2),         // 中心
-            (width / 4, height * 3 / 4),     // 左下
-            (width * 3 / 4, height * 3 / 4)  // 右下
+            (width / 4, height / 4),         // Top-left
+            (width * 3 / 4, height / 4),     // Top-right
+            (width / 2, height / 2),         // Center
+            (width / 4, height * 3 / 4),     // Bottom-left
+            (width * 3 / 4, height * 3 / 4)  // Bottom-right
         ]
 
         var sampledColors: [UIColor] = []
@@ -101,7 +100,7 @@ public final class ArtworkColorExtractor {
             }
         }
 
-        // 也計算全局平均色作為基準參考
+        // Compute global average color as a baseline reference.
         var sumR: CGFloat = 0, sumG: CGFloat = 0, sumB: CGFloat = 0
         let totalPixels = width * height
         for i in 0..<totalPixels {
@@ -117,13 +116,13 @@ public final class ArtworkColorExtractor {
             alpha: 1.0
         )
 
-        // 規範化顏色：降低明度至適當範圍，確保上方白色歌詞的高對比度（WCAG AAA 標竿）
+        // Normalize colors to constrain brightness for text legibility.
         let p1 = normalizeForBackground(sampledColors.indices.contains(0) ? sampledColors[0] : avgColor)
         let p2 = normalizeForBackground(sampledColors.indices.contains(1) ? sampledColors[1] : avgColor)
         let p3 = normalizeForBackground(sampledColors.indices.contains(2) ? sampledColors[2] : avgColor)
         let p4 = normalizeForBackground(sampledColors.indices.contains(3) ? sampledColors[3] : avgColor)
 
-        // 背景基底極深色（從平均色派生，亮度壓至 0.08~0.12）
+        // Derive deep dark background color from average color.
         let bgDark = createDeepBackground(from: avgColor)
 
         return ArtworkPalette(
@@ -135,20 +134,20 @@ public final class ArtworkColorExtractor {
         )
     }
 
-    /// 將採樣色彩調控為沉浸深邃背景色（將明度約束在 0.22 ~ 0.48，防止淺色背景沖淡白字）
+    /// Adjusts sample color saturation and brightness for background contrast.
     private static func normalizeForBackground(_ color: UIColor) -> UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         color.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
 
-        // 確保具有適當飽和度（至少 0.45），呈現濃郁色彩
+        // Ensure sufficient saturation.
         let targetSaturation = max(0.45, min(s * 1.25, 0.90))
-        // 嚴格控制亮度在 0.20 ~ 0.45 之間，徹底避免淺白或過亮色
+        // Constrain brightness to a dark range (0.20 - 0.45).
         let targetBrightness = max(0.20, min(b * 0.70, 0.45))
 
         return UIColor(hue: h, saturation: targetSaturation, brightness: targetBrightness, alpha: 1.0)
     }
 
-    /// 從色彩派生近乎黑色的低飽和沉穩底色
+    /// Derives a near-black, low-saturation tone from a given color.
     private static func createDeepBackground(from color: UIColor) -> UIColor {
         var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         color.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
