@@ -15,7 +15,7 @@
 > 🌐 **Website:** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
 > 📦 **Community Source (One-Click via AltDirect):**  
 >   - **Stable Version (AuraLyrics · latest release):** [Add Source](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
->   - **Latest Build (AuraLyrics(dev) · latest build):** [Add Source](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
+>   - **Nightly Build (AuraLyrics(nightly) · latest build):** [Add Source](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/nightly/apps-nightly.json)
 
 ---
 
