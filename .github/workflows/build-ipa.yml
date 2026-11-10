@@ -280,18 +280,12 @@ jobs:
                   app = data["apps"][0]
                   app["name"] = "AuraLyrics(latest build)"
                   app["subtitle"] = "latest build"
-                  # Only update top-level latest release metadata if building from main/workflow_dispatch, to prevent PRs from overriding default updates
-                  if not is_pr:
-                      app["version"] = version_str
-                      app["versionDate"] = now
-                      app["size"] = ipa_size
-                      app["downloadURL"] = download_url
-                      app["versionDescription"] = desc_str
-                  elif old_app:
-                      # If building a PR, retain previous main release metadata at the root level to avoid SemVer inversion
-                      for key in ["version", "versionDate", "size", "downloadURL", "versionDescription"]:
-                          if key in old_app:
-                              app[key] = old_app[key]
+                  # Always update top-level latest release metadata so that refreshing dev sources in AltStore/SideStore immediately shows the latest build (including PR builds)
+                  app["version"] = version_str
+                  app["versionDate"] = now
+                  app["size"] = ipa_size
+                  app["downloadURL"] = download_url
+                  app["versionDescription"] = desc_str
                   app["versions"] = updated_versions
 
               with open(manifest_path, "w", encoding="utf-8") as f:
