@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0a0c" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0d0e12" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f5f8" media="(prefers-color-scheme: light)">
   <title>CKie 軟體源 | iOS 應用程式庫</title>
   <link rel="icon" type="image/png" href="assets/icon.png">
   <style>
@@ -160,13 +160,11 @@
 
     /* Apps List Section */
     .section-title {
-      font-size: 18px;
-      font-weight: 700;
-      letter-spacing: -0.3px;
       padding-left: 4px;
       color: var(--text-secondary);
       text-transform: uppercase;
       font-size: 13px;
+      font-weight: 700;
       letter-spacing: 0.5px;
     }
 
@@ -299,10 +297,10 @@
       </p>
 
       <div class="action-group">
-        <a href="sidestore://source?url=https://ckieking.github.io/AuraLyrics/apps.json" id="btnSideStore" class="btn btn-primary">
+        <a href="sidestore://source?url=https%3A%2F%2Fckieking.github.io%2FAuraLyrics%2Fapps.json" id="btnSideStore" class="btn btn-primary">
           加入 SideStore
         </a>
-        <a href="altstore://source?url=https://ckieking.github.io/AuraLyrics/apps.json" id="btnAltStore" class="btn btn-secondary">
+        <a href="altstore://source?url=https%3A%2F%2Fckieking.github.io%2FAuraLyrics%2Fapps.json" id="btnAltStore" class="btn btn-secondary">
           加入 AltStore
         </a>
         <button type="button" class="btn btn-secondary" id="btnCopySource">
@@ -315,7 +313,7 @@
     <main>
       <div class="section-title">收錄應用程式</div>
       <div id="appsList" style="margin-top: 12px; display: flex; flex-direction: column; gap: 16px;">
-        <!-- Fallback static card (will be updated dynamically by JS if available) -->
+        <!-- Static fallback card -->
         <article class="app-card" id="app-auralyrics">
           <div class="app-header">
             <img src="assets/icon.png" alt="AuraLyrics" class="app-icon">
@@ -334,10 +332,10 @@
             <a href="https://github.com/ckieking/AuraLyrics/releases/download/v0.10.0Beta/AuraLyrics-0.10.0-beta.ipa" class="btn btn-primary btn-sm">
               下載 IPA
             </a>
-            <a href="sidestore://install?url=https://github.com/ckieking/AuraLyrics/releases/download/v0.10.0Beta/AuraLyrics-0.10.0-beta.ipa" class="btn btn-secondary btn-sm">
+            <a href="sidestore://install?url=https%3A%2F%2Fgithub.com%2Fckieking%2FAuraLyrics%2Freleases%2Fdownload%2Fv0.10.0Beta%2FAuraLyrics-0.10.0-beta.ipa" class="btn btn-secondary btn-sm">
               SideStore 安裝
             </a>
-            <a href="altstore://install?url=https://github.com/ckieking/AuraLyrics/releases/download/v0.10.0Beta/AuraLyrics-0.10.0-beta.ipa" class="btn btn-secondary btn-sm">
+            <a href="altstore://install?url=https%3A%2F%2Fgithub.com%2Fckieking%2FAuraLyrics%2Freleases%2Fdownload%2Fv0.10.0Beta%2FAuraLyrics-0.10.0-beta.ipa" class="btn btn-secondary btn-sm">
               AltStore 安裝
             </a>
           </div>
@@ -353,6 +351,17 @@
   <div class="toast" id="toast">已複製軟體源網址至剪貼簿</div>
 
   <script>
+    // Escape HTML characters to prevent XSS injection
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     // Compute current absolute apps.json URL
     const currentOrigin = window.location.origin;
     const currentPath = window.location.pathname.replace(/\/index\.html$/, '').replace(/\/$/, '');
@@ -412,22 +421,30 @@
             const card = document.createElement('article');
             card.className = 'app-card';
 
-            const downloadUrl = app.downloadURL || '#';
+            const latestVersion = (Array.isArray(app.versions) && app.versions[0]) || {};
+            const downloadUrl = app.downloadURL || latestVersion.downloadURL || '#';
+            const versionStr = app.version || latestVersion.version || '1.0';
+            const minOSStr = app.minOSVersion || latestVersion.minOSVersion || '16.0';
+            const descStr = app.localizedDescription || latestVersion.localizedDescription || app.versionDescription || '';
+            const safeName = escapeHtml(app.name || 'App');
+            const safeIcon = encodeURI(app.iconURL || 'assets/icon.png');
+            const safeBundle = escapeHtml(app.bundleIdentifier || '');
+
             const sideStoreInstall = `sidestore://install?url=${encodeURIComponent(downloadUrl)}`;
             const altStoreInstall = `altstore://install?url=${encodeURIComponent(downloadUrl)}`;
 
             card.innerHTML = `
               <div class="app-header">
-                <img src="${app.iconURL || 'assets/icon.png'}" alt="${app.name}" class="app-icon">
+                <img src="${safeIcon}" alt="${safeName}" class="app-icon">
                 <div class="app-meta">
                   <div class="app-title-row">
-                    <span class="app-title">${app.name}</span>
-                    <span class="app-badge">v${app.version || '1.0'}</span>
+                    <span class="app-title">${safeName}</span>
+                    <span class="app-badge">v${escapeHtml(versionStr)}</span>
                   </div>
-                  <div class="app-subtitle">${app.bundleIdentifier} · iOS ${app.minOSVersion || '16.0'}+</div>
+                  <div class="app-subtitle">${safeBundle} · iOS ${escapeHtml(minOSStr)}+</div>
                 </div>
               </div>
-              <p class="app-desc">${app.localizedDescription || app.versionDescription || ''}</p>
+              <p class="app-desc">${escapeHtml(descStr)}</p>
               <div class="app-actions">
                 <a href="${downloadUrl}" class="btn btn-primary btn-sm">下載 IPA</a>
                 <a href="${sideStoreInstall}" class="btn btn-secondary btn-sm">SideStore 安裝</a>
