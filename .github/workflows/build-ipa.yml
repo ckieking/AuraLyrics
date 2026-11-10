@@ -89,6 +89,7 @@ jobs:
                   "NSLocationWhenInUseUsageDescription",
                   "NSLocationAlwaysAndWhenInUseUsageDescription",
                   "UIBackgroundModes",
+                  "BGTaskSchedulerPermittedIdentifiers",
                   "NSSupportsLiveActivities",
                   "NSSupportsLiveActivitiesFrequentUpdates",
                   "LSRequiresIPhoneOS",
@@ -107,6 +108,11 @@ jobs:
               print(f"✓ Successfully merged main App Info.plist ({len(target)} keys)")
               assert "NSAppleMusicUsageDescription" in target, "Missing NSAppleMusicUsageDescription key!"
               assert "UIBackgroundModes" in target, "Missing UIBackgroundModes key!"
+              assert "BGTaskSchedulerPermittedIdentifiers" in target, "Missing BGTaskSchedulerPermittedIdentifiers key!"
+              bg_ids = target.get("BGTaskSchedulerPermittedIdentifiers", [])
+              assert "com.auralyrics.app.bgtask.*" in bg_ids, "Missing wildcard bgtask ID!"
+              assert "com.auralyrics.app.bgtask.lyrics" in bg_ids, "Missing specific bgtask ID!"
+              assert "com.auralyrics.app.bg.lyrics" in bg_ids, "Missing specific background refresh ID!"
 
           # 2. Widget Extension Info.plist completion and version synchronization
           widget_plist_path = "package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
@@ -143,6 +149,7 @@ jobs:
               print("  CFBundleShortVersionString:", p.get("CFBundleShortVersionString"))
               print("  CFBundleVersion:", p.get("CFBundleVersion"))
               print("  NSAppleMusicUsageDescription:", p.get("NSAppleMusicUsageDescription"))
+              print("  BGTaskSchedulerPermittedIdentifiers:", p.get("BGTaskSchedulerPermittedIdentifiers"))
               print("  NSSupportsLiveActivities:", p.get("NSSupportsLiveActivities"))
           '
 
@@ -167,9 +174,13 @@ jobs:
           retention-days: 14
 
       - name: Publish Nightly Release
-        if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          REF_NAME: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
           RUN_NUM: ${{ github.run_number }}
         run: |
@@ -177,7 +188,14 @@ jobs:
           export SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-7)
           export NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           export VERSION_STR="0.10.0-nightly.${BUILD_NUM}"
-          export DESC_STR="Nightly (Build #${BUILD_NUM}-${SHORT_SHA})"
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            export BRANCH_NAME="$PR_BRANCH"
+            export DESC_STR="PR #${PR_NUMBER} (Build #${BUILD_NUM}-${SHORT_SHA}): ${BRANCH_NAME}"
+          else
+            export BRANCH_NAME="$REF_NAME"
+            export DESC_STR="Nightly (Build #${BUILD_NUM}-${SHORT_SHA})"
+          fi
 
           IPA_SRC=$(ls ipa_output/*.ipa | head -n 1)
           cp "$IPA_SRC" "ipa_output/AuraLyrics-nightly.ipa"

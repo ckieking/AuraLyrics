@@ -19,6 +19,8 @@ public struct LyricsActivityAttributes: ActivityAttributes {
         public var progress: Double
         /// App Group relative path to cached artwork thumbnail.
         public var artworkPath: String?
+        /// In-memory compressed JPEG thumbnail data for cross-sandbox fallback rendering.
+        public var artworkData: Data?
         /// Dynamic Island compact presentation style key.
         public var compactStyle: String
         /// Indicates whether system appearance is in light mode.
@@ -32,6 +34,7 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             isPlaying: Bool = true,
             progress: Double = 0.0,
             artworkPath: String? = nil,
+            artworkData: Data? = nil,
             compactStyle: String = DynamicIslandCompactStyle.artworkAndText.rawValue,
             isLightMode: Bool = false
         ) {
@@ -42,6 +45,7 @@ public struct LyricsActivityAttributes: ActivityAttributes {
             self.isPlaying = isPlaying
             self.progress = progress
             self.artworkPath = artworkPath
+            self.artworkData = artworkData
             self.compactStyle = compactStyle
             self.isLightMode = isLightMode
         }

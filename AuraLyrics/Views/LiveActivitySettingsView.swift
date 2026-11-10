@@ -29,7 +29,11 @@ public struct LiveActivitySettingsView: View {
             } header: {
                 Text("功能啟用")
             } footer: {
-                Text("開啟後，當 Apple Music 播放音樂時，動態島與即時動態將同步呈現即時滾動歌詞。")
+                if RuntimeEnvironmentDetector.shared.isUsingContinuedProcessingLiveActivity || RuntimeEnvironmentDetector.shared.isLiveContainer {
+                    Text("當前運行於 LiveContainer 免擴充系統通道。首次啟動請維持 App 於前景開啟，後續將自動以系統原生動態島同步歌詞。")
+                } else {
+                    Text("開啟後，當 Apple Music 播放音樂時，動態島與即時動態將同步呈現即時滾動歌詞。")
+                }
             }
 
             // MARK: - Dynamic Island Compact Style

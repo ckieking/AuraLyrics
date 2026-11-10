@@ -21,7 +21,11 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 // Dynamic Island expanded presentation.
                 DynamicIslandExpandedRegion(.leading) {
                     HStack(spacing: 6) {
-                        ArtworkOrIconView(artworkPath: context.state.artworkPath, size: 18)
+                        ArtworkOrIconView(
+                            artworkPath: context.state.artworkPath,
+                            artworkData: context.state.artworkData,
+                            size: 18
+                        )
                         Text(context.state.trackTitle)
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundColor(.white)
@@ -72,7 +76,8 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 // Compact leading presentation.
                 CompactLeadingView(
                     compactStyle: context.state.compactStyle,
-                    artworkPath: context.state.artworkPath
+                    artworkPath: context.state.artworkPath,
+                    artworkData: context.state.artworkData
                 )
             } compactTrailing: {
                 // Compact trailing presentation with push animation.
@@ -81,7 +86,11 @@ public struct AuraLyricsLiveActivityWidget: Widget {
                 )
             } minimal: {
                 // Minimal presentation.
-                ArtworkOrIconView(artworkPath: context.state.artworkPath, size: 14)
+                ArtworkOrIconView(
+                    artworkPath: context.state.artworkPath,
+                    artworkData: context.state.artworkData,
+                    size: 14
+                )
             }
             .keylineTint(Color.pink.opacity(0.5))
         }
@@ -91,11 +100,25 @@ public struct AuraLyricsLiveActivityWidget: Widget {
 // MARK: - Artwork Or Icon View
 struct ArtworkOrIconView: View {
     let artworkPath: String?
+    let artworkData: Data?
     let size: CGFloat
+
+    init(artworkPath: String? = nil, artworkData: Data? = nil, size: CGFloat) {
+        self.artworkPath = artworkPath
+        self.artworkData = artworkData
+        self.size = size
+    }
 
     var body: some View {
         if let path = artworkPath,
            let uiImage = UIImage(contentsOfFile: path) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: 3.5, style: .continuous))
+        } else if let data = artworkData,
+                  let uiImage = UIImage(data: data) {
             Image(uiImage: uiImage)
                 .resizable()
                 .scaledToFill()
@@ -113,10 +136,17 @@ struct ArtworkOrIconView: View {
 struct CompactLeadingView: View {
     let compactStyle: String
     let artworkPath: String?
+    let artworkData: Data?
+
+    init(compactStyle: String, artworkPath: String? = nil, artworkData: Data? = nil) {
+        self.compactStyle = compactStyle
+        self.artworkPath = artworkPath
+        self.artworkData = artworkData
+    }
 
     var body: some View {
         if compactStyle == DynamicIslandCompactStyle.artworkAndText.rawValue {
-            ArtworkOrIconView(artworkPath: artworkPath, size: 16)
+            ArtworkOrIconView(artworkPath: artworkPath, artworkData: artworkData, size: 16)
                 .padding(.leading, 4)
         } else if compactStyle == DynamicIslandCompactStyle.iconAndText.rawValue {
             Image(systemName: "music.note")
@@ -167,7 +197,11 @@ struct LockScreenLyricsView: View {
         VStack(alignment: .leading, spacing: 6) {
             // Top track header.
             HStack(spacing: 8) {
-                ArtworkOrIconView(artworkPath: context.state.artworkPath, size: 18)
+                ArtworkOrIconView(
+                    artworkPath: context.state.artworkPath,
+                    artworkData: context.state.artworkData,
+                    size: 18
+                )
 
                 Text("\(context.state.trackTitle) · \(context.state.artistName)")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
