@@ -168,25 +168,31 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT_SHA: ${{ github.sha }}
+          RUN_NUM: ${{ github.run_number }}
         run: |
-          export BUILD_NUM="${{ github.run_number }}"
-          export SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          export BUILD_NUM="$RUN_NUM"
+          export SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-7)
           export NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ]; then
             export IS_PR="true"
-            export PR_NUM="${{ github.event.pull_request.number }}"
-            export BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+            export PR_NUM="$PR_NUMBER"
+            export BRANCH_NAME="$PR_BRANCH"
             export IPA_FILENAME="AuraLyrics-PR${PR_NUM}-build${BUILD_NUM}.ipa"
             export VERSION_STR="0.10.0-pr${PR_NUM}.${BUILD_NUM}"
             export DESC_STR="PR #${PR_NUM} (Build #${BUILD_NUM}-${SHORT_SHA}): ${BRANCH_NAME}"
           else
             export IS_PR="false"
             export PR_NUM=""
-            export BRANCH_NAME="${{ github.ref_name }}"
-            export IPA_FILENAME="AuraLyrics-latest.ipa"
+            export BRANCH_NAME="$REF_NAME"
+            export IPA_FILENAME="AuraLyrics-build${BUILD_NUM}.ipa"
             export VERSION_STR="0.10.0-dev.${BUILD_NUM}"
-            export DESC_STR="Main (Build #${BUILD_NUM}-${SHORT_SHA})"
+            export DESC_STR="${BRANCH_NAME} (Build #${BUILD_NUM}-${SHORT_SHA})"
           fi
 
           IPA_SRC=$(ls ipa_output/*.ipa | head -n 1)
@@ -198,17 +204,18 @@ jobs:
 
           # Create or update rolling latest-build release
           if gh release view latest-build > /dev/null 2>&1; then
-            gh release edit latest-build --title "AuraLyrics (Rolling Build #${BUILD_NUM}-${SHORT_SHA})" --notes "Automated rolling build. Commit: ${{ github.sha }}"
+            gh release edit latest-build --title "AuraLyrics (Rolling Build #${BUILD_NUM}-${SHORT_SHA})" --notes "Automated rolling build. Commit: ${COMMIT_SHA}"
           else
             gh release create latest-build \
-              --target "${{ github.sha }}" \
+              --target "${COMMIT_SHA}" \
               --title "AuraLyrics (Rolling Build #${BUILD_NUM}-${SHORT_SHA})" \
-              --notes "Automated rolling build. Commit: ${{ github.sha }}" \
+              --notes "Automated rolling build. Commit: ${COMMIT_SHA}" \
               --prerelease
           fi
 
-          # Attempt to download existing apps-dev.json to preserve build history
-          gh release download latest-build -p "apps-dev.json" -O downloaded-apps-dev.json 2>/dev/null || true
+          # Attempt to download existing apps-dev.json (or fallback apps-nightly.json) to preserve build history
+          gh release download latest-build -p "apps-dev.json" -O downloaded-apps-dev.json 2>/dev/null || \
+          gh release download latest-build -p "apps-nightly.json" -O downloaded-apps-dev.json 2>/dev/null || true
 
           # Update dev manifests with multi-version build history
           python3 - << 'EOF'
@@ -222,6 +229,7 @@ jobs:
           ipa_filename = os.environ["IPA_FILENAME"]
           version_str = os.environ["VERSION_STR"]
           desc_str = os.environ["DESC_STR"]
+          is_pr = os.environ.get("IS_PR") == "true"
           repo = os.environ.get("GITHUB_REPOSITORY", "ckieking/AuraLyrics")
 
           history_versions = []
@@ -262,11 +270,13 @@ jobs:
                   app = data["apps"][0]
                   app["name"] = "AuraLyrics(latest build)"
                   app["subtitle"] = "latest build"
-                  app["version"] = version_str
-                  app["versionDate"] = now
-                  app["size"] = ipa_size
-                  app["downloadURL"] = download_url
-                  app["versionDescription"] = desc_str
+                  # Only update top-level latest release metadata if building from main/workflow_dispatch, to prevent PRs from overriding default updates
+                  if not is_pr:
+                      app["version"] = version_str
+                      app["versionDate"] = now
+                      app["size"] = ipa_size
+                      app["downloadURL"] = download_url
+                      app["versionDescription"] = desc_str
                   app["versions"] = updated_versions
 
               with open(manifest_path, "w", encoding="utf-8") as f:
