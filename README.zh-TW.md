@@ -13,7 +13,9 @@
 > 專為 iOS 設計的動態歌詞應用程式，支援 Apple Music 播放追蹤、子母畫面 (PiP) 懸浮視窗與動態島即時動態（Live Activity）。
 >
 > 🌐 **官方網站：** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
-> 📦 **社群軟體源 (SideStore / AltStore)：** [https://ckieking.github.io/AuraLyrics/](https://ckieking.github.io/AuraLyrics/)（源網址：`https://ckieking.github.io/AuraLyrics/apps.json`）
+> 📦 **社群軟體源 (SideStore / AltStore)：** [https://ckieking.github.io/AuraLyrics/](https://ckieking.github.io/AuraLyrics/)  
+>   - **穩定版 (Stable)：** `https://ckieking.github.io/AuraLyrics/apps.json`  
+>   - **最新建置版 (Nightly)：** `https://ckieking.github.io/AuraLyrics/apps-nightly.json`
 
 ---
 

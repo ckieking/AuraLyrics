@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: xcode-27
@@ -160,3 +163,56 @@ jobs:
           name: AuraLyrics-IPA
           path: ipa_output/*.ipa
           retention-days: 14
+
+      - name: Publish Rolling Latest Build Release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IPA_SRC=$(ls ipa_output/*.ipa | head -n 1)
+          cp "$IPA_SRC" "ipa_output/AuraLyrics-latest.ipa"
+          IPA_SIZE=$(stat -c%s "ipa_output/AuraLyrics-latest.ipa" 2>/dev/null || stat -f%z "ipa_output/AuraLyrics-latest.ipa")
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          BUILD_NUM="${{ github.run_number }}"
+
+          # Create or update rolling latest-build release
+          if gh release view latest-build > /dev/null 2>&1; then
+            gh release edit latest-build --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" --notes "自動滾動建置版本。Commit: ${{ github.sha }}"
+            gh release upload latest-build "ipa_output/AuraLyrics-latest.ipa" --clobber
+          else
+            gh release create latest-build "ipa_output/AuraLyrics-latest.ipa" \
+              --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" \
+              --notes "自動滾動建置版本。Commit: ${{ github.sha }}" \
+              --prerelease
+          fi
+
+          # Update docs/apps-nightly.json with latest build info
+          python3 - << EOF
+          import json
+          with open("docs/apps-nightly.json", "r", encoding="utf-8") as f:
+              data = json.load(f)
+          if "apps" in data and len(data["apps"]) > 0:
+              app = data["apps"][0]
+              app["version"] = f"0.10.0-dev.{BUILD_NUM}"
+              app["versionDate"] = "$NOW"
+              app["size"] = int("$IPA_SIZE")
+              app["versionDescription"] = f"自動建置版本 Build #{BUILD_NUM} ({SHORT_SHA})"
+              if "versions" in app and len(app["versions"]) > 0:
+                  ver = app["versions"][0]
+                  ver["version"] = f"0.10.0-dev.{BUILD_NUM}"
+                  ver["date"] = "$NOW"
+                  ver["size"] = int("$IPA_SIZE")
+                  ver["localizedDescription"] = f"自動建置版本 Build #{BUILD_NUM} ({SHORT_SHA})"
+          with open("docs/apps-nightly.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, indent=2, ensure_ascii=False)
+          EOF
+
+          # Commit updated apps-nightly.json back to main
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/apps-nightly.json
+          if ! git diff-index --quiet HEAD; then
+            git commit -m "[ci]: update apps-nightly.json with build #${BUILD_NUM}"
+            git push origin main
+          fi

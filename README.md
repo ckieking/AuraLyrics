@@ -13,7 +13,9 @@
 > A dynamic lyrics application designed for iOS, supporting Apple Music tracking, Picture-in-Picture (PiP) floating window, and Dynamic Island Live Activities.
 > 
 > 🌐 **Website:** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
-> 📦 **Community Source (SideStore / AltStore):** [https://ckieking.github.io/AuraLyrics/](https://ckieking.github.io/AuraLyrics/) (Source URL: `https://ckieking.github.io/AuraLyrics/apps.json`)
+> 📦 **Community Source (SideStore / AltStore):** [https://ckieking.github.io/AuraLyrics/](https://ckieking.github.io/AuraLyrics/)  
+>   - **Stable Source:** `https://ckieking.github.io/AuraLyrics/apps.json`  
+>   - **Nightly Source:** `https://ckieking.github.io/AuraLyrics/apps-nightly.json`
 
 ---
 
