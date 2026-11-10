@@ -178,18 +178,13 @@ jobs:
           export BUILD_NUM="$RUN_NUM"
           export SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-7)
           export NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          export VERSION_STR="0.10.0-dev.${BUILD_NUM}"
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            export IS_PR="true"
-            export PR_NUM="$PR_NUMBER"
             export BRANCH_NAME="$PR_BRANCH"
-            export VERSION_STR="0.10.0-pr${PR_NUM}.${BUILD_NUM}"
-            export DESC_STR="PR #${PR_NUM} (Build #${BUILD_NUM}-${SHORT_SHA}): ${BRANCH_NAME}"
+            export DESC_STR="PR #${PR_NUMBER} (Build #${BUILD_NUM}-${SHORT_SHA}): ${BRANCH_NAME}"
           else
-            export IS_PR="false"
-            export PR_NUM=""
             export BRANCH_NAME="$REF_NAME"
-            export VERSION_STR="0.10.0-dev.${BUILD_NUM}"
             export DESC_STR="Main (Build #${BUILD_NUM}-${SHORT_SHA})"
           fi
 
@@ -213,8 +208,6 @@ jobs:
           import json
           import os
 
-          build_num = os.environ["BUILD_NUM"]
-          short_sha = os.environ["SHORT_SHA"]
           now = os.environ["NOW"]
           ipa_size = int(os.environ.get("IPA_SIZE") or 0)
           version_str = os.environ["VERSION_STR"]
