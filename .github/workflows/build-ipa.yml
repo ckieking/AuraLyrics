@@ -5,6 +5,8 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+  schedule:
+    - cron: '0 18 * * *'
   workflow_dispatch:
 
 permissions:
@@ -164,46 +166,42 @@ jobs:
           path: ipa_output/*.ipa
           retention-days: 14
 
-      - name: Publish Rolling Latest Build Release
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.event_name == 'workflow_dispatch'
+      - name: Publish Nightly Release
+        if: github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          EVENT_NAME: ${{ github.event_name }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
-          REF_NAME: ${{ github.ref_name }}
           COMMIT_SHA: ${{ github.sha }}
           RUN_NUM: ${{ github.run_number }}
         run: |
           export BUILD_NUM="$RUN_NUM"
           export SHORT_SHA=$(echo "$COMMIT_SHA" | cut -c1-7)
           export NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          export VERSION_STR="0.10.0-dev.${BUILD_NUM}"
-
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            export BRANCH_NAME="$PR_BRANCH"
-            export DESC_STR="PR #${PR_NUMBER} (Build #${BUILD_NUM}-${SHORT_SHA}): ${BRANCH_NAME}"
-          else
-            export BRANCH_NAME="$REF_NAME"
-            export DESC_STR="Main (Build #${BUILD_NUM}-${SHORT_SHA})"
-          fi
+          export VERSION_STR="0.10.0-nightly.${BUILD_NUM}"
+          export DESC_STR="Nightly (Build #${BUILD_NUM}-${SHORT_SHA})"
 
           IPA_SRC=$(ls ipa_output/*.ipa | head -n 1)
-          cp "$IPA_SRC" "ipa_output/AuraLyrics-latest.ipa"
-          export IPA_SIZE=$(stat -c%s "ipa_output/AuraLyrics-latest.ipa" 2>/dev/null || stat -f%z "ipa_output/AuraLyrics-latest.ipa")
+          cp "$IPA_SRC" "ipa_output/AuraLyrics-nightly.ipa"
+          export IPA_SIZE=$(stat -c%s "ipa_output/AuraLyrics-nightly.ipa" 2>/dev/null || stat -f%z "ipa_output/AuraLyrics-nightly.ipa")
 
-          # Create or update rolling latest-build release with clean title
-          if gh release view latest-build > /dev/null 2>&1; then
-            gh release edit latest-build --title "AuraLyrics (Latest Build)" --notes "Automated build #${BUILD_NUM} (${SHORT_SHA}) from ${BRANCH_NAME}."
+          # Create or update rolling nightly release with clean title
+          if gh release view nightly > /dev/null 2>&1; then
+            gh release edit nightly --target "${COMMIT_SHA}" --title "AuraLyrics (Nightly Build)" --notes "Automated nightly build #${BUILD_NUM} (${SHORT_SHA})."
           else
-            gh release create latest-build \
+            gh release create nightly \
               --target "${COMMIT_SHA}" \
-              --title "AuraLyrics (Latest Build)" \
-              --notes "Automated build #${BUILD_NUM} (${SHORT_SHA}) from ${BRANCH_NAME}." \
+              --title "AuraLyrics (Nightly Build)" \
+              --notes "Automated nightly build #${BUILD_NUM} (${SHORT_SHA})." \
               --prerelease
           fi
 
-          # Update dev manifests to maintain only the single latest build
+          # Clean up any lingering legacy assets
+          gh api "/repos/${GITHUB_REPOSITORY}/releases/tags/nightly" --jq '.assets[] | select(.name != "AuraLyrics-nightly.ipa" and .name != "apps-nightly.json") | .name' 2>/dev/null | while read -r asset_name; do
+            if [ -n "$asset_name" ]; then
+              gh release delete-asset nightly "$asset_name" -y || true
+            fi
+          done || true
+
+          # Update nightly manifest to maintain only the single latest nightly build
           python3 - << 'EOF'
           import json
           import os
@@ -214,7 +212,7 @@ jobs:
           desc_str = os.environ["DESC_STR"]
           repo = os.environ.get("GITHUB_REPOSITORY", "ckieking/AuraLyrics")
 
-          download_url = f"https://github.com/{repo}/releases/download/latest-build/AuraLyrics-latest.ipa"
+          download_url = f"https://github.com/{repo}/releases/download/nightly/AuraLyrics-nightly.ipa"
 
           single_version_entry = {
               "version": version_str,
@@ -225,13 +223,12 @@ jobs:
               "minOSVersion": "16.1"
           }
 
-          for manifest_path in ["docs/apps-dev.json", "docs/apps-nightly.json"]:
-              if not os.path.exists(manifest_path):
-                  continue
+          manifest_path = "docs/apps-nightly.json"
+          if os.path.exists(manifest_path):
               with open(manifest_path, "r", encoding="utf-8") as f:
                   data = json.load(f)
 
-              data["name"] = "AuraLyrics(dev)"
+              data["name"] = "AuraLyrics(nightly)"
               data["subtitle"] = "latest build"
 
               if "apps" in data and len(data["apps"]) > 0:
@@ -249,5 +246,5 @@ jobs:
                   json.dump(data, f, indent=2, ensure_ascii=False)
           EOF
 
-          # Upload single latest IPA and updated manifests to release
-          gh release upload latest-build "ipa_output/AuraLyrics-latest.ipa" docs/apps-dev.json docs/apps-nightly.json --clobber
+          # Upload single latest nightly IPA and manifest to release
+          gh release upload nightly "ipa_output/AuraLyrics-nightly.ipa" docs/apps-nightly.json --clobber
