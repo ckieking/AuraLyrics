@@ -407,7 +407,7 @@
         </article>
 
         <!-- Static fallback card for Nightly -->
-        <article class="app-card" id="app-nightly-fallback">
+        <article class="app-card" id="app-nightly-fallback" style="display: none;">
           <div class="app-header">
             <img src="assets/icon.png" alt="AuraLyrics (Dev)" class="app-icon">
             <div class="app-meta">
@@ -474,13 +474,17 @@
     const btnAltStore = document.getElementById('btnAltStore');
     const btnCopy = document.getElementById('btnCopySource');
     const listSectionTitle = document.getElementById('listSectionTitle');
+    const appStableFallback = document.getElementById('app-stable-fallback');
+    const appNightlyFallback = document.getElementById('app-nightly-fallback');
     const toast = document.getElementById('toast');
+    let toastTimer = null;
 
     function showToast(msg) {
       if (!toast) return;
+      if (toastTimer) clearTimeout(toastTimer);
       toast.textContent = msg;
       toast.classList.add('show');
-      setTimeout(() => toast.classList.remove('show'), 2200);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
     }
 
     function updateChannelUI(channel) {
@@ -489,14 +493,26 @@
 
       if (channel === 'nightly') {
         tabNightly.classList.add('active');
+        tabNightly.setAttribute('aria-selected', 'true');
         tabStable.classList.remove('active');
+        tabStable.setAttribute('aria-selected', 'false');
         btnSideStore.classList.add('nightly');
         listSectionTitle.textContent = '收錄應用程式（最新建置）';
+        if (appStableFallback && appNightlyFallback) {
+          appStableFallback.style.display = 'none';
+          appNightlyFallback.style.display = 'flex';
+        }
       } else {
         tabStable.classList.add('active');
+        tabStable.setAttribute('aria-selected', 'true');
         tabNightly.classList.remove('active');
+        tabNightly.setAttribute('aria-selected', 'false');
         btnSideStore.classList.remove('nightly');
         listSectionTitle.textContent = '收錄應用程式（穩定版本）';
+        if (appStableFallback && appNightlyFallback) {
+          appStableFallback.style.display = 'flex';
+          appNightlyFallback.style.display = 'none';
+        }
       }
 
       if (btnSideStore) btnSideStore.href = `sidestore://source?url=${encodeURIComponent(sourceUrl)}`;
@@ -535,6 +551,7 @@
         const res = await fetch(fileName);
         if (!res.ok) return;
         const data = await res.json();
+        if (channel !== currentChannel) return; // Prevent async race condition
 
         if (Array.isArray(data.apps) && data.apps.length > 0) {
           const listContainer = document.getElementById('appsList');
@@ -552,6 +569,7 @@
             const safeName = escapeHtml(app.name || 'App');
             const safeIcon = encodeURI(app.iconURL || 'assets/icon.png');
             const safeBundle = escapeHtml(app.bundleIdentifier || '');
+            const safeDownloadUrl = escapeHtml(downloadUrl);
             const isNightly = channel === 'nightly';
 
             const sideStoreInstall = `sidestore://install?url=${encodeURIComponent(downloadUrl)}`;
@@ -570,7 +588,7 @@
               </div>
               <p class="app-desc">${escapeHtml(descStr)}</p>
               <div class="app-actions">
-                <a href="${downloadUrl}" class="btn btn-primary ${isNightly ? 'nightly' : ''} btn-sm">下載 IPA</a>
+                <a href="${safeDownloadUrl}" class="btn btn-primary ${isNightly ? 'nightly' : ''} btn-sm">下載 IPA</a>
                 <a href="${sideStoreInstall}" class="btn btn-secondary btn-sm">SideStore 安裝</a>
                 <a href="${altStoreInstall}" class="btn btn-secondary btn-sm">AltStore 安裝</a>
               </div>

@@ -171,39 +171,49 @@ jobs:
         run: |
           IPA_SRC=$(ls ipa_output/*.ipa | head -n 1)
           cp "$IPA_SRC" "ipa_output/AuraLyrics-latest.ipa"
-          IPA_SIZE=$(stat -c%s "ipa_output/AuraLyrics-latest.ipa" 2>/dev/null || stat -f%z "ipa_output/AuraLyrics-latest.ipa")
-          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          BUILD_NUM="${{ github.run_number }}"
+          export IPA_SIZE=$(stat -c%s "ipa_output/AuraLyrics-latest.ipa" 2>/dev/null || stat -f%z "ipa_output/AuraLyrics-latest.ipa")
+          export NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          export SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          export BUILD_NUM="${{ github.run_number }}"
 
           # Create or update rolling latest-build release
           if gh release view latest-build > /dev/null 2>&1; then
-            gh release edit latest-build --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" --notes "自動滾動建置版本。Commit: ${{ github.sha }}"
+            gh release edit latest-build --target "${{ github.sha }}" --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" --notes "自動滾動建置版本。Commit: ${{ github.sha }}"
             gh release upload latest-build "ipa_output/AuraLyrics-latest.ipa" --clobber
           else
             gh release create latest-build "ipa_output/AuraLyrics-latest.ipa" \
+              --target "${{ github.sha }}" \
               --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" \
               --notes "自動滾動建置版本。Commit: ${{ github.sha }}" \
               --prerelease
           fi
 
-          # Update docs/apps-nightly.json with latest build info
-          python3 - << EOF
+          # Update docs/apps-nightly.json with latest build info using environment variables
+          python3 - << 'EOF'
           import json
+          import os
+
+          build_num = os.environ["BUILD_NUM"]
+          short_sha = os.environ["SHORT_SHA"]
+          now = os.environ["NOW"]
+          ipa_size = int(os.environ["IPA_SIZE"])
+
           with open("docs/apps-nightly.json", "r", encoding="utf-8") as f:
               data = json.load(f)
+
           if "apps" in data and len(data["apps"]) > 0:
               app = data["apps"][0]
-              app["version"] = f"0.10.0-dev.{BUILD_NUM}"
-              app["versionDate"] = "$NOW"
-              app["size"] = int("$IPA_SIZE")
-              app["versionDescription"] = f"自動建置版本 Build #{BUILD_NUM} ({SHORT_SHA})"
+              app["version"] = f"0.10.0-dev.{build_num}"
+              app["versionDate"] = now
+              app["size"] = ipa_size
+              app["versionDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
               if "versions" in app and len(app["versions"]) > 0:
                   ver = app["versions"][0]
-                  ver["version"] = f"0.10.0-dev.{BUILD_NUM}"
-                  ver["date"] = "$NOW"
-                  ver["size"] = int("$IPA_SIZE")
-                  ver["localizedDescription"] = f"自動建置版本 Build #{BUILD_NUM} ({SHORT_SHA})"
+                  ver["version"] = f"0.10.0-dev.{build_num}"
+                  ver["date"] = now
+                  ver["size"] = ipa_size
+                  ver["localizedDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
+
           with open("docs/apps-nightly.json", "w", encoding="utf-8") as f:
               json.dump(data, f, indent=2, ensure_ascii=False)
           EOF
@@ -214,5 +224,5 @@ jobs:
           git add docs/apps-nightly.json
           if ! git diff-index --quiet HEAD; then
             git commit -m "[ci]: update apps-nightly.json with build #${BUILD_NUM}"
-            git push origin main
+            git push origin HEAD:main
           fi
