@@ -45,6 +45,22 @@
 
 ---
 
+## Installation
+
+You can easily add the AuraLyrics source repository to your favorite sideloading app (LiveContainer, SideStore, AltStore, Feather, etc.) with one click via [AltDirect](https://altdirect.app/), or copy the direct source URLs below:
+
+### 1. One-Click Add via AltDirect
+- **Stable Version (AuraLyrics):**
+  [Add Stable Source via AltDirect](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
+- **Latest Build (AuraLyrics(latest build)):**
+  [Add Latest Build Source via AltDirect](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
+
+### 2. Direct Source URLs
+- **Stable Source (AuraLyrics):** `https://ckieking.github.io/AuraLyrics/apps.json`
+- **Latest Build Source (AuraLyrics(latest build)):** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
+
+---
+
 ## Runtime Compatibility
 
 AuraLyrics includes runtime environment detection (`RuntimeEnvironmentDetector`) and is distributed as a unified package **`AuraLyrics-<version>.ipa`**:

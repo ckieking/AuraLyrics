@@ -7,7 +7,7 @@
   "website": "https://ckieking.github.io/AuraLyrics/",
   "apps": [
     {
-      "name": "AuraLyrics (Dev)",
+      "name": "AuraLyrics(latest build)",
       "bundleIdentifier": "com.auralyrics.app",
       "developerName": "ckieking",
       "subtitle": "最新建置版本 (Nightly)",

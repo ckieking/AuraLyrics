@@ -45,6 +45,22 @@
 
 ---
 
+## 安裝指南 (Installation)
+
+你可以透過 [AltDirect](https://altdirect.app/) 一鍵將 AuraLyrics 軟體源加入你使用的側載工具（LiveContainer、SideStore、AltStore、Feather 等），或直接複製下方訂閱網址：
+
+### 1. 透過 AltDirect 一鍵加入軟體源
+- **穩定版本 (AuraLyrics)：**
+  [透過 AltDirect 加入穩定源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
+- **最新建置版 (AuraLyrics(latest build))：**
+  [透過 AltDirect 加入最新建置源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
+
+### 2. 手動複製軟體源網址
+- **穩定版本 (AuraLyrics)：** `https://ckieking.github.io/AuraLyrics/apps.json`
+- **最新建置版 (AuraLyrics(latest build))：** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
+
+---
+
 ## 運行環境相容性
 
 AuraLyrics 具備環境偵測機制（`RuntimeEnvironmentDetector`），統一透過單一套件 **`AuraLyrics-<版本號>.ipa`** 發布：

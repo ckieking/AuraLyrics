@@ -202,6 +202,7 @@ jobs:
 
           if "apps" in data and len(data["apps"]) > 0:
               app = data["apps"][0]
+              app["name"] = "AuraLyrics(latest build)"
               app["version"] = f"0.10.0-dev.{build_num}"
               app["versionDate"] = now
               app["size"] = ipa_size
