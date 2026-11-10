@@ -13,9 +13,9 @@
 > 專為 iOS 設計的動態歌詞應用程式，支援 Apple Music 播放追蹤、子母畫面 (PiP) 懸浮視窗與動態島即時動態（Live Activity）。
 >
 > 🌐 **官方網站：** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
-> 📦 **社群軟體源（LiveContainer / SideStore / AltStore 訂閱網址）：**  
->   - **穩定版本 (Stable)：** `https://ckieking.github.io/AuraLyrics/apps.json`  
->   - **最新建置 (Latest Build)：** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
+> 📦 **社群軟體源（AltDirect 一鍵加入）：**  
+>   - **穩定版本 (AuraLyrics · latest release)：** [一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
+>   - **最新建置版 (AuraLyrics(dev) · latest build)：** [一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---
 
@@ -42,6 +42,17 @@
   - **即時動態模式**：採用低耗電定位追蹤搭配 `BGTaskScheduler` 標準排程，確保背景穩定運作。
   - **PiP 模式**：採用合規的低音量音訊混音保活機制（無任何非公開 API），確保子母畫面懸浮視窗在背景持續流暢更新。
   - **終止清理與權限一致性**：強化終止清理時的併發安全性，並確保權限描述字串（InfoPlist.xcstrings）完整一致。
+
+---
+
+## 安裝指南 (Installation)
+
+你可以透過 [AltDirect](https://altdirect.app/) 一鍵將 AuraLyrics 軟體源加入你使用的側載工具（LiveContainer、SideStore、AltStore、Feather 等）：
+
+- **穩定版本 (AuraLyrics · latest release)：**
+  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
+- **最新建置版 (AuraLyrics(dev) · latest build)：**
+  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---
 
