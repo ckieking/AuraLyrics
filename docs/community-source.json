@@ -1,7 +1,7 @@
 {
-  "name": "CKie 軟體源",
+  "name": "AuraLyrics",
   "identifier": "com.ckieking.source",
-  "subtitle": "AuraLyrics 與 iOS 精選工具軟體源",
+  "subtitle": "latest release",
   "description": "官方 AltStore / SideStore 軟體源，提供 AuraLyrics 及精選 iOS 工具的最新穩定版本與快速安裝。",
   "iconURL": "https://ckieking.github.io/AuraLyrics/assets/icon.png",
   "website": "https://ckieking.github.io/AuraLyrics/",

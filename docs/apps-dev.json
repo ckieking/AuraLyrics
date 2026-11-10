@@ -1,7 +1,7 @@
 {
-  "name": "CKie 軟體源 (Dev)",
+  "name": "AuraLyrics(dev)",
   "identifier": "com.ckieking.source.dev",
-  "subtitle": "AuraLyrics 最新開發與建置版本",
+  "subtitle": "latest build",
   "description": "官方 AltStore / SideStore 開發者源，隨主分支（main）自動持續更新最新建置版本。",
   "iconURL": "https://ckieking.github.io/AuraLyrics/assets/icon.png",
   "website": "https://ckieking.github.io/AuraLyrics/",

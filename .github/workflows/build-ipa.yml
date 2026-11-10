@@ -203,6 +203,9 @@ jobs:
               with open(manifest_path, "r", encoding="utf-8") as f:
                   data = json.load(f)
 
+              data["name"] = "AuraLyrics(dev)"
+              data["subtitle"] = "latest build"
+
               if "apps" in data and len(data["apps"]) > 0:
                   app = data["apps"][0]
                   app["name"] = "AuraLyrics(latest build)"

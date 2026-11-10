@@ -14,8 +14,8 @@
 > 
 > 🌐 **Website:** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
 > 📦 **Community Source (One-Click via AltDirect):**  
->   - **Stable Version (AuraLyrics):** [Add Source](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
->   - **Latest Build (AuraLyrics(latest build)):** [Add Source](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
+>   - **Stable Version (AuraLyrics · latest release):** [Add Source](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
+>   - **Latest Build (AuraLyrics(dev) · latest build):** [Add Source](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---
 
@@ -49,9 +49,9 @@
 
 You can easily add the AuraLyrics source repository to your favorite sideloading app (LiveContainer, SideStore, AltStore, Feather, etc.) with one click via [AltDirect](https://altdirect.app/):
 
-- **Stable Version (AuraLyrics):**
+- **Stable Version (AuraLyrics · latest release):**
   [Add Stable Source via AltDirect](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
-- **Latest Build (AuraLyrics(latest build)):**
+- **Latest Build (AuraLyrics(dev) · latest build):**
   [Add Latest Build Source via AltDirect](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---

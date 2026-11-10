@@ -14,8 +14,8 @@
 >
 > 🌐 **官方網站：** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
 > 📦 **社群軟體源（AltDirect 一鍵加入）：**  
->   - **穩定版本 (AuraLyrics)：** [一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
->   - **最新建置版 (AuraLyrics(latest build))：** [一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
+>   - **穩定版本 (AuraLyrics · latest release)：** [一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
+>   - **最新建置版 (AuraLyrics(dev) · latest build)：** [一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---
 
@@ -49,9 +49,9 @@
 
 你可以透過 [AltDirect](https://altdirect.app/) 一鍵將 AuraLyrics 軟體源加入你使用的側載工具（LiveContainer、SideStore、AltStore、Feather 等）：
 
-- **穩定版本 (AuraLyrics)：**
+- **穩定版本 (AuraLyrics · latest release)：**
   [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
-- **最新建置版 (AuraLyrics(latest build))：**
+- **最新建置版 (AuraLyrics(dev) · latest build)：**
   [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---
