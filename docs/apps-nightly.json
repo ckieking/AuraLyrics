@@ -1,0 +1,39 @@
+{
+  "name": "AuraLyrics(dev)",
+  "identifier": "com.ckieking.source.dev",
+  "subtitle": "latest build",
+  "description": "Official AltStore / SideStore developer source, automatically tracking the latest builds from the main branch.",
+  "iconURL": "https://ckieking.github.io/AuraLyrics/assets/icon.png",
+  "website": "https://ckieking.github.io/AuraLyrics/",
+  "apps": [
+    {
+      "name": "AuraLyrics(latest build)",
+      "bundleIdentifier": "com.auralyrics.app",
+      "developerName": "ckieking",
+      "subtitle": "latest build",
+      "version": "0.10.0-latest",
+      "versionDate": "2026-11-10T00:00:00Z",
+      "versionDescription": "Latest development build automatically built from GitHub main branch.",
+      "downloadURL": "https://github.com/ckieking/AuraLyrics/releases/download/latest-build/AuraLyrics-latest.ipa",
+      "localizedDescription": "Dynamic lyrics application for iOS (latest development build), featuring Apple Music playback tracking, Picture-in-Picture (PiP) floating window, and Dynamic Island Live Activities.",
+      "iconURL": "https://ckieking.github.io/AuraLyrics/assets/icon.png",
+      "tintColor": "FF9500",
+      "size": 1563772,
+      "minOSVersion": "16.1",
+      "screenshotURLs": [
+        "https://raw.githubusercontent.com/ckieking/AuraLyrics/main/AuraLyrics/Resources/AppIcon-Preview.png"
+      ],
+      "versions": [
+        {
+          "version": "0.10.0-latest",
+          "date": "2026-11-10T00:00:00Z",
+          "downloadURL": "https://github.com/ckieking/AuraLyrics/releases/download/latest-build/AuraLyrics-latest.ipa",
+          "localizedDescription": "Latest development build automatically built from GitHub main branch.",
+          "size": 1563772,
+          "minOSVersion": "16.1"
+        }
+      ]
+    }
+  ],
+  "news": []
+}
