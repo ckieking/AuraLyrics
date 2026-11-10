@@ -74,10 +74,12 @@ public final class RuntimeEnvironmentDetector: ObservableObject {
             }
         }
 
-        if var guestAppInfo = UserDefaults.standard.dictionary(forKey: "guestAppInfo") {
-            if guestAppInfo["fixBackgroundTaskIdentifiers"] as? Bool != true {
-                guestAppInfo["fixBackgroundTaskIdentifiers"] = true
-                UserDefaults.standard.set(guestAppInfo, forKey: "guestAppInfo")
+        if let userDefaultsClass = NSClassFromString("NSUserDefaults") as AnyObject as? NSObjectProtocol {
+            let sel = NSSelectorFromString("guestAppInfo")
+            if userDefaultsClass.responds(to: sel),
+               let unmanaged = (userDefaultsClass as AnyObject).perform(sel),
+               let infoDict = unmanaged.takeUnretainedValue() as? NSMutableDictionary {
+                infoDict["fixBackgroundTaskIdentifiers"] = true
             }
         }
     }
@@ -124,12 +126,17 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
     public static let shared = LCBackgroundTaskRuntimeBridge()
 
     private static var isBridgeInstalled = false
-    private static let lock = NSLock()
+    private static let lock = NSRecursiveLock()
 
     private static var guestTaskPrefix: String = ""
     private static var hostTaskPrefix: String = ""
-    private static var guestTaskIdentifiers: Set<String> = []
-    private static var guestTaskFamilies: [String] = []
+    private static var guestTaskIdentifiers: Set<String> = [
+        "com.auralyrics.app.bgtask.lyrics",
+        "com.auralyrics.app.bg.lyrics"
+    ]
+    private static var guestTaskFamilies: [String] = [
+        "com.auralyrics.app.bgtask."
+    ]
 
     private static let continuedProcessingReason = "com.apple.das.bgongoingprocessing"
     private static let continuedProcessingNamePrefix = "bgContinuedProcessing-"
@@ -145,6 +152,10 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
     public func isBridgeInstalled() -> Bool {
         Self.lock.lock()
         defer { Self.lock.unlock() }
+        return checkBridgeInstalledUnlocked()
+    }
+
+    private func checkBridgeInstalledUnlocked() -> Bool {
         if Self.isBridgeInstalled { return true }
 
         dlopen("/System/Library/Frameworks/BackgroundTasks.framework/BackgroundTasks", RTLD_LAZY)
@@ -167,12 +178,48 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         return false
     }
 
+    /// Safely verifies whether BGTaskScheduler will accept the given identifier without throwing NSInternalInconsistencyException.
+    public func canRegisterTask(withIdentifier identifier: String) -> Bool {
+        if !RuntimeEnvironmentDetector.shared.isLiveContainer {
+            if let declarations = Bundle.main.infoDictionary?["BGTaskSchedulerPermittedIdentifiers"] as? [String] {
+                if declarations.contains(identifier) { return true }
+                for decl in declarations where decl.hasSuffix(".*") {
+                    let prefix = String(decl.dropLast())
+                    if identifier.hasPrefix(prefix) { return true }
+                }
+            }
+            return false
+        }
+
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+
+        dlopen("/System/Library/Frameworks/BackgroundTasks.framework/BackgroundTasks", RTLD_LAZY)
+        guard let registryClass = NSClassFromString("_BGTaskIdentifierRegistry") else {
+            return false
+        }
+
+        let sel = NSSelectorFromString("isPermissibleFullyComposedIdentifier:")
+        let sharedSel = NSSelectorFromString("sharedRegistry")
+
+        if class_getClassMethod(registryClass, sharedSel) != nil,
+           let sharedRegistry = (registryClass as AnyObject).perform(sharedSel)?.takeUnretainedValue() {
+            if let method = class_getInstanceMethod(registryClass, sel) {
+                let imp = method_getImplementation(method)
+                let callable = unsafeBitCast(imp, to: PermissibleIMP.self)
+                return callable(sharedRegistry, sel, identifier as NSString).boolValue
+            }
+        }
+
+        return Self.isGuestTaskIdentifier(identifier)
+    }
+
     /// Installs the ObjC Runtime swizzling bridge if not already present.
     public func installBridgeIfNeeded() {
         Self.lock.lock()
         defer { Self.lock.unlock() }
 
-        guard !Self.isBridgeInstalled && !isBridgeInstalled() else { return }
+        guard !Self.isBridgeInstalled && !checkBridgeInstalledUnlocked() else { return }
 
         // 1. Load BackgroundTasks framework dynamically.
         dlopen("/System/Library/Frameworks/BackgroundTasks.framework/BackgroundTasks", RTLD_LAZY)
@@ -188,9 +235,14 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         Self.guestTaskPrefix = guestBundleID + "."
         Self.hostTaskPrefix = hostBundleID + "."
 
-        // 3. Collect permitted identifiers from Info.plist declarations.
-        var identifiers = Set<String>()
-        var families = [String]()
+        // 3. Collect permitted identifiers from Info.plist declarations with defaults.
+        var identifiers: Set<String> = [
+            "\(guestBundleID).bgtask.lyrics",
+            "\(guestBundleID).bg.lyrics"
+        ]
+        var families: [String] = [
+            "\(guestBundleID).bgtask."
+        ]
         if let declarations = Bundle.main.infoDictionary?["BGTaskSchedulerPermittedIdentifiers"] as? [String] {
             for id in declarations {
                 guard id.hasPrefix(Self.guestTaskPrefix), id.count > 0, id.count <= 128 else { continue }

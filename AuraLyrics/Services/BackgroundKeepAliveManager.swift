@@ -78,9 +78,19 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         }
     }
 
+    public static let refreshTaskIdentifier = "com.auralyrics.app.bg.lyrics"
+    private var isRefreshTaskRegistered: Bool = false
+
     // MARK: - BGTaskScheduler Registration
     public func registerBackgroundTasks() {
-        BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.auralyrics.bg.lyrics", using: .main) { task in
+        guard !isRefreshTaskRegistered else { return }
+        guard LCBackgroundTaskRuntimeBridge.shared.canRegisterTask(withIdentifier: Self.refreshTaskIdentifier) else {
+            print("[BackgroundKeepAliveManager] 背景任務識別碼 \(Self.refreshTaskIdentifier) 尚未獲系統許可或處於免擴展安全模式，略過註冊")
+            return
+        }
+
+        isRefreshTaskRegistered = true
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshTaskIdentifier, using: .main) { task in
             task.expirationHandler = {
                 task.setTaskCompleted(success: false)
             }
@@ -95,7 +105,8 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
 
     /// Schedules next background refresh task via BGTaskScheduler.
     public func scheduleNextBackgroundTask() {
-        let request = BGAppRefreshTaskRequest(identifier: "com.auralyrics.bg.lyrics")
+        guard isRefreshTaskRegistered else { return }
+        let request = BGAppRefreshTaskRequest(identifier: Self.refreshTaskIdentifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
         do {
             try BGTaskScheduler.shared.submit(request)

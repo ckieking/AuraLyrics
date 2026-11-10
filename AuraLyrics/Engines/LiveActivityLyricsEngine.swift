@@ -129,6 +129,10 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     /// Pre-registers the background continued processing task before application launch completes.
     public func registerContinuedProcessingTask() {
         guard #available(iOS 26.0, *), !isContinuedTaskRegistered else { return }
+        guard LCBackgroundTaskRuntimeBridge.shared.canRegisterTask(withIdentifier: Self.continuedTaskIdentifier) else {
+            print("[LiveActivityLyricsEngine] 任務識別碼 \(Self.continuedTaskIdentifier) 尚未獲系統許可，略過註冊以策安全")
+            return
+        }
         isContinuedTaskRegistered = true
 
         BGTaskScheduler.shared.register(
@@ -623,7 +627,9 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             task.setTaskCompleted(success: true)
             self.currentContinuedTask = nil
         }
-        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
+        if isContinuedTaskRegistered {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
+        }
 
         // Reset monotonic tracking for fresh sessions.
         monotonicBaseUnits = 0
@@ -638,7 +644,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             Task {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
-        } else {
+        } else if !RuntimeEnvironmentDetector.shared.isLiveContainer {
             Task {
                 for act in Activity<LyricsActivityAttributes>.activities {
                     await act.end(nil, dismissalPolicy: .immediate)
@@ -664,9 +670,6 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             }
         }
 
-        // Cancel pending background task requests synchronously.
-        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
-
         Task.detached {
             for activity in Activity<LyricsActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
@@ -687,7 +690,10 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     // MARK: - Clean Up Orphaned Activities
     public func cleanUpOrphanedActivities() {
         isSubmittingContinuedTask = false
-        BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
+        if isContinuedTaskRegistered {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
+        }
+        guard !RuntimeEnvironmentDetector.shared.isLiveContainer else { return }
         Task {
             for activity in Activity<LyricsActivityAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)

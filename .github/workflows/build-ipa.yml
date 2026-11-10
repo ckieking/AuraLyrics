@@ -110,6 +110,7 @@ jobs:
               bg_ids = target.get("BGTaskSchedulerPermittedIdentifiers", [])
               assert "com.auralyrics.app.bgtask.*" in bg_ids, "Missing wildcard bgtask ID!"
               assert "com.auralyrics.app.bgtask.lyrics" in bg_ids, "Missing specific bgtask ID!"
+              assert "com.auralyrics.app.bg.lyrics" in bg_ids, "Missing specific background refresh ID!"
 
           # 2. Widget Extension Info.plist completion and version synchronization
           widget_plist_path = "package/Payload/AuraLyrics.app/PlugIns/AuraLyricsWidget.appex/Info.plist"
