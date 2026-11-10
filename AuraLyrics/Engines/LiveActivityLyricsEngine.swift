@@ -18,11 +18,17 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     private var lastContinuedSubmissionTimestamp: Date? = nil
     private var pendingForegroundSubmission: Bool = false
 
-    // Monotonic Progress Guard state variables
-    private var monotonicBaseUnits: Int64 = 0
-    private let unitsPerTrack: Int64 = 100
+    // Channel B (BGContinuedProcessingTask) Progress state variables
+    private let unitsPerTrack: Int64 = 1000
     private var lastReportedCompletedUnits: Int64 = 0
     private var lastTrackKey: String = ""
+
+    // User dismissal state (X button clicked on dynamic island)
+    private var isDismissedUntilNextTrigger: Bool = false
+    private var dismissedTrackKey: String = ""
+
+    // Pause heartbeat timer for Channel B
+    private var pauseHeartbeatTimer: Timer?
 
     // Debounce cache for Channel B updates
     private var lastSentContinuedTitle: String?
@@ -141,7 +147,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             using: .main
         ) { [weak self] task in
             guard let continuedTask = task as? BGContinuedProcessingTask else {
-                task.setTaskCompleted(success: false)
+                task.setTaskCompleted(success: true)
                 return
             }
             self?.handleContinuedProcessingTaskLaunch(continuedTask)
@@ -286,13 +292,6 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             }
         }
 
-        // Foreground submit guard: Apple requires first submission to occur while the app is active.
-        if UIApplication.shared.applicationState != .active {
-            self.pendingForegroundSubmission = true
-            self.lastErrorMessage = String(localized: "首次啟動免擴充動態島必須在 App 前景狀態下進行，請返回 AuraLyrics 開啟")
-            return
-        }
-
         let request = BGContinuedProcessingTaskRequest(
             identifier: Self.continuedTaskIdentifier,
             title: lineText,
@@ -312,7 +311,12 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
         } catch {
             self.isSubmittingContinuedTask = false
-            self.lastErrorMessage = String(format: String(localized: "啟動免擴充動態島失敗: %@"), error.localizedDescription)
+            if UIApplication.shared.applicationState != .active {
+                // Background submission was deferred by system; queue for foreground completion.
+                self.pendingForegroundSubmission = true
+            } else {
+                self.lastErrorMessage = String(format: String(localized: "啟動免擴充動態島失敗: %@"), error.localizedDescription)
+            }
             self.isActivityActive = false
         }
     }
@@ -320,9 +324,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     /// Handles launch callback from BGTaskScheduler for a continued processing task.
     private func handleContinuedProcessingTaskLaunch(_ task: BGContinuedProcessingTask) {
         task.expirationHandler = { [weak self] in
-            // Finding 5: Synchronously mark task completed as failed before the handler returns
-            // to satisfy iOS BGTask contract and prevent watchdog 0x8badf00d termination.
-            task.setTaskCompleted(success: false)
+            // Synchronously mark task completed as successful to prevent Task Failed system banner.
+            task.setTaskCompleted(success: true)
 
             Task { @MainActor [weak self] in
                 self?.handleContinuedTaskExpired(task)
@@ -334,12 +337,10 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         self.isActivityActive = true
         self.lastErrorMessage = nil
 
-        // Initialize monotonic progress counters ensuring completed strictly < total.
-        let initialCompleted = max(monotonicBaseUnits, lastReportedCompletedUnits)
-        let initialTotal = max(monotonicBaseUnits + unitsPerTrack, initialCompleted + 1)
-        task.progress.totalUnitCount = initialTotal
-        task.progress.completedUnitCount = initialCompleted
-        lastReportedCompletedUnits = initialCompleted
+        // Initialize progress counters ensuring completed strictly < total.
+        task.progress.totalUnitCount = unitsPerTrack
+        task.progress.completedUnitCount = 0
+        lastReportedCompletedUnits = 0
 
         // Immediately apply current track state if available.
         let track = AppleMusicMonitor.shared.currentTrack
@@ -354,12 +355,16 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
     /// Handles system task expiration by updating state and scheduling recovery.
     private func handleContinuedTaskExpired(_ task: BGContinuedProcessingTask) {
+        pauseHeartbeatTimer?.invalidate()
+        pauseHeartbeatTimer = nil
+
         if currentContinuedTask === task {
             currentContinuedTask = nil
         }
         self.isSubmittingContinuedTask = false
         self.isActivityActive = false
-        self.pendingForegroundSubmission = true
+        self.isDismissedUntilNextTrigger = true
+        self.dismissedTrackKey = lastTrackKey
         BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
     }
 
@@ -464,6 +469,20 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         isPlaying: Bool,
         progress: Double
     ) {
+        let trackKey = "\(track.title)_\(track.artist)"
+
+        // If user tapped X, wait until track changes or loops before reviving dynamic island.
+        if isDismissedUntilNextTrigger {
+            let isTrackChanged = !dismissedTrackKey.isEmpty && dismissedTrackKey != trackKey
+            let isTrackLoop = !isTrackChanged && progress < 0.05 && lastReportedCompletedUnits > 800
+            if isTrackChanged || isTrackLoop {
+                isDismissedUntilNextTrigger = false
+                dismissedTrackKey = ""
+            } else {
+                return
+            }
+        }
+
         guard let task = currentContinuedTask else {
             if isPlaying && !isSubmittingContinuedTask {
                 startContinuedProcessingTask(track: track, initialLine: line, initialSecondary: secondaryLine)
@@ -491,27 +510,22 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             lastSentContinuedIsPlaying = isPlaying
         }
 
-        // Monotonic Progress Guard: advance track unit counter and prevent backward progression.
-        let trackKey = "\(track.title)_\(track.artist)"
         let clampedProgress = min(max(progress, 0.0), 1.0)
-
-        // Loop detection: advance monotonicBaseUnits on track change or when single track repeats.
         let isTrackChanged = !lastTrackKey.isEmpty && lastTrackKey != trackKey
-        let isTrackLoop = !isTrackChanged && clampedProgress < 0.1 && (lastReportedCompletedUnits - monotonicBaseUnits) > 80
+        let isTrackLoop = !isTrackChanged && clampedProgress < 0.05 && lastReportedCompletedUnits > 800
 
-        if isTrackChanged || isTrackLoop {
-            // Track changed or repeated: shift monotonic base units upward without rewinding completed units.
-            monotonicBaseUnits = max(lastReportedCompletedUnits, monotonicBaseUnits + unitsPerTrack)
+        let targetCompleted = max(0, min(990, Int64(clampedProgress * 990.0)))
+        let isSeekBackward = targetCompleted + 50 < lastReportedCompletedUnits
+
+        if isTrackChanged || isTrackLoop || isSeekBackward {
+            lastReportedCompletedUnits = targetCompleted
+            task.progress.totalUnitCount = unitsPerTrack
+            task.progress.completedUnitCount = targetCompleted
         }
         lastTrackKey = trackKey
 
-        let songProgressUnits = Int64(clampedProgress * Double(unitsPerTrack))
-        let targetCompleted = monotonicBaseUnits + songProgressUnits
         let newCompleted = max(targetCompleted, lastReportedCompletedUnits)
-
-        let targetTotal = monotonicBaseUnits + unitsPerTrack
-        let resolvedTotal = max(task.progress.totalUnitCount, max(targetTotal, newCompleted + 1))
-        task.progress.totalUnitCount = resolvedTotal
+        task.progress.totalUnitCount = unitsPerTrack
         task.progress.completedUnitCount = newCompleted
         lastReportedCompletedUnits = newCompleted
     }
@@ -520,16 +534,13 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     public func sendHeartbeat(track: TrackInfo) {
         guard isActivityActive else { return }
 
-        // Channel B: Nudge monotonic progress forward to prevent system reclamation.
+        // Channel B: Nudge progress forward slightly to prevent system reclamation.
         if let task = currentContinuedTask {
-            let total = task.progress.totalUnitCount
-            if lastReportedCompletedUnits >= total - 1 {
-                // Dynamically expand totalUnitCount so progress can continue advancing monotonically.
-                task.progress.totalUnitCount = max(task.progress.totalUnitCount + unitsPerTrack, lastReportedCompletedUnits + unitsPerTrack)
+            if lastReportedCompletedUnits < unitsPerTrack - 1 {
+                let bumped = lastReportedCompletedUnits + 1
+                task.progress.completedUnitCount = bumped
+                lastReportedCompletedUnits = bumped
             }
-            let bumped = lastReportedCompletedUnits + 1
-            task.progress.completedUnitCount = bumped
-            lastReportedCompletedUnits = bumped
             return
         }
 
@@ -546,8 +557,12 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     public func handlePlaybackPaused() {
         guard isActivityActive else { return }
 
+        startPauseHeartbeatIfNeeded()
+
         switch pausePolicy {
         case .dismissImmediately:
+            pauseHeartbeatTimer?.invalidate()
+            pauseHeartbeatTimer = nil
             endActivity()
 
         case .keepActiveWithTimeout:
@@ -585,9 +600,40 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
     }
 
+    private func startPauseHeartbeatIfNeeded() {
+        pauseHeartbeatTimer?.invalidate()
+        guard currentContinuedTask != nil else { return }
+        pauseHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.sendPauseHeartbeat()
+            }
+        }
+    }
+
+    private func sendPauseHeartbeat() {
+        guard let task = currentContinuedTask, isActivityActive else {
+            pauseHeartbeatTimer?.invalidate()
+            pauseHeartbeatTimer = nil
+            return
+        }
+        let currentCompleted = task.progress.completedUnitCount
+        let currentTotal = task.progress.totalUnitCount
+        if currentCompleted < currentTotal - 1 {
+            let bumped = currentCompleted + 1
+            task.progress.completedUnitCount = bumped
+            lastReportedCompletedUnits = bumped
+        }
+    }
+
     public func handlePlaybackResumed(track: TrackInfo) {
         pauseTimer?.invalidate()
         pauseTimer = nil
+        pauseHeartbeatTimer?.invalidate()
+        pauseHeartbeatTimer = nil
+
+        // Reset user dismissal when playback resumes so dynamic island can recover.
+        isDismissedUntilNextTrigger = false
+        dismissedTrackKey = ""
 
         guard isEnabled else { return }
 
@@ -622,6 +668,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     public func endActivity() {
         pauseTimer?.invalidate()
         pauseTimer = nil
+        pauseHeartbeatTimer?.invalidate()
+        pauseHeartbeatTimer = nil
         updateTask?.cancel()
         updateTask = nil
         lastSentState = nil
@@ -629,6 +677,8 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         currentCachedMicroArtworkData = nil
         pendingForegroundSubmission = false
         isSubmittingContinuedTask = false
+        isDismissedUntilNextTrigger = false
+        dismissedTrackKey = ""
 
         // Tear down Channel B continued processing task.
         if let task = currentContinuedTask {
@@ -639,8 +689,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.continuedTaskIdentifier)
         }
 
-        // Reset monotonic tracking for fresh sessions.
-        monotonicBaseUnits = 0
+        // Reset tracking for fresh sessions.
         lastReportedCompletedUnits = 0
         lastTrackKey = ""
         lastSentContinuedTitle = nil
@@ -666,6 +715,12 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
     // MARK: - Synchronous Termination Cleanup
     public nonisolated func cleanUpAllActivitiesSync() {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                LiveActivityLyricsEngine.shared.endActivity()
+            }
+        }
+
         final class TaskHolder: @unchecked Sendable {
             var id: UIBackgroundTaskIdentifier = .invalid
         }
@@ -680,7 +735,11 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         Task.detached {
             let isLiveContainer = await MainActor.run { RuntimeEnvironmentDetector.shared.isLiveContainer }
-            if !isLiveContainer {
+            if isLiveContainer {
+                await MainActor.run {
+                    LiveActivityLyricsEngine.shared.endActivity()
+                }
+            } else {
                 for activity in Activity<LyricsActivityAttributes>.activities {
                     await activity.end(nil, dismissalPolicy: .immediate)
                 }

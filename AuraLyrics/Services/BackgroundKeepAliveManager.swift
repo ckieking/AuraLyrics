@@ -92,7 +92,7 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         isRefreshTaskRegistered = true
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshTaskIdentifier, using: .main) { task in
             task.expirationHandler = {
-                task.setTaskCompleted(success: false)
+                task.setTaskCompleted(success: true)
             }
             Task { @MainActor in
                 // Refresh keep-alive and schedule next background task cycle.

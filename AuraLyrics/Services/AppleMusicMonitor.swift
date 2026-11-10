@@ -316,11 +316,17 @@ public final class AppleMusicMonitor: ObservableObject {
                 handlePlaybackStateChanged()
                 return
             }
-        } else if hasFreshAdvance && !isPlaying {
-            isPlaying = true
-            anchorPlaybackTimeSec = playTime
-            anchorMediaTime = now
-            LiveActivityLyricsEngine.shared.handlePlaybackResumed(track: currentTrack)
+        } else {
+            let actualIsPlaying = (musicPlayer.playbackState == .playing)
+            if isPlaying && !actualIsPlaying {
+                handlePlaybackStateChanged()
+                return
+            } else if hasFreshAdvance && !isPlaying {
+                isPlaying = true
+                anchorPlaybackTimeSec = playTime
+                anchorMediaTime = now
+                LiveActivityLyricsEngine.shared.handlePlaybackResumed(track: currentTrack)
+            }
         }
 
         // 3. Playback clock advancement and drift calibration.

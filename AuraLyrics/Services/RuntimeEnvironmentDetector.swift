@@ -370,14 +370,22 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
     fileprivate static func handleEncodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) {
         guard let orig = originalEncodeActivity else { return }
 
+        let launchReasonSel = NSSelectorFromString("launchReason")
+        let clientProvidedIdSel = NSSelectorFromString("clientProvidedIdentifier")
+        let nameSel = NSSelectorFromString("name")
+
         if isXPCCoder(coder, className: "NSXPCEncoder"),
-           let launchReason = (activity as AnyObject).perform(NSSelectorFromString("launchReason"))?.takeUnretainedValue() as? String,
+           (activity as AnyObject).responds(to: launchReasonSel),
+           (activity as AnyObject).responds(to: clientProvidedIdSel),
+           let launchReason = (activity as AnyObject).perform(launchReasonSel)?.takeUnretainedValue() as? String,
            launchReason == continuedProcessingReason,
-           let source = (activity as AnyObject).perform(NSSelectorFromString("clientProvidedIdentifier"))?.takeUnretainedValue() as? String {
+           let source = (activity as AnyObject).perform(clientProvidedIdSel)?.takeUnretainedValue() as? String {
 
             let destination = hostTaskIdentifier(source)
             let expectedName = continuedProcessingNamePrefix + source
-            let currentName = (activity as AnyObject).perform(NSSelectorFromString("name"))?.takeUnretainedValue() as? String
+            let currentName = (activity as AnyObject).responds(to: nameSel)
+                ? (activity as AnyObject).perform(nameSel)?.takeUnretainedValue() as? String
+                : nil
 
             if destination != source && currentName == expectedName, let nsCoder = coder as? NSCoder {
                 let adapter = LCBackgroundTaskCoder(coder: nsCoder, sourceIdentifier: source, destinationIdentifier: destination)
