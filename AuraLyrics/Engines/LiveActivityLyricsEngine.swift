@@ -15,6 +15,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     private var currentContinuedTask: BGContinuedProcessingTask?
     private var isContinuedTaskRegistered: Bool = false
     private var isSubmittingContinuedTask: Bool = false
+    private var lastContinuedSubmissionTimestamp: Date? = nil
     private var pendingForegroundSubmission: Bool = false
 
     // Monotonic Progress Guard state variables
@@ -276,8 +277,14 @@ public final class LiveActivityLyricsEngine: ObservableObject {
             return
         }
 
-        // Guard against duplicate in-flight submission during 150ms tick loop.
-        guard !isSubmittingContinuedTask else { return }
+        // Guard against duplicate in-flight submission during 150ms tick loop with 30s timeout reset.
+        if isSubmittingContinuedTask {
+            if let lastTime = lastContinuedSubmissionTimestamp, Date().timeIntervalSince(lastTime) > 30 {
+                isSubmittingContinuedTask = false
+            } else {
+                return
+            }
+        }
 
         // Foreground submit guard: Apple requires first submission to occur while the app is active.
         if UIApplication.shared.applicationState != .active {
@@ -293,6 +300,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         )
 
         self.isSubmittingContinuedTask = true
+        self.lastContinuedSubmissionTimestamp = Date()
         do {
             try BGTaskScheduler.shared.submit(request)
             self.pendingForegroundSubmission = false
@@ -671,8 +679,11 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
 
         Task.detached {
-            for activity in Activity<LyricsActivityAttributes>.activities {
-                await activity.end(nil, dismissalPolicy: .immediate)
+            let isLiveContainer = await MainActor.run { RuntimeEnvironmentDetector.shared.isLiveContainer }
+            if !isLiveContainer {
+                for activity in Activity<LyricsActivityAttributes>.activities {
+                    await activity.end(nil, dismissalPolicy: .immediate)
+                }
             }
             let taskID = holder.id
             if taskID != .invalid {
