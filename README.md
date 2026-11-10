@@ -13,9 +13,9 @@
 > A dynamic lyrics application designed for iOS, supporting Apple Music tracking, Picture-in-Picture (PiP) floating window, and Dynamic Island Live Activities.
 > 
 > 🌐 **Website:** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
-> 📦 **Community Source (LiveContainer / SideStore / AltStore URLs):**  
->   - **Stable Source:** `https://ckieking.github.io/AuraLyrics/apps.json`  
->   - **Latest Build Source:** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
+> 📦 **Community Source (One-Click via AltDirect):**  
+>   - **Stable Version (AuraLyrics):** [Add Source](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
+>   - **Latest Build (AuraLyrics(latest build)):** [Add Source](https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
 
 ---
 
@@ -47,17 +47,12 @@
 
 ## Installation
 
-You can easily add the AuraLyrics source repository to your favorite sideloading app (LiveContainer, SideStore, AltStore, Feather, etc.) with one click via [AltDirect](https://altdirect.app/), or copy the direct source URLs below:
+You can easily add the AuraLyrics source repository to your favorite sideloading app (LiveContainer, SideStore, AltStore, Feather, etc.) with one click via [AltDirect](https://altdirect.app/):
 
-### 1. One-Click Add via AltDirect
 - **Stable Version (AuraLyrics):**
   [Add Stable Source via AltDirect](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
 - **Latest Build (AuraLyrics(latest build)):**
   [Add Latest Build Source via AltDirect](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
-
-### 2. Direct Source URLs
-- **Stable Source (AuraLyrics):** `https://ckieking.github.io/AuraLyrics/apps.json`
-- **Latest Build Source (AuraLyrics(latest build)):** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
 
 ---
 

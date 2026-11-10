@@ -13,9 +13,9 @@
 > 專為 iOS 設計的動態歌詞應用程式，支援 Apple Music 播放追蹤、子母畫面 (PiP) 懸浮視窗與動態島即時動態（Live Activity）。
 >
 > 🌐 **官方網站：** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
-> 📦 **社群軟體源（LiveContainer / SideStore / AltStore 訂閱網址）：**  
->   - **穩定版本 (Stable)：** `https://ckieking.github.io/AuraLyrics/apps.json`  
->   - **最新建置 (Latest Build)：** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
+> 📦 **社群軟體源（AltDirect 一鍵加入）：**  
+>   - **穩定版本 (AuraLyrics)：** [一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
+>   - **最新建置版 (AuraLyrics(latest build))：** [一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
 
 ---
 
@@ -47,17 +47,12 @@
 
 ## 安裝指南 (Installation)
 
-你可以透過 [AltDirect](https://altdirect.app/) 一鍵將 AuraLyrics 軟體源加入你使用的側載工具（LiveContainer、SideStore、AltStore、Feather 等），或直接複製下方訂閱網址：
+你可以透過 [AltDirect](https://altdirect.app/) 一鍵將 AuraLyrics 軟體源加入你使用的側載工具（LiveContainer、SideStore、AltStore、Feather 等）：
 
-### 1. 透過 AltDirect 一鍵加入軟體源
 - **穩定版本 (AuraLyrics)：**
-  [透過 AltDirect 加入穩定源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
+  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
 - **最新建置版 (AuraLyrics(latest build))：**
-  [透過 AltDirect 加入最新建置源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
-
-### 2. 手動複製軟體源網址
-- **穩定版本 (AuraLyrics)：** `https://ckieking.github.io/AuraLyrics/apps.json`
-- **最新建置版 (AuraLyrics(latest build))：** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
+  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
 
 ---
 
