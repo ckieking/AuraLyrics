@@ -187,7 +187,7 @@ jobs:
               --prerelease
           fi
 
-          # Update docs/apps-nightly.json with latest build info using environment variables
+          # Update dev manifests with latest build info using environment variables
           python3 - << 'EOF'
           import json
           import os
@@ -197,26 +197,29 @@ jobs:
           now = os.environ["NOW"]
           ipa_size = int(os.environ["IPA_SIZE"])
 
-          with open("docs/apps-nightly.json", "r", encoding="utf-8") as f:
-              data = json.load(f)
+          for manifest_path in ["docs/apps-dev.json", "docs/apps-nightly.json"]:
+              if not os.path.exists(manifest_path):
+                  continue
+              with open(manifest_path, "r", encoding="utf-8") as f:
+                  data = json.load(f)
 
-          if "apps" in data and len(data["apps"]) > 0:
-              app = data["apps"][0]
-              app["name"] = "AuraLyrics(latest build)"
-              app["version"] = f"0.10.0-dev.{build_num}"
-              app["versionDate"] = now
-              app["size"] = ipa_size
-              app["versionDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
-              if "versions" in app and len(app["versions"]) > 0:
-                  ver = app["versions"][0]
-                  ver["version"] = f"0.10.0-dev.{build_num}"
-                  ver["date"] = now
-                  ver["size"] = ipa_size
-                  ver["localizedDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
+              if "apps" in data and len(data["apps"]) > 0:
+                  app = data["apps"][0]
+                  app["name"] = "AuraLyrics(latest build)"
+                  app["version"] = f"0.10.0-dev.{build_num}"
+                  app["versionDate"] = now
+                  app["size"] = ipa_size
+                  app["versionDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
+                  if "versions" in app and len(app["versions"]) > 0:
+                      ver = app["versions"][0]
+                      ver["version"] = f"0.10.0-dev.{build_num}"
+                      ver["date"] = now
+                      ver["size"] = ipa_size
+                      ver["localizedDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
 
-          with open("docs/apps-nightly.json", "w", encoding="utf-8") as f:
-              json.dump(data, f, indent=2, ensure_ascii=False)
+              with open(manifest_path, "w", encoding="utf-8") as f:
+                  json.dump(data, f, indent=2, ensure_ascii=False)
           EOF
 
-          # Upload both latest IPA and updated apps-nightly.json to rolling release asset
-          gh release upload latest-build "ipa_output/AuraLyrics-latest.ipa" docs/apps-nightly.json --clobber
+          # Upload latest IPA and dev manifests to rolling release asset
+          gh release upload latest-build "ipa_output/AuraLyrics-latest.ipa" docs/apps-dev.json docs/apps-nightly.json --clobber

@@ -15,7 +15,7 @@
 > 🌐 **官方網站：** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
 > 📦 **社群軟體源（AltDirect 一鍵加入）：**  
 >   - **穩定版本 (AuraLyrics)：** [一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)  
->   - **最新建置版 (AuraLyrics(latest build))：** [一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
+>   - **最新建置版 (AuraLyrics(latest build))：** [一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---
 
@@ -52,7 +52,7 @@
 - **穩定版本 (AuraLyrics)：**
   [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
 - **最新建置版 (AuraLyrics(latest build))：**
-  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json)
+  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
 
 ---
 

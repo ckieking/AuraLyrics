@@ -1,0 +1,39 @@
+{
+  "name": "CKie 軟體源 (Dev)",
+  "identifier": "com.ckieking.source.dev",
+  "subtitle": "AuraLyrics 最新開發與建置版本",
+  "description": "官方 AltStore / SideStore 開發者源，隨主分支（main）自動持續更新最新建置版本。",
+  "iconURL": "https://ckieking.github.io/AuraLyrics/assets/icon.png",
+  "website": "https://ckieking.github.io/AuraLyrics/",
+  "apps": [
+    {
+      "name": "AuraLyrics(latest build)",
+      "bundleIdentifier": "com.auralyrics.app",
+      "developerName": "ckieking",
+      "subtitle": "最新建置版本 (Dev)",
+      "version": "0.10.0-latest",
+      "versionDate": "2026-11-10T00:00:00Z",
+      "versionDescription": "隨 GitHub main 分支自動建置之最新開發版本。",
+      "downloadURL": "https://github.com/ckieking/AuraLyrics/releases/download/latest-build/AuraLyrics-latest.ipa",
+      "localizedDescription": "專為 iOS 設計的動態歌詞應用程式（最新開發建置版），支援 Apple Music 播放追蹤、子母畫面 (PiP) 懸浮視窗與動態島即時動態（Live Activity）。",
+      "iconURL": "https://ckieking.github.io/AuraLyrics/assets/icon.png",
+      "tintColor": "FF9500",
+      "size": 1563772,
+      "minOSVersion": "16.1",
+      "screenshotURLs": [
+        "https://raw.githubusercontent.com/ckieking/AuraLyrics/main/AuraLyrics/Resources/AppIcon-Preview.png"
+      ],
+      "versions": [
+        {
+          "version": "0.10.0-latest",
+          "date": "2026-11-10T00:00:00Z",
+          "downloadURL": "https://github.com/ckieking/AuraLyrics/releases/download/latest-build/AuraLyrics-latest.ipa",
+          "localizedDescription": "隨 GitHub main 分支自動建置之最新開發版本。",
+          "size": 1563772,
+          "minOSVersion": "16.1"
+        }
+      ]
+    }
+  ],
+  "news": []
+}
