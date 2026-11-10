@@ -178,12 +178,12 @@ jobs:
 
           # Create or update rolling latest-build release
           if gh release view latest-build > /dev/null 2>&1; then
-            gh release edit latest-build --target "${{ github.sha }}" --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" --notes "自動滾動建置版本。Commit: ${{ github.sha }}"
+            gh release edit latest-build --target "${{ github.sha }}" --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" --notes "Automated rolling build. Commit: ${{ github.sha }}"
           else
             gh release create latest-build \
               --target "${{ github.sha }}" \
               --title "AuraLyrics (Latest Build #${BUILD_NUM}-${SHORT_SHA})" \
-              --notes "自動滾動建置版本。Commit: ${{ github.sha }}" \
+              --notes "Automated rolling build. Commit: ${{ github.sha }}" \
               --prerelease
           fi
 
@@ -209,16 +209,17 @@ jobs:
               if "apps" in data and len(data["apps"]) > 0:
                   app = data["apps"][0]
                   app["name"] = "AuraLyrics(latest build)"
+                  app["subtitle"] = "latest build"
                   app["version"] = f"0.10.0-dev.{build_num}"
                   app["versionDate"] = now
                   app["size"] = ipa_size
-                  app["versionDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
+                  app["versionDescription"] = f"Automated development build #{build_num} ({short_sha})"
                   if "versions" in app and len(app["versions"]) > 0:
                       ver = app["versions"][0]
                       ver["version"] = f"0.10.0-dev.{build_num}"
                       ver["date"] = now
                       ver["size"] = ipa_size
-                      ver["localizedDescription"] = f"自動建置版本 Build #{build_num} ({short_sha})"
+                      ver["localizedDescription"] = f"Automated development build #{build_num} ({short_sha})"
 
               with open(manifest_path, "w", encoding="utf-8") as f:
                   json.dump(data, f, indent=2, ensure_ascii=False)
