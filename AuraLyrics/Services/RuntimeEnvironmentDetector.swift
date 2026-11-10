@@ -172,7 +172,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         Self.lock.lock()
         defer { Self.lock.unlock() }
 
-        guard !Self.isBridgeInstalled else { return }
+        guard !Self.isBridgeInstalled && !isBridgeInstalled() else { return }
 
         // 1. Load BackgroundTasks framework dynamically.
         dlopen("/System/Library/Frameworks/BackgroundTasks.framework/BackgroundTasks", RTLD_LAZY)
@@ -258,9 +258,15 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
                let unmanaged = (userDefaultsClass as AnyObject).perform(sel),
                let hostBundle = unmanaged.takeUnretainedValue() as? Bundle {
                 let isLiveProcSel = NSSelectorFromString("isLiveProcess")
-                if userDefaultsClass.responds(to: isLiveProcSel),
-                   let isLiveProc = (userDefaultsClass as AnyObject).perform(isLiveProcSel)?.takeUnretainedValue() as? Bool,
-                   isLiveProc {
+                var isLiveProc = false
+                if let targetClass = NSClassFromString("NSUserDefaults"),
+                   let method = class_getClassMethod(targetClass, isLiveProcSel) {
+                    let imp = method_getImplementation(method)
+                    typealias IsLiveProcessIMP = @convention(c) (AnyObject, Selector) -> Bool
+                    let fn = unsafeBitCast(imp, to: IsLiveProcessIMP.self)
+                    isLiveProc = fn(targetClass as AnyObject, isLiveProcSel)
+                }
+                if isLiveProc {
                     let rootPath = (hostBundle.bundlePath as NSString).deletingLastPathComponent
                     let grandRootPath = (rootPath as NSString).deletingLastPathComponent
                     if let rootBundle = Bundle(path: grandRootPath), let id = rootBundle.bundleIdentifier, !id.isEmpty {
