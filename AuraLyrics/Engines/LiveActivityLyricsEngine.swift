@@ -324,11 +324,14 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     /// Handles launch callback from BGTaskScheduler for a continued processing task.
     private func handleContinuedProcessingTaskLaunch(_ task: BGContinuedProcessingTask) {
         task.expirationHandler = { [weak self] in
-            // Synchronously mark task completed as successful to prevent Task Failed system banner.
+            let wasCancelledByUser = task.progress.isCancelled
+            // Ensure completed unit count reaches total before marking success
+            // so SpringBoard sees 100% finished and avoids "Task Failed" fault banner.
+            task.progress.completedUnitCount = task.progress.totalUnitCount
             task.setTaskCompleted(success: true)
 
             Task { @MainActor [weak self] in
-                self?.handleContinuedTaskExpired(task)
+                self?.handleContinuedTaskExpired(task, wasCancelledByUser: wasCancelledByUser)
             }
         }
 
@@ -354,7 +357,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
     }
 
     /// Handles system task expiration by updating state and scheduling recovery.
-    private func handleContinuedTaskExpired(_ task: BGContinuedProcessingTask) {
+    private func handleContinuedTaskExpired(_ task: BGContinuedProcessingTask, wasCancelledByUser: Bool) {
         pauseHeartbeatTimer?.invalidate()
         pauseHeartbeatTimer = nil
 
@@ -363,8 +366,18 @@ public final class LiveActivityLyricsEngine: ObservableObject {
         }
         self.isSubmittingContinuedTask = false
         self.isActivityActive = false
-        self.isDismissedUntilNextTrigger = true
-        self.dismissedTrackKey = lastTrackKey
+
+        if wasCancelledByUser {
+            // User explicitly tapped the X button on Dynamic Island.
+            self.isDismissedUntilNextTrigger = true
+            self.dismissedTrackKey = lastTrackKey
+        } else {
+            // System timeout or rollover while in background: do not mark user-dismissed
+            // so next tick or track update can automatically renew the task.
+            self.isDismissedUntilNextTrigger = false
+            self.dismissedTrackKey = ""
+        }
+
         BackgroundKeepAliveManager.shared.refreshKeepAliveMode()
     }
 
@@ -682,6 +695,7 @@ public final class LiveActivityLyricsEngine: ObservableObject {
 
         // Tear down Channel B continued processing task.
         if let task = currentContinuedTask {
+            task.progress.completedUnitCount = task.progress.totalUnitCount
             task.setTaskCompleted(success: true)
             self.currentContinuedTask = nil
         }

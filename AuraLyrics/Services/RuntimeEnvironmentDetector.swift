@@ -101,7 +101,7 @@ public final class RuntimeEnvironmentDetector: ObservableObject {
 // MARK: - LiveContainer Background Task Runtime Bridge
 
 fileprivate typealias EncodeActivityIMP = @convention(c) (AnyObject, Selector, AnyObject) -> Void
-fileprivate typealias DecodeActivityIMP = @convention(c) (AnyObject, Selector, AnyObject) -> AnyObject
+fileprivate typealias DecodeActivityIMP = @convention(c) (AnyObject, Selector, AnyObject) -> AnyObject?
 fileprivate typealias CancelTaskIMP = @convention(c) (AnyObject, Selector, NSString) -> Void
 fileprivate typealias PermissibleIMP = @convention(c) (AnyObject, Selector, NSString) -> ObjCBool
 
@@ -109,7 +109,7 @@ private func bridgeHookEncodeActivity(activity: AnyObject, selector: Selector, c
     LCBackgroundTaskRuntimeBridge.handleEncodeActivity(activity: activity, selector: selector, coder: coder)
 }
 
-private func bridgeHookDecodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) -> AnyObject {
+private func bridgeHookDecodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) -> AnyObject? {
     LCBackgroundTaskRuntimeBridge.handleDecodeActivity(activity: activity, selector: selector, coder: coder)
 }
 
@@ -397,7 +397,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
         orig(activity, selector, coder)
     }
 
-    fileprivate static func handleDecodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) -> AnyObject {
+    fileprivate static func handleDecodeActivity(activity: AnyObject, selector: Selector, coder: AnyObject) -> AnyObject? {
         guard let orig = originalDecodeActivity else { return activity }
 
         if isXPCCoder(coder, className: "NSXPCDecoder"), let nsCoder = coder as? NSCoder {

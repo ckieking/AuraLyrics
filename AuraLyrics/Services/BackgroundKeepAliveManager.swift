@@ -91,13 +91,18 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
 
         isRefreshTaskRegistered = true
         BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.refreshTaskIdentifier, using: .main) { task in
+            var isCompleted = false
             task.expirationHandler = {
+                guard !isCompleted else { return }
+                isCompleted = true
                 task.setTaskCompleted(success: true)
             }
             Task { @MainActor in
                 // Refresh keep-alive and schedule next background task cycle.
                 BackgroundKeepAliveManager.shared.ensureRollingBackgroundTask()
                 BackgroundKeepAliveManager.shared.scheduleNextBackgroundTask()
+                guard !isCompleted else { return }
+                isCompleted = true
                 task.setTaskCompleted(success: true)
             }
         }
@@ -128,7 +133,11 @@ public final class BackgroundKeepAliveManager: NSObject, ObservableObject {
         if isLiveActivityActive {
             // Live Activity mode (ActivityKit or BGContinuedProcessingTask):
             // Stop dither audio player to avoid audio session collision, and rely on location keep-alive and rolling background assertions.
-            stopAudioPlayer()
+            if RuntimeEnvironmentDetector.shared.isLiveContainer {
+                startAudioPlayer()
+            } else {
+                stopAudioPlayer()
+            }
             startLocationKeepAlive()
             ensureRollingBackgroundTask()
             isRunning = true
