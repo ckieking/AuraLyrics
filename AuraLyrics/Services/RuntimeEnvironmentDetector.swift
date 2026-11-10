@@ -179,6 +179,7 @@ public final class LCBackgroundTaskRuntimeBridge: @unchecked Sendable {
     }
 
     /// Safely verifies whether BGTaskScheduler will accept the given identifier without throwing NSInternalInconsistencyException.
+    @MainActor
     public func canRegisterTask(withIdentifier identifier: String) -> Bool {
         if !RuntimeEnvironmentDetector.shared.isLiveContainer {
             if let declarations = Bundle.main.infoDictionary?["BGTaskSchedulerPermittedIdentifiers"] as? [String] {
