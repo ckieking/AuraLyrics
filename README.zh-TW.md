@@ -15,7 +15,7 @@
 > 🌐 **官方網站：** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
 > 📦 **社群軟體源（LiveContainer / SideStore / AltStore 訂閱網址）：**  
 >   - **穩定版本 (Stable)：** `https://ckieking.github.io/AuraLyrics/apps.json`  
->   - **最新建置 (Latest Build)：** `https://ckieking.github.io/AuraLyrics/apps-nightly.json`
+>   - **最新建置 (Latest Build)：** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
 
 ---
 

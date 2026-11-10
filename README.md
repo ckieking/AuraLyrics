@@ -15,7 +15,7 @@
 > 🌐 **Website:** [https://auralyrics.dpdns.org](https://auralyrics.dpdns.org)  
 > 📦 **Community Source (LiveContainer / SideStore / AltStore URLs):**  
 >   - **Stable Source:** `https://ckieking.github.io/AuraLyrics/apps.json`  
->   - **Latest Build Source:** `https://ckieking.github.io/AuraLyrics/apps-nightly.json`
+>   - **Latest Build Source:** `https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-nightly.json`
 
 ---
 
