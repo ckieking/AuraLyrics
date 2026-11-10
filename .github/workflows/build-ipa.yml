@@ -185,7 +185,7 @@ jobs:
 
           # Create or update rolling nightly release with clean title
           if gh release view nightly > /dev/null 2>&1; then
-            gh release edit nightly --title "AuraLyrics (Nightly Build)" --notes "Automated nightly build #${BUILD_NUM} (${SHORT_SHA})."
+            gh release edit nightly --target "${COMMIT_SHA}" --title "AuraLyrics (Nightly Build)" --notes "Automated nightly build #${BUILD_NUM} (${SHORT_SHA})."
           else
             gh release create nightly \
               --target "${COMMIT_SHA}" \

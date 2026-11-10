@@ -51,8 +51,8 @@ You can easily add the AuraLyrics source repository to your favorite sideloading
 
 - **Stable Version (AuraLyrics · latest release):**
   [Add Stable Source via AltDirect](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
-- **Latest Build (AuraLyrics(dev) · latest build):**
-  [Add Latest Build Source via AltDirect](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
+- **Nightly Build (AuraLyrics(nightly) · latest build):**
+  [Add Nightly Source via AltDirect](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/nightly/apps-nightly.json)
 
 ---
 

@@ -51,8 +51,8 @@
 
 - **穩定版本 (AuraLyrics · latest release)：**
   [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://ckieking.github.io/AuraLyrics/apps.json)
-- **最新建置版 (AuraLyrics(dev) · latest build)：**
-  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/latest-build/apps-dev.json)
+- **每晚建置版 (AuraLyrics(nightly) · latest build)：**
+  [透過 AltDirect 一鍵加入軟體源](https://altdirect.app/?url=https://github.com/ckieking/AuraLyrics/releases/download/nightly/apps-nightly.json)
 
 ---
 
