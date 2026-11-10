@@ -183,43 +183,32 @@ jobs:
             export IS_PR="true"
             export PR_NUM="$PR_NUMBER"
             export BRANCH_NAME="$PR_BRANCH"
-            export IPA_FILENAME="AuraLyrics-PR${PR_NUM}-build${BUILD_NUM}.ipa"
             export VERSION_STR="0.10.0-pr${PR_NUM}.${BUILD_NUM}"
             export DESC_STR="PR #${PR_NUM} (Build #${BUILD_NUM}-${SHORT_SHA}): ${BRANCH_NAME}"
           else
             export IS_PR="false"
             export PR_NUM=""
             export BRANCH_NAME="$REF_NAME"
-            export IPA_FILENAME="AuraLyrics-build${BUILD_NUM}.ipa"
             export VERSION_STR="0.10.0-dev.${BUILD_NUM}"
-            export DESC_STR="${BRANCH_NAME} (Build #${BUILD_NUM}-${SHORT_SHA})"
+            export DESC_STR="Main (Build #${BUILD_NUM}-${SHORT_SHA})"
           fi
 
           IPA_SRC=$(ls ipa_output/*.ipa | head -n 1)
-          cp "$IPA_SRC" "ipa_output/${IPA_FILENAME}"
-          if [ "$IS_PR" != "true" ]; then
-            cp "$IPA_SRC" "ipa_output/AuraLyrics-latest.ipa"
-          fi
-          export IPA_SIZE=$(stat -c%s "ipa_output/${IPA_FILENAME}" 2>/dev/null || stat -f%z "ipa_output/${IPA_FILENAME}")
+          cp "$IPA_SRC" "ipa_output/AuraLyrics-latest.ipa"
+          export IPA_SIZE=$(stat -c%s "ipa_output/AuraLyrics-latest.ipa" 2>/dev/null || stat -f%z "ipa_output/AuraLyrics-latest.ipa")
 
-          # Create or update rolling latest-build release
+          # Create or update rolling latest-build release with clean title
           if gh release view latest-build > /dev/null 2>&1; then
-            if [ "$IS_PR" != "true" ]; then
-              gh release edit latest-build --title "AuraLyrics (Rolling Build #${BUILD_NUM}-${SHORT_SHA})" --notes "Automated rolling build. Commit: ${COMMIT_SHA}"
-            fi
+            gh release edit latest-build --title "AuraLyrics (Latest Build)" --notes "Automated build #${BUILD_NUM} (${SHORT_SHA}) from ${BRANCH_NAME}."
           else
             gh release create latest-build \
               --target "${COMMIT_SHA}" \
-              --title "AuraLyrics (Rolling Build #${BUILD_NUM}-${SHORT_SHA})" \
-              --notes "Automated rolling build. Commit: ${COMMIT_SHA}" \
+              --title "AuraLyrics (Latest Build)" \
+              --notes "Automated build #${BUILD_NUM} (${SHORT_SHA}) from ${BRANCH_NAME}." \
               --prerelease
           fi
 
-          # Attempt to download existing apps-dev.json (or fallback apps-nightly.json) to preserve build history
-          gh release download latest-build -p "apps-dev.json" -O downloaded-apps-dev.json 2>/dev/null || \
-          gh release download latest-build -p "apps-nightly.json" -O downloaded-apps-dev.json 2>/dev/null || true
-
-          # Update dev manifests with multi-version build history
+          # Update dev manifests to maintain only the single latest build
           python3 - << 'EOF'
           import json
           import os
@@ -228,27 +217,13 @@ jobs:
           short_sha = os.environ["SHORT_SHA"]
           now = os.environ["NOW"]
           ipa_size = int(os.environ.get("IPA_SIZE") or 0)
-          ipa_filename = os.environ["IPA_FILENAME"]
           version_str = os.environ["VERSION_STR"]
           desc_str = os.environ["DESC_STR"]
-          is_pr = os.environ.get("IS_PR") == "true"
           repo = os.environ.get("GITHUB_REPOSITORY", "ckieking/AuraLyrics")
 
-          old_app = {}
-          history_versions = []
-          if os.path.exists("downloaded-apps-dev.json"):
-              try:
-                  with open("downloaded-apps-dev.json", "r", encoding="utf-8") as f:
-                      old_data = json.load(f)
-                      if "apps" in old_data and len(old_data["apps"]) > 0:
-                          old_app = old_data["apps"][0]
-                          history_versions = old_app.get("versions", [])
-              except Exception as e:
-                  print("Could not read previous version history:", e)
+          download_url = f"https://github.com/{repo}/releases/download/latest-build/AuraLyrics-latest.ipa"
 
-          download_url = f"https://github.com/{repo}/releases/download/latest-build/{ipa_filename}"
-
-          new_entry = {
+          single_version_entry = {
               "version": version_str,
               "date": now,
               "downloadURL": download_url,
@@ -256,10 +231,6 @@ jobs:
               "size": ipa_size,
               "minOSVersion": "16.1"
           }
-
-          filtered_history = [v for v in history_versions if v.get("version") != version_str]
-          updated_versions = [new_entry] + filtered_history
-          updated_versions = updated_versions[:10]
 
           for manifest_path in ["docs/apps-dev.json", "docs/apps-nightly.json"]:
               if not os.path.exists(manifest_path):
@@ -274,27 +245,16 @@ jobs:
                   app = data["apps"][0]
                   app["name"] = "AuraLyrics(latest build)"
                   app["subtitle"] = "latest build"
-                  # Only update top-level latest release metadata if building from main/workflow_dispatch, to prevent PRs from overriding default updates
-                  if not is_pr:
-                      app["version"] = version_str
-                      app["versionDate"] = now
-                      app["size"] = ipa_size
-                      app["downloadURL"] = download_url
-                      app["versionDescription"] = desc_str
-                  elif old_app:
-                      # If building a PR, retain previous main release metadata at the root level to avoid SemVer inversion
-                      for key in ["version", "versionDate", "size", "downloadURL", "versionDescription"]:
-                          if key in old_app:
-                              app[key] = old_app[key]
-                  app["versions"] = updated_versions
+                  app["version"] = version_str
+                  app["versionDate"] = now
+                  app["size"] = ipa_size
+                  app["downloadURL"] = download_url
+                  app["versionDescription"] = desc_str
+                  app["versions"] = [single_version_entry]
 
               with open(manifest_path, "w", encoding="utf-8") as f:
                   json.dump(data, f, indent=2, ensure_ascii=False)
           EOF
 
-          # Upload new IPA and updated manifests to release
-          if [ "$IS_PR" = "true" ]; then
-            gh release upload latest-build "ipa_output/${IPA_FILENAME}" docs/apps-dev.json docs/apps-nightly.json --clobber
-          else
-            gh release upload latest-build "ipa_output/${IPA_FILENAME}" "ipa_output/AuraLyrics-latest.ipa" docs/apps-dev.json docs/apps-nightly.json --clobber
-          fi
+          # Upload single latest IPA and updated manifests to release
+          gh release upload latest-build "ipa_output/AuraLyrics-latest.ipa" docs/apps-dev.json docs/apps-nightly.json --clobber
