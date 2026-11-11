@@ -2,7 +2,7 @@
   "name": "AuraLyrics(nightly)",
   "identifier": "com.ckieking.source.nightly",
   "subtitle": "latest build",
-  "description": "Official AltStore / SideStore nightly source, automatically built every night from the main branch.",
+  "description": "Official AltStore / SideStore nightly source, automatically updated on commits to the main branch.",
   "iconURL": "https://ckieking.github.io/AuraLyrics/assets/icon.png",
   "website": "https://ckieking.github.io/AuraLyrics/",
   "apps": [
