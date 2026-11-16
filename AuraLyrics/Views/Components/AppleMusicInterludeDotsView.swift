@@ -5,13 +5,15 @@ public struct AppleMusicInterludeDotsView: View {
     let startMs: Int
     let endMs: Int
     let currentPlaybackTimeMs: Int
+    let isIntro: Bool
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(startMs: Int, endMs: Int, currentPlaybackTimeMs: Int) {
+    public init(startMs: Int, endMs: Int, currentPlaybackTimeMs: Int, isIntro: Bool = false) {
         self.startMs = startMs
         self.endMs = endMs
         self.currentPlaybackTimeMs = currentPlaybackTimeMs
+        self.isIntro = isIntro
     }
 
     private var overallProgress: Double {
@@ -36,8 +38,9 @@ public struct AppleMusicInterludeDotsView: View {
         .padding(.vertical, 8)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(String(localized: "間奏拍點指示器"))
-        .accessibilityHint(String(localized: "點擊跳回此段間奏起點"))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(isIntro ? String(localized: "前奏拍點指示器") : String(localized: "間奏拍點指示器"))
+        .accessibilityHint(isIntro ? String(localized: "點擊跳回前奏起點") : String(localized: "點擊跳回此段間奏起點"))
         .transaction { $0.animation = nil }
     }
 

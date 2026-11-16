@@ -114,7 +114,7 @@ public final class LRCParser: Sendable {
 
         let markerKeywords: Set<String> = [
             "間奏", "间奏", "間奏中", "间奏中",
-            "music", "instrumental", "interlude", "inst", "break"
+            "music", "instrumental", "interlude", "inst"
         ]
         return markerKeywords.contains(stripped)
     }

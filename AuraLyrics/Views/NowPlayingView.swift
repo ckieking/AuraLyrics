@@ -448,6 +448,13 @@ struct NowPlayingView: View {
             }
             .onChange(of: monitor.activeInterlude) { _, newInterlude in
                 guard enableInterludeDots, let interlude = newInterlude, !tracker.isUserScrolling else { return }
+                let isVisible: Bool = {
+                    if let after = interlude.afterLineIndex {
+                        return tracker.visibleIndices.contains(after) || isCurrentLineInViewport
+                    }
+                    return tracker.visibleIndices.contains(0) || isCurrentLineInViewport
+                }()
+                guard isVisible else { return }
                 let targetID = interludeScrollID(for: interlude)
                 if reduceMotion {
                     proxy.scrollTo(targetID, anchor: .center)
@@ -506,7 +513,8 @@ struct NowPlayingView: View {
                 AppleMusicInterludeDotsView(
                     startMs: interlude.startMs,
                     endMs: interlude.endMs,
-                    currentPlaybackTimeMs: monitor.interpolatedPlaybackTimeMs()
+                    currentPlaybackTimeMs: monitor.interpolatedPlaybackTimeMs() + monitor.currentLyrics.offsetMs,
+                    isIntro: interlude.afterLineIndex == nil
                 )
             }
             Spacer()
