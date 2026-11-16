@@ -92,8 +92,50 @@ public final class LRCParser: Sendable {
             }
         }
 
-        // Sort lines chronologically.
-        return lines.sorted { $0.timeMs < $1.timeMs }
+        // Sort lines chronologically and convert blank/marker lines into explicit end times.
+        return consolidateInterludeMarkers(lines)
+    }
+
+    /// Identifies blank lines or common instrumental/interlude marker lines.
+    public func isInterludeMarkerLine(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return true
+        }
+
+        // Strip common decorative wrappers such as brackets, tildes, and spaces.
+        let stripped = trimmed
+            .trimmingCharacters(in: CharacterSet(charactersIn: "()[]{}（）【】「」~～-—•*·.…⋯♪♫♩♬ \t"))
+            .lowercased()
+
+        if stripped.isEmpty {
+            return true
+        }
+
+        let markerKeywords: Set<String> = [
+            "間奏", "间奏", "間奏中", "间奏中",
+            "music", "instrumental", "interlude", "inst", "break"
+        ]
+        return markerKeywords.contains(stripped)
+    }
+
+    /// Sorts lines chronologically and absorbs interlude marker lines into the preceding line's explicit end timestamp.
+    public func consolidateInterludeMarkers(_ lines: [LyricLine]) -> [LyricLine] {
+        let sorted = lines.sorted { $0.timeMs < $1.timeMs }
+        var result: [LyricLine] = []
+        result.reserveCapacity(sorted.count)
+
+        for line in sorted {
+            if isInterludeMarkerLine(line.text) {
+                if !result.isEmpty && result[result.count - 1].explicitEndTimeMs == nil {
+                    result[result.count - 1].explicitEndTimeMs = max(result[result.count - 1].timeMs, line.timeMs)
+                }
+                continue
+            }
+            result.append(line)
+        }
+
+        return result
     }
 
     /// Parses inline syllable timestamp tags (<mm:ss.xx>syllable) from a lyric line.
@@ -195,7 +237,8 @@ public final class LRCParser: Sendable {
                 timeMs: orig.timeMs,
                 text: orig.text,
                 translation: translatedText,
-                syllables: orig.syllables
+                syllables: orig.syllables,
+                explicitEndTimeMs: orig.explicitEndTimeMs
             ))
         }
 
@@ -279,7 +322,7 @@ public final class LRCParser: Sendable {
             }
         }
 
-        return lines.sorted { $0.timeMs < $1.timeMs }
+        return consolidateInterludeMarkers(lines)
     }
 
     // MARK: - KRC Parser
@@ -354,7 +397,7 @@ public final class LRCParser: Sendable {
             }
         }
 
-        return lines.sorted { $0.timeMs < $1.timeMs }
+        return consolidateInterludeMarkers(lines)
     }
 
     // MARK: - Song Credits Extraction
@@ -538,7 +581,7 @@ public final class LRCParser: Sendable {
             ))
         }
 
-        return result.sorted { $0.timeMs < $1.timeMs }
+        return consolidateInterludeMarkers(result)
     }
 
     // MARK: - Musixmatch Subtitles Parser
@@ -570,7 +613,7 @@ public final class LRCParser: Sendable {
                     ))
                 }
                 if !lines.isEmpty {
-                    return lines.sorted { $0.timeMs < $1.timeMs }
+                    return consolidateInterludeMarkers(lines)
                 }
             }
         }
@@ -590,7 +633,7 @@ public final class LRCParser: Sendable {
         parser.delegate = delegate
         guard parser.parse(), !delegate.lines.isEmpty else { return [] }
 
-        return delegate.lines.sorted { $0.timeMs < $1.timeMs }
+        return consolidateInterludeMarkers(delegate.lines)
     }
 
     // MARK: - PetitLyrics LSY (Line-Sync Binary XOR) Parser
@@ -658,7 +701,7 @@ public final class LRCParser: Sendable {
             ))
         }
 
-        return lines.sorted { $0.timeMs < $1.timeMs }
+        return consolidateInterludeMarkers(lines)
     }
 }
 

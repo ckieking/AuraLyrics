@@ -21,6 +21,7 @@ struct NowPlayingView: View {
     @AppStorage("showBilingualLyrics") private var showTranslation = true
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
+    @AppStorage("enableInterludeDots") private var enableInterludeDots = true
 
     /// Translation framework session configuration trigger.
     @State private var translationConfig: TranslationSession.Configuration? = nil
@@ -298,8 +299,13 @@ struct NowPlayingView: View {
                     .padding(.vertical, 100)
                 } else {
                     LazyVStack(spacing: 26) {
+                        if enableInterludeDots, let interlude = monitor.activeInterlude, interlude.afterLineIndex == nil {
+                            interludeRowView(for: interlude)
+                        }
+
                         ForEach(Array(monitor.currentLyrics.lines.enumerated()), id: \.element.id) { index, line in
-                            let isCurrent = (index == monitor.currentLineIndex)
+                            let isInterludeActive = enableInterludeDots && (monitor.activeInterlude != nil)
+                            let isCurrent = !isInterludeActive && (index == monitor.currentLineIndex)
                             let rowOpacity = lyricOpacity(for: index)
                             let rowBlur = defocusBlurRadius(for: index)
 
@@ -368,6 +374,10 @@ struct NowPlayingView: View {
                             .accessibilityHint(isCurrent ? String(localized: "目前唱到的歌詞") : String(localized: "點擊跳轉至此句"))
                             .blur(radius: isCurrent ? 0 : rowBlur)
                             .animation(reduceMotion || isUserScrolling ? nil : .easeInOut(duration: 0.35), value: rowOpacity)
+
+                            if enableInterludeDots, let interlude = monitor.activeInterlude, interlude.afterLineIndex == index {
+                                interludeRowView(for: interlude)
+                            }
                         }
 
                         // MARK: - Song Credits
@@ -392,6 +402,7 @@ struct NowPlayingView: View {
                     }
                     .padding(.top, 60)
                     .padding(.bottom, 72)
+                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.30), value: monitor.activeInterlude)
                 }
             }
             .onScrollPhaseChange { oldPhase, newPhase in
@@ -422,6 +433,7 @@ struct NowPlayingView: View {
             // Auto-scrolls to current playing line when visible in viewport
             .onChange(of: monitor.currentLineIndex) { _, newIndex in
                 checkCurrentLineVisibility()
+                guard monitor.activeInterlude == nil || !enableInterludeDots else { return }
                 guard let index = newIndex else { return }
                 let isVisible = tracker.visibleIndices.contains(index) || index <= 1
                 if isVisible && !tracker.isUserScrolling {
@@ -431,6 +443,17 @@ struct NowPlayingView: View {
                         withAnimation(.easeInOut(duration: 0.35)) {
                             proxy.scrollTo(index, anchor: .center)
                         }
+                    }
+                }
+            }
+            .onChange(of: monitor.activeInterlude) { _, newInterlude in
+                guard enableInterludeDots, let interlude = newInterlude, !tracker.isUserScrolling else { return }
+                let targetID = interludeScrollID(for: interlude)
+                if reduceMotion {
+                    proxy.scrollTo(targetID, anchor: .center)
+                } else {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        proxy.scrollTo(targetID, anchor: .center)
                     }
                 }
             }
@@ -470,6 +493,43 @@ struct NowPlayingView: View {
         }
     }
 
+    private func interludeScrollID(for interlude: InterludeWindow) -> String {
+        if let after = interlude.afterLineIndex {
+            return "Interlude_\(after)"
+        }
+        return "Interlude_Intro"
+    }
+
+    private func interludeRowView(for interlude: InterludeWindow) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: !monitor.isPlaying || scenePhase != .active)) { _ in
+                AppleMusicInterludeDotsView(
+                    startMs: interlude.startMs,
+                    endMs: interlude.endMs,
+                    currentPlaybackTimeMs: monitor.interpolatedPlaybackTimeMs()
+                )
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .id(interludeScrollID(for: interlude))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            tracker.scrollIdleTask?.cancel()
+            tracker.scrollIdleTask = nil
+            tracker.isUserScrolling = false
+            isCurrentLineInViewport = true
+            if isUserScrolling {
+                withAnimation(.easeInOut(duration: 0.35)) {
+                    isUserScrolling = false
+                }
+            }
+            monitor.seek(toMs: interlude.startMs)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .leading)))
+    }
+
     /// Calculates defocus blur radius based on distance from current focused line.
     private func defocusBlurRadius(for index: Int) -> CGFloat {
         guard enableLyricDefocusBlur, !reduceTransparency, !isUserScrolling, isCurrentLineInViewport, scenePhase == .active else {
@@ -478,7 +538,8 @@ struct NowPlayingView: View {
         guard let current = monitor.currentLineIndex else {
             return 0.0
         }
-        let distance = abs(index - current)
+        let isInterludeActive = enableInterludeDots && (monitor.activeInterlude != nil)
+        let distance = isInterludeActive ? max(1, abs(index - current)) : abs(index - current)
         switch distance {
         case 0:
             return 0.0  // Current active line remains sharp
@@ -493,10 +554,11 @@ struct NowPlayingView: View {
 
     /// Calculates opacity based on distance from current focused line.
     private func lyricOpacity(for index: Int) -> Double {
+        let isInterludeActive = enableInterludeDots && (monitor.activeInterlude != nil)
         guard let current = monitor.currentLineIndex else {
             return reduceTransparency ? 0.70 : 0.40
         }
-        let distance = abs(index - current)
+        let distance = isInterludeActive ? max(1, abs(index - current)) : abs(index - current)
         if distance == 0 {
             return 1.0
         }
@@ -522,10 +584,11 @@ struct NowPlayingView: View {
 
     /// Calculates translation text opacity based on distance from current line.
     private func translationOpacity(for index: Int) -> Double {
+        let isInterludeActive = enableInterludeDots && (monitor.activeInterlude != nil)
         guard let current = monitor.currentLineIndex else {
             return reduceTransparency ? 0.75 : 0.45
         }
-        let distance = abs(index - current)
+        let distance = isInterludeActive ? max(1, abs(index - current)) : abs(index - current)
         if distance == 0 {
             return 1.0
         }

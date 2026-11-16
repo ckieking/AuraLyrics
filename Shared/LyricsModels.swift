@@ -89,19 +89,96 @@ public struct LyricLine: Identifiable, Codable, Equatable, Sendable {
     public var translation: String?
     /// Word or syllable timing data when available.
     public var syllables: [LyricSyllable]?
+    /// Explicit line end timestamp in milliseconds, derived from trailing blank/marker lines.
+    public var explicitEndTimeMs: Int?
 
     public init(
         id: UUID = UUID(),
         timeMs: Int,
         text: String,
         translation: String? = nil,
-        syllables: [LyricSyllable]? = nil
+        syllables: [LyricSyllable]? = nil,
+        explicitEndTimeMs: Int? = nil
     ) {
         self.id = id
         self.timeMs = timeMs
         self.text = text
         self.translation = translation
         self.syllables = syllables
+        self.explicitEndTimeMs = explicitEndTimeMs
+    }
+
+    /// Indicates whether the line has explicit end-time information from syllables or marker lines.
+    public var hasExplicitEndTiming: Bool {
+        if let syllables = syllables, !syllables.isEmpty {
+            return true
+        }
+        return explicitEndTimeMs != nil
+    }
+
+    /// Exact or estimated end timestamp in milliseconds for interlude detection.
+    public var estimatedEndTimeMs: Int {
+        if let syllables = syllables, let last = syllables.last {
+            return max(timeMs, last.timeMs + max(50, last.durationMs))
+        }
+        if let explicitEndTimeMs = explicitEndTimeMs {
+            return max(timeMs, explicitEndTimeMs)
+        }
+        return timeMs + Self.estimateSingingDurationMs(for: text)
+    }
+
+    /// Estimates singing duration (clamped to 1,500ms–5,000ms) from CJK character and word counts.
+    private static func estimateSingingDurationMs(for text: String) -> Int {
+        var cjkCount = 0
+        var nonCJKWordCount = 0
+        var inNonCJKWord = false
+
+        for scalar in text.unicodeScalars {
+            let v = scalar.value
+            let isCJK = (0x4E00...0x9FFF).contains(v)
+                || (0x3400...0x4DBF).contains(v)
+                || (0x3040...0x309F).contains(v)
+                || (0x30A0...0x30FF).contains(v)
+                || (0xAC00...0xD7AF).contains(v)
+
+            if isCJK {
+                cjkCount += 1
+                if inNonCJKWord {
+                    inNonCJKWord = false
+                }
+            } else if CharacterSet.whitespacesAndNewlines.contains(scalar) || CharacterSet.punctuationCharacters.contains(scalar) {
+                if inNonCJKWord {
+                    inNonCJKWord = false
+                }
+            } else {
+                if !inNonCJKWord {
+                    nonCJKWordCount += 1
+                    inNonCJKWord = true
+                }
+            }
+        }
+
+        let rawDuration = cjkCount * 280 + nonCJKWordCount * 250
+        return min(5000, max(1500, rawDuration))
+    }
+}
+
+/// Active intro or interlude window for rhythm indicator rendering.
+public struct InterludeWindow: Equatable, Sendable {
+    /// Preceding lyric line index, or nil during the track intro.
+    public let afterLineIndex: Int?
+    /// Index of the upcoming lyric line following the interlude.
+    public let nextLineIndex: Int
+    /// Interlude start timestamp in milliseconds (0 for intro).
+    public let startMs: Int
+    /// Interlude end timestamp in milliseconds (start of nextLineIndex).
+    public let endMs: Int
+
+    public init(afterLineIndex: Int?, nextLineIndex: Int, startMs: Int, endMs: Int) {
+        self.afterLineIndex = afterLineIndex
+        self.nextLineIndex = nextLineIndex
+        self.startMs = startMs
+        self.endMs = endMs
     }
 }
 
@@ -218,6 +295,60 @@ public struct SyncedLyrics: Identifiable, Codable, Equatable, Sendable {
             }
         }
         return resultIndex
+    }
+
+    /// Returns the active intro or interlude window at the given playback timestamp, or nil when singing.
+    public func activeInterlude(at currentPlaybackTimeMs: Int, globalOffsetMs: Int = 0) -> InterludeWindow? {
+        guard !lines.isEmpty else { return nil }
+        let adjustedTime = currentPlaybackTimeMs + globalOffsetMs + offsetMs
+        let minimumInterludeGapMs = 5000
+        let minimumPlainLrcStartGapMs = 8000
+
+        // Intro window before the first lyric line.
+        if adjustedTime < lines[0].timeMs {
+            guard adjustedTime >= 0, lines[0].timeMs >= minimumInterludeGapMs else {
+                return nil
+            }
+            return InterludeWindow(
+                afterLineIndex: nil,
+                nextLineIndex: 0,
+                startMs: 0,
+                endMs: lines[0].timeMs
+            )
+        }
+
+        guard let currentIndex = currentLineIndex(at: currentPlaybackTimeMs, globalOffsetMs: globalOffsetMs),
+              currentIndex + 1 < lines.count else {
+            // No interlude indicator after the final lyric line (outro).
+            return nil
+        }
+
+        let currentLine = lines[currentIndex]
+        let nextLine = lines[currentIndex + 1]
+        let lineEndMs = min(nextLine.timeMs, currentLine.estimatedEndTimeMs)
+        let remainingGapMs = nextLine.timeMs - lineEndMs
+
+        guard remainingGapMs >= minimumInterludeGapMs else {
+            return nil
+        }
+
+        if !currentLine.hasExplicitEndTiming {
+            let startToStartGapMs = nextLine.timeMs - currentLine.timeMs
+            guard startToStartGapMs >= minimumPlainLrcStartGapMs else {
+                return nil
+            }
+        }
+
+        guard adjustedTime >= lineEndMs && adjustedTime < nextLine.timeMs else {
+            return nil
+        }
+
+        return InterludeWindow(
+            afterLineIndex: currentIndex,
+            nextLineIndex: currentIndex + 1,
+            startMs: lineEndMs,
+            endMs: nextLine.timeMs
+        )
     }
 }
 
