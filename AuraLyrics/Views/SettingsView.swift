@@ -16,6 +16,7 @@ struct SettingsView: View {
     @AppStorage("showBilingualLyrics") private var showTranslation = true
     @AppStorage("enableLyricDefocusBlur") private var enableLyricDefocusBlur = true
     @AppStorage("inactiveLyricOpacity") private var inactiveLyricOpacity = 0.10
+    @AppStorage("enableInterludeDots") private var enableInterludeDots = true
 
     var body: some View {
         NavigationStack {
@@ -101,6 +102,10 @@ struct SettingsView: View {
 
                 // MARK: - Visual Effects
                 Section {
+                    Toggle("前奏與間奏拍點指示器", isOn: $enableInterludeDots)
+                        .onChange(of: enableInterludeDots) { _, _ in
+                            musicMonitor.refreshInterludeState()
+                        }
                     Toggle("非焦點歌詞模糊效果", isOn: $enableLyricDefocusBlur)
                     InactiveLyricOpacitySlider(
                         opacity: $inactiveLyricOpacity,

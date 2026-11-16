@@ -11,6 +11,7 @@ public final class AppleMusicMonitor: ObservableObject {
     @Published public private(set) var currentTrack: TrackInfo = .placeholder
     @Published public private(set) var currentLyrics: SyncedLyrics = .empty
     @Published public var currentLineIndex: Int? = nil
+    @Published public private(set) var activeInterlude: InterludeWindow? = nil
     @Published public private(set) var isPlaying: Bool = false
     public private(set) var playbackProgress: Double = 0.0
     public private(set) var currentPlaybackTimeSec: TimeInterval = 0.0
@@ -158,6 +159,7 @@ public final class AppleMusicMonitor: ObservableObject {
             currentTrack = .placeholder
             currentLyrics = .empty
             currentLineIndex = nil
+            activeInterlude = nil
             playbackProgress = 0.0
             anchorPlaybackTimeSec = 0
             anchorMediaTime = 0
@@ -202,6 +204,7 @@ public final class AppleMusicMonitor: ObservableObject {
         currentTrack = newTrack
         currentLyrics = .empty
         currentLineIndex = nil
+        activeInterlude = nil
         playbackProgress = 0.0
 
         // Reset playback position if initial reading exceeds threshold on track change.
@@ -379,14 +382,23 @@ public final class AppleMusicMonitor: ObservableObject {
         refreshCurrentLineIndex()
     }
 
-    /// Computes active lyric line index from interpolated clock and dispatches updates.
+    private var isInterludeDotsEnabled: Bool {
+        UserDefaults.standard.object(forKey: "enableInterludeDots") as? Bool ?? true
+    }
+
+    /// Computes active lyric line index and interlude window from interpolated clock and dispatches updates.
     private func refreshCurrentLineIndex(forceSync: Bool = false) {
         let accurateTimeMs = interpolatedPlaybackTimeMs()
         let newIndex = currentLyrics.currentLineIndex(at: accurateTimeMs, globalOffsetMs: 0)
+        let newInterlude = isInterludeDotsEnabled
+            ? currentLyrics.activeInterlude(at: accurateTimeMs, globalOffsetMs: 0)
+            : nil
 
-        // Calculate interval to next line for Live Activity staleDate determination.
+        // Calculate interval to next state transition for Live Activity staleDate determination.
         var nextLineIntervalSec: TimeInterval? = nil
-        if let idx = newIndex, idx + 1 < currentLyrics.lines.count {
+        if let interlude = newInterlude {
+            nextLineIntervalSec = max(0.5, Double(interlude.endMs - accurateTimeMs) / 1000.0)
+        } else if let idx = newIndex, idx + 1 < currentLyrics.lines.count {
             let nextStartMs = currentLyrics.lines[idx + 1].timeMs
             nextLineIntervalSec = max(0.5, Double(nextStartMs - accurateTimeMs) / 1000.0)
         }
@@ -396,8 +408,9 @@ public final class AppleMusicMonitor: ObservableObject {
             return
         }
 
-        if newIndex != currentLineIndex {
+        if newIndex != currentLineIndex || newInterlude != activeInterlude {
             currentLineIndex = newIndex
+            activeInterlude = newInterlude
             lastHeartbeatTimestamp = CACurrentMediaTime()
             syncExternalEngines(nextLineIntervalSec: nextLineIntervalSec)
         } else if forceSync {
@@ -416,6 +429,26 @@ public final class AppleMusicMonitor: ObservableObject {
     /// Dispatches current playback and lyric state to display engines.
     public func syncExternalEngines(nextLineIntervalSec: TimeInterval? = nil) {
         let showTranslation = UserDefaults.standard.object(forKey: "showBilingualLyrics") as? Bool ?? true
+
+        if isInterludeDotsEnabled,
+           let interlude = activeInterlude,
+           currentLyrics.lines.indices.contains(interlude.nextLineIndex) {
+            let upcomingText = currentLyrics.lines[interlude.nextLineIndex].text
+            PiPLyricsEngine.shared.updateLyrics(
+                line: "• • •",
+                secondaryLine: upcomingText,
+                progress: playbackProgress
+            )
+            LiveActivityLyricsEngine.shared.updateLyrics(
+                line: "• • •",
+                secondaryLine: upcomingText,
+                track: currentTrack,
+                isPlaying: isPlaying,
+                progress: playbackProgress,
+                nextLineIntervalSec: nextLineIntervalSec
+            )
+            return
+        }
 
         if let index = currentLineIndex, currentLyrics.lines.indices.contains(index) {
             let current = currentLyrics.lines[index]
@@ -494,6 +527,11 @@ public final class AppleMusicMonitor: ObservableObject {
 
     public func resetGlobalOffset() {
         globalOffsetMs = 0
+        refreshCurrentLineIndex(forceSync: true)
+    }
+
+    // MARK: - Refresh Interlude State
+    public func refreshInterludeState() {
         refreshCurrentLineIndex(forceSync: true)
     }
 

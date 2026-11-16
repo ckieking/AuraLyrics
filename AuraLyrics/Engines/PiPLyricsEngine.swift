@@ -196,7 +196,12 @@ public final class PiPLyricsEngine: NSObject, ObservableObject {
         let monitor = AppleMusicMonitor.shared
         let showTranslation = UserDefaults.standard.object(forKey: "showBilingualLyrics") as? Bool ?? true
 
-        if let index = monitor.currentLineIndex, monitor.currentLyrics.lines.indices.contains(index) {
+        if let interlude = monitor.activeInterlude,
+           (UserDefaults.standard.object(forKey: "enableInterludeDots") as? Bool ?? true),
+           monitor.currentLyrics.lines.indices.contains(interlude.nextLineIndex) {
+            let upcomingText = monitor.currentLyrics.lines[interlude.nextLineIndex].text
+            updateLyrics(line: "• • •", secondaryLine: upcomingText, progress: monitor.playbackProgress)
+        } else if let index = monitor.currentLineIndex, monitor.currentLyrics.lines.indices.contains(index) {
             let current = monitor.currentLyrics.lines[index]
             let nextLineText = (index + 1 < monitor.currentLyrics.lines.count) ? monitor.currentLyrics.lines[index + 1].text : nil
             let secondary = (showTranslation && current.translation?.isEmpty == false) ? current.translation : nextLineText
